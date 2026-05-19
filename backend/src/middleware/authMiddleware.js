@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { supabaseAdmin } from '../config/supabase.js'
+import * as profileModel from '../models/profileModel.js'
 
 /**
  * Middleware xác thực — Verify Bearer token và gắn user info vào request.
@@ -22,7 +23,6 @@ export async function authMiddleware(req, res, next) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    console.log('[authMiddleware] Received token:', token ? `${token.substring(0, 30)}... (length: ${token.length})` : 'empty')
 
     // Bước 2: Verify token với Supabase
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
@@ -71,5 +71,35 @@ export function requireRank(minRank) {
       })
     }
     next()
+  }
+}
+
+/**
+ * Middleware kiểm tra permission hoặc rank tối thiểu.
+ * Cho phép truy cập nếu user có rank >= minRank HOẶC có permissionCode.
+ */
+export function requirePermissionOrRank(permissionCode, minRank = 100) {
+  return async (req, res, next) => {
+    if (!req.profile) {
+      return res.status(403).json({ error: 'Không tìm thấy hồ sơ người dùng.' })
+    }
+    
+    try {
+      // Lấy quyền cụ thể của user
+      const permissions = await profileModel.findPermissionsByUserId(req.profile.id, req.profile.role)
+      req.permissions = permissions // Gắn vào request để controller dùng
+      
+      // Nếu đạt yêu cầu về Rank HOẶC có quyền -> Cho qua
+      if (req.profile.rank >= minRank || permissions.includes(permissionCode)) {
+        return next()
+      }
+      
+      return res.status(403).json({
+        error: `Bạn không có quyền thực hiện chức năng này. Yêu cầu quyền: ${permissionCode}`
+      })
+    } catch (err) {
+      console.error('[requirePermissionOrRank]', err.message)
+      return res.status(500).json({ error: 'Lỗi khi kiểm tra quyền truy cập.' })
+    }
   }
 }

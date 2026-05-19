@@ -1,15 +1,12 @@
 // ============================================================================
 // routes/classRoutes.js — Route definitions cho Class management
-// Trách nhiệm DUY NHẤT: Ánh xạ URL → Controller handler.
 // ============================================================================
 
 import { Router } from 'express'
-import { authMiddleware } from '../middleware/authMiddleware.js'
+import { authMiddleware, requireRank } from '../middleware/authMiddleware.js'
 import * as classController from '../controllers/classController.js'
 
 const router = Router()
-
-// Tất cả routes yêu cầu đăng nhập
 router.use(authMiddleware)
 
 // GET /api/classes — Danh sách lớp học
@@ -21,7 +18,13 @@ router.get('/my-registrations', classController.getMyRegistrations)
 // GET /api/classes/:id — Chi tiết lớp
 router.get('/:id', classController.getClassById)
 
-// POST /api/classes/register — Đăng ký vào lớp
+// POST /api/classes — Tạo lớp mới (PĐT, rank >= 70)
+router.post('/', requireRank(70), classController.createClass)
+
+// PUT /api/classes/:id/instructor — Phân công GV (TBM, rank >= 60)
+router.put('/:id/instructor', requireRank(60), classController.assignInstructor)
+
+// POST /api/classes/register — Đăng ký vào lớp (SV)
 router.post('/register', classController.registerToClass)
 
 export { router }

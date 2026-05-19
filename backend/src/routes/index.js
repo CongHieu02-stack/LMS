@@ -1,7 +1,6 @@
 // ============================================================================
 // routes/index.js — Route Aggregator
 // Trách nhiệm DUY NHẤT: Gom tất cả route groups vào một router duy nhất.
-// KHÔNG chứa logic handler hay middleware riêng.
 // ============================================================================
 
 import { Router } from 'express'
@@ -11,6 +10,10 @@ import { router as classRoutes } from './classRoutes.js'
 import { router as examRoutes } from './examRoutes.js'
 import { router as subjectRoutes } from './subjectRoutes.js'
 import { router as configRoutes } from './configRoutes.js'
+import { router as classProposalRoutes } from './classProposalRoutes.js'
+import { router as lessonRoutes } from './lessonRoutes.js'
+import { router as examManageRoutes } from './examManageRoutes.js'
+import { router as gradeRoutes } from './gradeRoutes.js'
 
 const router = Router()
 
@@ -21,6 +24,9 @@ router.use('/classes', classRoutes)
 router.use('/exam', examRoutes)
 router.use('/subjects', subjectRoutes)
 router.use('/configs', configRoutes)
+router.use('/class-proposals', classProposalRoutes)
+router.use('/lessons', lessonRoutes)
+router.use('/exam-manage', examManageRoutes)
+router.use('/grades', gradeRoutes)
 
 export { router }
-

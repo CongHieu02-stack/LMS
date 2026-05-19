@@ -77,3 +77,48 @@ export async function getMyRegistrations(req, res) {
     return res.status(500).json({ error: 'Lỗi khi lấy danh sách đăng ký.' })
   }
 }
+
+/**
+ * POST /api/classes — Tạo lớp học mới (PĐT tạo).
+ */
+export async function createClass(req, res) {
+  try {
+    const { subjectId, name, maxSlots, schedule, room, semester, managerId } = req.body
+    if (!subjectId || !name || !maxSlots) {
+      return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: subjectId, name, maxSlots.' })
+    }
+    const newClass = await classModel.create({
+      subject_id: subjectId,
+      code: name,
+      name,
+      max_slots: parseInt(maxSlots),
+      max_students: parseInt(maxSlots),
+      remaining_slots: parseInt(maxSlots),
+      schedule: schedule || '',
+      room: room || '',
+      semester: semester || '',
+      manager_id: managerId || null
+    })
+    return res.status(201).json({ success: true, message: 'Tạo lớp học thành công.', data: newClass })
+  } catch (err) {
+    console.error('[ClassController.createClass]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi tạo lớp học.' })
+  }
+}
+
+/**
+ * PUT /api/classes/:id/instructor — Phân công giảng viên vào lớp.
+ */
+export async function assignInstructor(req, res) {
+  try {
+    const { instructorId } = req.body
+    if (!instructorId) {
+      return res.status(400).json({ error: 'Thiếu instructorId.' })
+    }
+    const updated = await classModel.assignInstructor(req.params.id, instructorId)
+    return res.json({ success: true, message: 'Phân công giảng viên thành công.', data: updated })
+  } catch (err) {
+    console.error('[ClassController.assignInstructor]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi phân công giảng viên.' })
+  }
+}

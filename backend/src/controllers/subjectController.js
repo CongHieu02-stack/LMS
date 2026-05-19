@@ -50,3 +50,35 @@ export async function updateApproval(req, res) {
     return res.status(500).json({ error: 'Lỗi khi cập nhật trạng thái môn học.' })
   }
 }
+
+/**
+ * POST /api/subjects — Tạo đề xuất môn học mới.
+ * Yêu cầu: rank >= 60 (PĐT & TBM trở lên).
+ */
+export async function create(req, res) {
+  try {
+    const { code, name, description, credits } = req.body
+    if (!code || !name) {
+      return res.status(400).json({ error: 'Thiếu mã môn học hoặc tên.' })
+    }
+    const subject = await subjectModel.create({
+      code: code.toUpperCase(),
+      name,
+      description: description || '',
+      credits: parseInt(credits) || 3,
+      creator_id: req.user.id,
+      status: 'pending'
+    })
+    return res.status(201).json({
+      success: true,
+      message: 'Đề xuất môn học đã được gửi tới Hiệu trưởng để phê duyệt.',
+      data: subject
+    })
+  } catch (err) {
+    console.error('[SubjectController.create]', err.message)
+    if (err.message?.includes('duplicate') || err.code === '23505') {
+      return res.status(409).json({ error: `Mã môn học đã tồn tại.` })
+    }
+    return res.status(500).json({ error: 'Lỗi khi tạo đề xuất môn học.' })
+  }
+}

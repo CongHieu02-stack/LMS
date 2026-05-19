@@ -13,7 +13,7 @@ import { supabaseAdmin } from '../config/supabase.js'
 export async function findAll() {
   const { data, error } = await supabaseAdmin
     .from('subjects')
-    .select('*, creator:profiles!created_by(id, full_name)')
+    .select('*, creator:profiles!creator_id(id, full_name)')
     .order('code', { ascending: true })
 
   if (error) throw error

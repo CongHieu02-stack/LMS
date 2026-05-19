@@ -18,7 +18,6 @@ export async function findAll() {
       subject:subjects(id, code, name, credits),
       instructor:profiles!instructor_id(id, full_name, email)
     `)
-    .eq('is_active', true)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -82,4 +81,31 @@ export async function findRegistrationsByStudent(studentId) {
 
   if (error) throw error
   return data || []
+}
+
+/**
+ * Tạo lớp học mới
+ */
+export async function create(classData) {
+  const { data, error } = await supabaseAdmin
+    .from('classes')
+    .insert(classData)
+    .select(`*, subject:subjects(id, code, name)`)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Phân công giảng viên vào lớp
+ */
+export async function assignInstructor(classId, instructorId) {
+  const { data, error } = await supabaseAdmin
+    .from('classes')
+    .update({ instructor_id: instructorId })
+    .eq('id', classId)
+    .select(`*, subject:subjects(id, code, name), instructor:profiles!instructor_id(id, full_name, email)`)
+    .single()
+  if (error) throw error
+  return data
 }

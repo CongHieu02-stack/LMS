@@ -9,8 +9,6 @@ import { useAuthStore } from '@/stores/auth'
 
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
-import RegistrationView from '../views/RegistrationView.vue'
-import ExamView from '../views/ExamView.vue'
 import UserManagementView from '../views/UserManagementView.vue'
 import SubjectApprovalView from '../views/SubjectApprovalView.vue'
 import SchoolConfigView from '../views/SchoolConfigView.vue'
@@ -35,18 +33,8 @@ const router = createRouter({
       component: DashboardView,
       meta: { requiresAuth: true }
     },
-    {
-      path: '/registration',
-      name: 'registration',
-      component: RegistrationView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/exam',
-      name: 'exam',
-      component: ExamView,
-      meta: { requiresAuth: true }
-    },
+
+    // ---- ADMIN & HR ----
     {
       path: '/admin/users',
       name: 'user-management',
@@ -60,17 +48,60 @@ const router = createRouter({
       meta: { requiresAuth: true, requirePermission: 'user_manage_senior' }
     },
     {
-      path: '/admin/subjects',
-      name: 'subject-approval',
-      component: SubjectApprovalView,
-      meta: { requiresAuth: true, requirePermission: 'subject_approve' }
+      path: '/admin/configs',
+      name: 'school-config',
+      component: SchoolConfigView,
+      meta: { requiresAuth: true, minRank: 90 }
     },
+
+    // ---- QUẢN LÝ MÔN HỌC ----
     {
       path: '/subjects/propose',
       name: 'subject-propose',
       component: () => import('@/views/SubjectProposeView.vue'),
       meta: { requiresAuth: true, requirePermission: 'subject_propose' }
     },
+    {
+      path: '/admin/subjects',
+      name: 'subject-approval',
+      component: SubjectApprovalView,
+      meta: { requiresAuth: true, requirePermission: 'subject_approve' }
+    },
+
+    // ---- QUẢN LÝ LỚP HỌC ----
+    {
+      path: '/classes/propose',
+      name: 'class-propose',
+      component: () => import('@/views/ClassProposalView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'class_quantity_propose' }
+    },
+    {
+      path: '/admin/classes/approve',
+      name: 'class-approve',
+      component: () => import('@/views/admin/ClassApprovalView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'class_quantity_approve' }
+    },
+    {
+      path: '/admin/classes',
+      name: 'class-management',
+      component: () => import('@/views/admin/ClassManagementView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'class_create' }
+    },
+    {
+      path: '/admin/classes/assign',
+      name: 'instructor-assign',
+      component: () => import('@/views/admin/InstructorAssignView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'instructor_assign' }
+    },
+
+    // ---- ĐÀO TẠO & KHẢO THÍ ----
+    {
+      path: '/lessons',
+      name: 'lesson-exam-manage',
+      component: () => import('@/views/LessonExamManageView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'lesson_exam_manage' }
+    },
+
     // ---- PHÂN HỆ SINH VIÊN ----
     {
       path: '/registration',
@@ -89,50 +120,34 @@ const router = createRouter({
       name: 'grades',
       component: () => import('@/views/GradeView.vue'),
       meta: { requiresAuth: true, requirePermission: 'grade_view' }
-    },
-    // ---------------------------
-    {
-      path: '/admin/configs',
-      name: 'school-config',
-      component: SchoolConfigView,
-      meta: { requiresAuth: true, minRank: 90 }
     }
   ]
 })
 
 // ─── NAVIGATION GUARDS ───
 router.beforeEach(async (to, _from, next) => {
-  // Lấy session từ Supabase trực tiếp
   const { data: { session } } = await supabase.auth.getSession()
   const isAuthenticated = !!session
 
   const authStore = useAuthStore()
 
-  // Nếu đã đăng nhập nhưng chưa có profile ở store, fetch ngay lập tức
   if (isAuthenticated && !authStore.profile) {
     await authStore.initialize()
   }
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    // Nếu chưa đăng nhập mà vào trang bảo vệ → redirect login
     next({ name: 'login' })
   } else if (to.meta.requiresGuest && isAuthenticated) {
-    // Nếu đã đăng nhập mà vào trang login → redirect dashboard
     next({ name: 'dashboard' })
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    // Yêu cầu quyền admin tối cao nhưng không phải
     next({ name: 'dashboard' })
   } else if (to.meta.requirePermission && !authStore.hasPermission(to.meta.requirePermission as string) && !authStore.hasPermission('user_manage_senior')) {
-    // Không có quyền tĩnh nào khớp và không phải super_admin quản lý cấp cao
     next({ name: 'dashboard' })
   } else if (to.meta.minRank && (authStore.profile?.rank || 0) < (to.meta.minRank as number)) {
-    // Yêu cầu rank tối thiểu nhưng không đủ
     next({ name: 'dashboard' })
   } else {
-    // Hợp lệ, cho qua
     next()
   }
 })
 
 export default router
-

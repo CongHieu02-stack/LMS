@@ -1,24 +1,67 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { apiGet, apiPost } from '@/lib/api'
 
 const router = useRouter()
+
+// Lấy danh sách bài thi
+const availableExams = ref<any[]>([])
+const loading = ref(true)
+const selectedExam = ref<any>(null)
 
 // State
 const isExamStarted = ref(false)
 const isExamFinished = ref(false)
 const cheatWarnings = ref(0)
 const finalScore = ref<number | null>(null)
-const timeLeft = ref(60 * 60) // 60 phút tính bằng giây
+const timeLeft = ref(0)
 let timerInterval: any = null
 
-// Data giả lập
-const questions = [
-  { id: 1, text: 'Thủ đô của Việt Nam là?', options: ['Hà Nội', 'Đà Nẵng', 'TP.HCM', 'Huế'], answer: 0 },
-  { id: 2, text: 'Ngôn ngữ lập trình nào phổ biến cho AI?', options: ['Java', 'C++', 'Python', 'PHP'], answer: 2 },
-  { id: 3, text: 'Vue 3 sử dụng API nào mới để quản lý State?', options: ['Options API', 'Composition API', 'Class API', 'Hooks'], answer: 1 },
-]
+const questions = ref<any[]>([])
 const answers = ref<Record<number, number>>({})
+
+// ==========================================
+// LOAD DATA
+// ==========================================
+async function loadExams() {
+  loading.value = true
+  try {
+    // Lấy lớp đã đăng ký
+    const regRes = await apiGet<{ success: boolean; data: any[] }>('/classes/my-registrations')
+    const registeredClasses = regRes.data || []
+    
+    // Lấy bài kiểm tra của các lớp này
+    let examsList: any[] = []
+    for (const reg of registeredClasses) {
+      const classId = reg.class?.id || reg.class_id
+      if (classId) {
+        try {
+          const exRes = await apiGet<{ success: boolean; data: any[] }>(`/exam-manage/published/${classId}`)
+          if (exRes.data && exRes.data.length > 0) {
+            examsList.push(...exRes.data.map(e => ({
+              ...e, 
+              className: reg.class?.name || 'Lớp học',
+              subjectName: reg.class?.subject?.name || 'Môn học'
+            })))
+          }
+        } catch (e) { console.warn(e) }
+      }
+    }
+    availableExams.value = examsList
+  } catch (err) {
+    console.error(err)
+  }
+  loading.value = false
+}
+
+onMounted(loadExams)
+
+function selectExamToStart(exam: any) {
+  selectedExam.value = exam
+  questions.value = exam.questions || []
+  timeLeft.value = (exam.duration_minutes || 60) * 60
+}
 
 // ==========================================
 // ANTI-CHEAT LOGIC
@@ -28,7 +71,7 @@ function handleVisibilityChange() {
     cheatWarnings.value++
     if (cheatWarnings.value >= 2) {
       alert('PHÁT HIỆN GIAN LẬN: Bạn đã thoát khỏi màn hình làm bài quá 2 lần. Bài thi sẽ tự động thu lại!')
-      submitExam()
+      submitExam(true)
     } else {
       alert(`CẢNH BÁO LẦN 1: Bạn vừa Alt+Tab hoặc rời khỏi màn hình làm bài. 
 Nghiêm cấm thoát màn hình khi đang thi. Nếu tái phạm, bài thi sẽ bị thu ngay lập tức!`)
@@ -41,7 +84,7 @@ function handleFullscreenChange() {
     cheatWarnings.value++
     if (cheatWarnings.value >= 2) {
       alert('PHÁT HIỆN GIAN LẬN: Bạn đã thoát chế độ Toàn Màn Hình. Bài thi bị thu lại!')
-      submitExam()
+      submitExam(true)
     } else {
       alert('CẢNH BÁO: Bắt buộc phải làm bài ở chế độ Toàn Màn Hình. Vui lòng bật lại để tiếp tục!')
       enterFullscreen()
@@ -70,6 +113,7 @@ async function exitFullscreen() {
 // THAO TÁC THI
 // ==========================================
 async function startExam() {
+  if (!selectedExam.value) return
   await enterFullscreen()
   isExamStarted.value = true
   
@@ -83,23 +127,55 @@ async function startExam() {
       timeLeft.value--
     } else {
       alert('Hết thời gian làm bài! Hệ thống tự động thu bài.')
-      submitExam()
+      submitExam(false)
     }
   }, 1000)
 }
 
-function submitExam() {
+async function submitExam(isForced = false) {
   clearInterval(timerInterval)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
   
-  // Tính điểm giả lập
-  let correct = 0
-  questions.forEach(q => {
-    if (answers.value[q.id] === q.answer) correct++
-  })
-  finalScore.value = parseFloat(((correct / questions.length) * 10).toFixed(1))
-  
+  const answersList = Object.keys(answers.value).map(qid => ({
+    question_id: parseInt(qid),
+    selected_option: answers.value[parseInt(qid)]
+  }))
+
+  try {
+    const res = await apiPost<{ success: boolean; data: any }>('/exam/submit', {
+      examTitle: selectedExam.value.title,
+      answers: answersList,
+      isForced,
+      violations: cheatWarnings.value
+    })
+    
+    // Lưu điểm qua API Grades
+    // Mock calculate score for grade table (in a real app, backend will grade)
+    let correct = 0
+    questions.value.forEach((q: any) => {
+      if (answers.value[q.id] === q.answer) correct++
+    })
+    const score = questions.value.length > 0 ? parseFloat(((correct / questions.value.length) * 10).toFixed(1)) : 0
+    finalScore.value = score
+    
+    try {
+      await apiPost('/grades', {
+        classId: selectedExam.value.class_id,
+        examId: selectedExam.value.id,
+        // using a specific backend route or student passing logic is normally required
+        // Since we only have /grades which requires rank >= 50, we mock this score locally,
+        // In real LMS, `submitExam` backend will trigger grading and update `grades` table automatically
+        score: score
+      })
+    } catch (e) {
+      console.warn('Grade API failed or restricted, score is local only', e)
+    }
+
+  } catch (err) {
+    console.error('Submit error:', err)
+  }
+
   isExamFinished.value = true
   exitFullscreen()
 }
@@ -123,23 +199,56 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <div v-if="loading" class="mono-wrapper loading-view">
+    <div class="ld"><i class="pi pi-spin pi-spinner"></i></div>
+  </div>
+
+  <!-- CHỌN BÀI THI -->
+  <div v-else-if="!selectedExam" class="mono-wrapper lobby-view">
+    <div class="page-header">
+      <div>
+        <div class="breadcrumb">Khảo thí / <span>Bài kiểm tra</span></div>
+        <h1 class="page-title">Tham Gia Làm Bài Kiểm Tra</h1>
+        <div class="page-subtitle">Danh sách các bài thi đang mở dành cho bạn.</div>
+      </div>
+    </div>
+    
+    <div v-if="availableExams.length === 0" class="empty-state">
+      <i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af"></i>
+      <h3>Không có bài thi nào đang mở</h3>
+    </div>
+    
+    <div class="grid-cards" v-else>
+      <div v-for="e in availableExams" :key="e.id" class="mono-card">
+        <div class="card-header"><span>{{ e.className }}</span></div>
+        <div class="card-body">
+          <h3 class="font-bold">{{ e.title }}</h3>
+          <p class="text-sm text-gray-500 mb-4">{{ e.subjectName }}</p>
+          <div class="info-row"><i class="pi pi-clock"></i> {{ e.duration_minutes }} phút</div>
+          <button class="btn-submit w-full mt-4" @click="selectExamToStart(e)">Vào phòng Lobby</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- LOBBY (Chưa bắt đầu) -->
-  <div v-if="!isExamStarted" class="mono-wrapper lobby-view">
+  <div v-else-if="!isExamStarted" class="mono-wrapper lobby-view">
     <div class="mono-card max-w-lg mx-auto mt-10">
       <div class="card-header bg-gray-900 text-white">
-        <span>Kỳ thi Cuối kỳ - Môn: Trí Tuệ Nhân Tạo</span>
+        <span>Bài thi: {{ selectedExam.title }}</span>
       </div>
       <div class="card-body">
         <h2 class="text-xl font-semibold mb-4 text-gray-900">Nội quy phòng thi</h2>
         <ul class="rules-list">
-          <li><i class="pi pi-check text-green-600"></i> Thời gian làm bài: <strong>60 phút</strong>.</li>
+          <li><i class="pi pi-check text-green-600"></i> Thời gian làm bài: <strong>{{ selectedExam.duration_minutes }} phút</strong>.</li>
           <li><i class="pi pi-exclamation-triangle text-orange-500"></i> <strong>CHỐNG GIAN LẬN:</strong> Bài thi yêu cầu chạy ở chế độ Toàn Màn Hình (Full-screen).</li>
           <li><i class="pi pi-ban text-red-600"></i> Bất kỳ hành vi bấm Alt+Tab, mở tab mới, hay thu nhỏ trình duyệt sẽ bị hệ thống ghi nhận.</li>
           <li><i class="pi pi-info-circle text-blue-600"></i> Vi phạm lần 1 sẽ bị cảnh báo. Vi phạm lần 2 hệ thống tự động <strong>thu bài và cho điểm 0</strong>.</li>
         </ul>
-        <div class="mt-6">
-          <button class="btn-submit w-full" @click="startExam">
-            <i class="pi pi-play"></i> Tôi đã hiểu & Bắt đầu làm bài
+        <div class="mt-6 flex-gap">
+          <button class="btn-outline flex-1" @click="selectedExam = null">Trở lại</button>
+          <button class="btn-submit flex-2" @click="startExam">
+            <i class="pi pi-play"></i> Tôi đã hiểu & Bắt đầu
           </button>
         </div>
       </div>
@@ -150,15 +259,16 @@ onUnmounted(() => {
   <div v-else-if="!isExamFinished" class="exam-workspace">
     <!-- Topbar cố định -->
     <div class="exam-topbar">
-      <div class="exam-title">INT101 - Trí tuệ nhân tạo (Mã đề: 001)</div>
+      <div class="exam-title">{{ selectedExam.title }}</div>
       <div class="exam-timer" :class="{ 'text-red-600': timeLeft < 300 }">
         <i class="pi pi-clock"></i> {{ formatTime(timeLeft) }}
       </div>
-      <button class="btn-outline" @click="submitExam">Nộp bài sớm</button>
+      <button class="btn-outline" @click="submitExam(false)">Nộp bài sớm</button>
     </div>
 
     <!-- Nội dung câu hỏi -->
     <div class="exam-content">
+      <div v-if="questions.length === 0" class="text-center py-10 text-gray-500">Bài thi chưa có nội dung câu hỏi.</div>
       <div class="mono-card mb-6" v-for="(q, index) in questions" :key="q.id">
         <div class="card-body">
           <h3 class="question-text">Câu {{ index + 1 }}: {{ q.text }}</h3>
@@ -178,10 +288,10 @@ onUnmounted(() => {
     <div class="mono-card max-w-md mx-auto mt-10 text-center py-10">
       <i class="pi pi-check-circle text-green-500 result-icon"></i>
       <h2 class="text-2xl font-semibold mt-4 mb-2">Đã Nộp Bài Thành Công</h2>
-      <p class="text-gray-500 mb-6">Bạn đã hoàn thành bài thi môn Trí tuệ nhân tạo.</p>
+      <p class="text-gray-500 mb-6">Bạn đã hoàn thành bài thi: {{ selectedExam.title }}.</p>
       
       <div class="score-display">
-        <span class="score-label">Điểm số của bạn</span>
+        <span class="score-label">Điểm số ước tính</span>
         <span class="score-value" :class="finalScore! >= 5 ? 'text-green-600' : 'text-red-600'">
           {{ finalScore }} <small>/ 10</small>
         </span>
@@ -195,7 +305,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.mono-wrapper { padding: 2rem; animation: fadeIn 0.3s ease-out; background: #f3f4f6; min-height: 100vh; }
+.mono-wrapper { padding: 1.5rem 2rem; animation: fadeIn 0.3s ease-out; background: #f3f4f6; min-height: 100vh; }
+
+.page-header { margin-bottom: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; }
+.breadcrumb { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem; } .breadcrumb span { color: #111827; font-weight: 600; }
+.page-title { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem 0; color: #111827; }
+.page-subtitle { font-size: 0.875rem; color: #6b7280; }
+
+.ld { display: flex; justify-content: center; padding: 4rem; font-size: 2rem; color: #6b7280; }
+.empty-state { text-align: center; padding: 4rem; color: #6b7280; }
+
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
 
 /* Utilities */
 .max-w-lg { max-width: 32rem; }
@@ -212,6 +332,8 @@ onUnmounted(() => {
 .text-xl { font-size: 1.25rem; }
 .text-2xl { font-size: 1.5rem; }
 .font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; font-size: 1.1rem; color: #111827; margin-bottom: 0.25rem; }
+.text-sm { font-size: 0.85rem; }
 .text-gray-900 { color: #111827; }
 .text-gray-500 { color: #6b7280; }
 .text-green-600 { color: #166534; }
@@ -221,16 +343,15 @@ onUnmounted(() => {
 .text-blue-600 { color: #2563eb; }
 .py-10 { padding-top: 2.5rem; padding-bottom: 2.5rem; }
 .w-full { width: 100%; }
+.flex-gap { display: flex; gap: 1rem; }
+.flex-1 { flex: 1; } .flex-2 { flex: 2; }
+.info-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #4b5563; }
 
 /* Card */
-.mono-card {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-  overflow: hidden;
-}
+.mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
 .bg-gray-900 { background: #111827 !important; }
 .text-white { color: #fff !important; }
-.card-header { padding: 1rem 1.5rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; }
+.card-header { padding: 1rem 1.5rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; background: #f9fafb; color: #111827; }
 .card-body { padding: 1.5rem; }
 
 /* Buttons */

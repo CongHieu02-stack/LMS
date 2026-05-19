@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { apiGet, apiPost } from '@/lib/api'
+import { useToast } from 'primevue/usetoast'
 
 const authStore = useAuthStore()
+const toast = useToast()
 
 const isStudent = computed(() => authStore.profile?.role === 'SINH_VIEN')
 
@@ -23,6 +26,160 @@ const rankDescription: Record<number, string> = {
   50: 'Giảng dạy và quản lý lớp học.',
   10: 'Đăng ký lớp học và tham gia thi cử.'
 }
+
+// Student Real Data State
+const loadingStudent = ref(false)
+const availableClasses = ref<any[]>([])
+const upcomingExams = ref<any[]>([])
+const gpaDisplay = ref('0.0')
+const registeredCount = ref(0)
+const myRegisteredClasses = ref<any[]>([])
+
+// Student Lessons Viewer State
+const activeClassForLessons = ref<any | null>(null)
+const classLessons = ref<any[]>([])
+const loadingLessons = ref(false)
+const expandedStudentLessons = ref<string[]>([])
+
+async function viewLessons(cls: any) {
+  activeClassForLessons.value = cls
+  classLessons.value = []
+  loadingLessons.value = true
+  expandedStudentLessons.value = []
+  try {
+    const res = await apiGet<any>(`/lessons/class/${cls.id}`)
+    classLessons.value = res.data || res || []
+  } catch (err) {
+    console.error('Failed to load class lessons:', err)
+  } finally {
+    loadingLessons.value = false
+  }
+}
+
+function closeLessonsModal() {
+  activeClassForLessons.value = null
+  classLessons.value = []
+}
+
+function toggleStudentLessonExpand(id: string) {
+  if (expandedStudentLessons.value.includes(id)) {
+    expandedStudentLessons.value = expandedStudentLessons.value.filter(x => x !== id)
+  } else {
+    expandedStudentLessons.value.push(id)
+  }
+}
+
+function parseLessonContent(contentStr: string) {
+  try {
+    const parsed = JSON.parse(contentStr)
+    return {
+      youtubeId: parsed.youtubeId || '',
+      description: parsed.description || ''
+    }
+  } catch {
+    return {
+      youtubeId: '',
+      description: contentStr || ''
+    }
+  }
+}
+
+async function loadStudentData() {
+  if (!isStudent.value) return
+  loadingStudent.value = true
+  try {
+    const [classRes, regRes, gradeRes] = await Promise.all([
+      apiGet<any>('/classes'),
+      apiGet<{success: boolean; data: any[]}>('/classes/my-registrations'),
+      apiGet<{success: boolean; data: any[]}>('/grades/me')
+    ])
+    
+    // 1. Lớp đã đăng ký
+    const regs = regRes.data || []
+    registeredCount.value = regs.length
+    myRegisteredClasses.value = regs.map(r => r.class).filter(Boolean)
+    const myClassIds = regs.map(r => r.class?.id || r.class_id)
+    
+    // 2. Điểm GPA
+    const grades = gradeRes.data || []
+    let totalCredits = 0; let totalScore = 0;
+    grades.forEach(g => {
+      const tc = g.class?.subject?.credits || 0
+      totalCredits += tc
+      totalScore += (parseFloat(g.score) || 0) * tc
+    })
+    if (totalCredits > 0) gpaDisplay.value = (totalScore / totalCredits).toFixed(1)
+
+    // 3. Lớp đang mở (Gợi ý 2 lớp chưa đăng ký)
+    const allClasses = classRes.data || classRes
+    if (Array.isArray(allClasses)) {
+      availableClasses.value = allClasses.filter(c => !myClassIds.includes(c.id) && (c.remainingSlots || c.remaining_slots || 0) > 0).slice(0, 2)
+    }
+
+    // 4. Lịch thi sắp tới (từ các lớp đã đăng ký)
+    let exams: any[] = []
+    for (const cId of myClassIds) {
+      try {
+        const eRes = await apiGet<{success: boolean; data: any[]}>(`/exam-manage/published/${cId}`)
+        if (eRes.data && eRes.data.length > 0) {
+          const className = regs.find(r => (r.class?.id || r.class_id) === cId)?.class?.name || 'Lớp học'
+          exams.push(...eRes.data.map(e => ({ ...e, className })))
+        }
+      } catch (err) {}
+    }
+    upcomingExams.value = exams.slice(0, 3)
+
+  } catch (err) {
+    console.error('Failed to load student dashboard data:', err)
+  }
+  loadingStudent.value = false
+}
+
+onMounted(() => {
+  if (isStudent.value) loadStudentData()
+})
+
+// ─── AVATAR UPLOAD ───
+const avatarInput = ref<HTMLInputElement | null>(null)
+const uploadingAvatar = ref(false)
+
+function triggerAvatarUpload() {
+  avatarInput.value?.click()
+}
+
+async function onAvatarSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (file.size > 2 * 1024 * 1024) {
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Kích thước ảnh tối đa là 2MB', life: 3000 })
+    return
+  }
+
+  uploadingAvatar.value = true
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const base64Data = e.target?.result as string
+    try {
+      const res = await apiPost<{ success: boolean; avatarUrl: string }>(`/profiles/${authStore.profile?.id}/avatar`, {
+        avatarData: base64Data
+      })
+      if (res.success && res.avatarUrl) {
+        if (authStore.profile) {
+          authStore.profile.avatarUrl = res.avatarUrl
+        }
+        toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật ảnh đại diện thành công', life: 3000 })
+      }
+    } catch (err: any) {
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: err.message || 'Không thể tải lên ảnh đại diện', life: 3000 })
+    } finally {
+      uploadingAvatar.value = false
+      if (avatarInput.value) avatarInput.value.value = ''
+    }
+  }
+  reader.readAsDataURL(file)
+}
 </script>
 
 <template>
@@ -36,7 +193,7 @@ const rankDescription: Record<number, string> = {
     <div class="page-header">
       <h1 class="page-title">Chào mừng trở lại, {{ authStore.profile?.fullName }}</h1>
       <div class="page-subtitle">
-        {{ isStudent ? 'Dưới đây là các lớp học đang mở và lịch thi sắp tới của bạn.' : 'Xem thông tin hồ sơ và các truy cập nhanh bên dưới.' }}
+        {{ isStudent ? 'Dưới đây là các thông tin tổng quan về học tập của bạn.' : 'Xem thông tin hồ sơ và các truy cập nhanh bên dưới.' }}
       </div>
     </div>
 
@@ -44,108 +201,141 @@ const rankDescription: Record<number, string> = {
     <!-- DASHBOARD DÀNH CHO SINH VIÊN -->
     <!-- ============================================== -->
     <div v-if="isStudent" class="student-dashboard">
-      <!-- 3 thẻ thống kê nhanh -->
-      <div class="stats-row mb-xl">
-        <div class="lms-card stat-card">
-          <div class="stat-icon-wrapper bg-blue-100 text-blue-600"><i class="pi pi-book"></i></div>
-          <div class="stat-content">
-            <div class="stat-value">2</div>
-            <div class="stat-label">Lớp đang mở đăng ký</div>
-          </div>
-        </div>
-        <div class="lms-card stat-card">
-          <div class="stat-icon-wrapper bg-purple-100 text-purple-600"><i class="pi pi-clock"></i></div>
-          <div class="stat-content">
-            <div class="stat-value">1</div>
-            <div class="stat-label">Bài thi tuần này</div>
-          </div>
-        </div>
-        <div class="lms-card stat-card">
-          <div class="stat-icon-wrapper bg-green-100 text-green-600"><i class="pi pi-chart-line"></i></div>
-          <div class="stat-content">
-            <div class="stat-value">8.5</div>
-            <div class="stat-label">Điểm GPA hiện tại</div>
-          </div>
-        </div>
+      <div v-if="loadingStudent" class="loading-center">
+        <i class="pi pi-spin pi-spinner" style="font-size:2rem;color:#6b7280"></i>
       </div>
+      <template v-else>
+        <!-- 3 thẻ thống kê nhanh -->
+        <div class="stats-row mb-xl">
+          <div class="lms-card stat-card">
+            <div class="stat-icon-wrapper bg-blue-100 text-blue-600"><i class="pi pi-book"></i></div>
+            <div class="stat-content">
+              <div class="stat-value">{{ registeredCount }}</div>
+              <div class="stat-label">Lớp đã đăng ký</div>
+            </div>
+          </div>
+          <div class="lms-card stat-card">
+            <div class="stat-icon-wrapper bg-purple-100 text-purple-600"><i class="pi pi-clock"></i></div>
+            <div class="stat-content">
+              <div class="stat-value">{{ upcomingExams.length }}</div>
+              <div class="stat-label">Bài thi đang mở</div>
+            </div>
+          </div>
+          <div class="lms-card stat-card">
+            <div class="stat-icon-wrapper bg-green-100 text-green-600"><i class="pi pi-chart-line"></i></div>
+            <div class="stat-content">
+              <div class="stat-value">{{ gpaDisplay }}</div>
+              <div class="stat-label">Điểm GPA hiện tại</div>
+            </div>
+          </div>
+        </div>
 
-      <div class="dashboard-grid">
-        <div class="main-column">
-          
-          <!-- Widget 1: Lớp học đang mở -->
-          <div class="lms-card mb-xl">
-            <div class="card-header-flex">
-              <h3 class="card-title"><i class="pi pi-bell text-blue-600 mr-2"></i> Lớp học đang mở đăng ký</h3>
-              <RouterLink to="/registration" class="link-more">Xem tất cả</RouterLink>
+        <div class="dashboard-grid">
+          <div class="main-column">
+
+            <!-- Widget 0: Lớp học của tôi -->
+            <div class="lms-card mb-xl">
+              <div class="card-header-flex">
+                <h3 class="card-title"><i class="pi pi-bookmark-fill text-purple-600 mr-2"></i> Lớp học của tôi</h3>
+                <span class="text-sm text-gray-500 font-medium">Bấm vào để vào lớp học</span>
+              </div>
+              
+              <div v-if="myRegisteredClasses.length === 0" class="text-gray-500 py-6 text-center text-sm">
+                Bạn chưa đăng ký lớp học nào. Hãy xem danh sách đăng ký ở dưới!
+              </div>
+              
+              <div v-else class="my-classes-list">
+                <div v-for="cls in myRegisteredClasses" :key="cls.id" class="my-class-row" @click="viewLessons(cls)">
+                  <div class="my-class-info">
+                    <span class="my-class-code">{{ cls.subject?.code }}</span>
+                    <strong class="my-class-name">{{ cls.name }} - {{ cls.subject?.name }}</strong>
+                    <span class="my-class-teacher">GV: {{ cls.instructor?.fullName || cls.instructor?.full_name || 'Chưa phân công' }}</span>
+                  </div>
+                  <button class="btn-learn"><i class="pi pi-play mr-1"></i> Vào học</button>
+                </div>
+              </div>
             </div>
             
-            <div class="notification-item">
-              <div class="notif-content">
-                <div class="notif-title">INT101 - Trí tuệ nhân tạo</div>
-                <div class="notif-desc"><i class="pi pi-calendar mr-1"></i> Thứ 2 (T1-3) &nbsp; | &nbsp; <i class="pi pi-user mr-1"></i> TS. Nguyễn Văn A</div>
+            <!-- Widget 1: Lớp học gợi ý đăng ký -->
+            <div class="lms-card mb-xl">
+              <div class="card-header-flex">
+                <h3 class="card-title"><i class="pi pi-bell text-blue-600 mr-2"></i> Lớp học đang mở đăng ký</h3>
+                <RouterLink to="/registration" class="link-more">Xem tất cả</RouterLink>
               </div>
-              <div class="notif-action text-right">
-                <div class="text-sm font-semibold mb-2 text-orange-600">Sĩ số: 48/50</div>
-                <RouterLink to="/registration" class="btn-primary-small">Tranh Slot Ngay</RouterLink>
+              
+              <div v-if="availableClasses.length === 0" class="text-gray-500 py-4 text-center text-sm">
+                Không có lớp mới nào đang mở đăng ký.
+              </div>
+              
+              <div v-for="(cls, idx) in availableClasses" :key="cls.id" class="notification-item" :class="{ 'no-border-bottom': idx === availableClasses.length - 1 }">
+                <div class="notif-content">
+                  <div class="notif-title">{{ cls.name || cls.subject?.code }} - {{ cls.subject?.name }}</div>
+                  <div class="notif-desc"><i class="pi pi-calendar mr-1"></i> {{ cls.schedule || 'Chưa xếp lịch' }} &nbsp; | &nbsp; <i class="pi pi-user mr-1"></i> {{ cls.instructor?.fullName || cls.instructor?.full_name || 'Chưa phân công' }}</div>
+                </div>
+                <div class="notif-action text-right">
+                  <div class="text-sm font-semibold mb-2" :class="(cls.remainingSlots || cls.remaining_slots || 0) < 10 ? 'text-orange-600' : 'text-green-600'">Còn: {{ cls.remainingSlots || cls.remaining_slots || 0 }} slot</div>
+                  <RouterLink to="/registration" class="btn-primary-small">Đăng ký</RouterLink>
+                </div>
               </div>
             </div>
 
-            <div class="notification-item no-border-bottom">
-              <div class="notif-content">
-                <div class="notif-title">WEB202 - Lập trình Web</div>
-                <div class="notif-desc"><i class="pi pi-calendar mr-1"></i> Thứ 6 (T4-6) &nbsp; | &nbsp; <i class="pi pi-user mr-1"></i> ThS. Lê C</div>
+            <!-- Widget 2: Bài thi sắp tới -->
+            <div class="lms-card">
+              <div class="card-header-flex">
+                <h3 class="card-title"><i class="pi pi-pencil text-purple-600 mr-2"></i> Bài thi đang mở</h3>
+                <RouterLink to="/exam" class="link-more">Đến trang Khảo thí</RouterLink>
               </div>
-              <div class="notif-action text-right">
-                <div class="text-sm font-semibold mb-2 text-green-600">Sĩ số: 12/40</div>
-                <RouterLink to="/registration" class="btn-primary-small">Đăng ký</RouterLink>
+              
+              <div v-if="upcomingExams.length === 0" class="text-gray-500 py-4 text-center text-sm">
+                Bạn chưa có bài kiểm tra nào sắp diễn ra.
+              </div>
+              
+              <div v-for="e in upcomingExams" :key="e.id" class="exam-item">
+                <div class="exam-date">
+                  <span class="exam-day">Đang mở</span>
+                  <span class="exam-time">{{ e.duration_minutes }}p</span>
+                </div>
+                <div class="exam-info">
+                  <div class="exam-name">{{ e.title }}</div>
+                  <div class="exam-rules"><i class="pi pi-info-circle"></i> {{ e.className }} (Bắt buộc Full-screen)</div>
+                </div>
+                <div class="exam-action">
+                  <RouterLink to="/exam" class="btn-purple-small">Vào phòng thi</RouterLink>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Widget 2: Bài thi sắp tới -->
-          <div class="lms-card">
-            <div class="card-header-flex">
-              <h3 class="card-title"><i class="pi pi-pencil text-purple-600 mr-2"></i> Lịch thi sắp diễn ra</h3>
-              <RouterLink to="/exam" class="link-more">Đến trang Khảo thí</RouterLink>
-            </div>
-            
-            <div class="exam-item">
-              <div class="exam-date">
-                <span class="exam-day">Hôm nay</span>
-                <span class="exam-time">14:00</span>
+          <!-- Cột Profile (Dùng chung) -->
+          <div class="side-column">
+            <div class="lms-card profile-card">
+              <div class="profile-avatar editable" :class="{ 'uploading': uploadingAvatar }" @click="triggerAvatarUpload">
+                <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" alt="Avatar" class="avatar-img" />
+                <i v-else class="pi pi-user"></i>
+                <div class="avatar-overlay">
+                  <i v-if="uploadingAvatar" class="pi pi-spin pi-spinner"></i>
+                  <i v-else class="pi pi-camera"></i>
+                </div>
               </div>
-              <div class="exam-info">
-                <div class="exam-name">Thi Cuối Kỳ - Trí Tuệ Nhân Tạo</div>
-                <div class="exam-rules"><i class="pi pi-exclamation-triangle"></i> Yêu cầu làm bài Full-screen (Anti-cheat)</div>
-              </div>
-              <div class="exam-action">
-                <RouterLink to="/exam" class="btn-purple-small">Vào phòng thi</RouterLink>
+              <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
+              <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
+              <div class="profile-divider"></div>
+              <div class="profile-detail">
+                <div class="detail-row">
+                  <span class="detail-label">Khoa</span>
+                  <span class="detail-value">CNTT</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Trạng thái</span>
+                  <span class="lms-tag lms-tag-success">Đang học</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- Cột Profile (Dùng chung) -->
-        <div class="side-column">
-          <div class="lms-card profile-card">
-            <div class="profile-avatar"><i class="pi pi-user"></i></div>
-            <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
-            <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
-            <div class="profile-divider"></div>
-            <div class="profile-detail">
-              <div class="detail-row">
-                <span class="detail-label">Khoa</span>
-                <span class="detail-value">CNTT</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Trạng thái</span>
-                <span class="lms-tag lms-tag-success">Đang học</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      </template>
     </div>
+
 
     <!-- ============================================== -->
     <!-- DASHBOARD DÀNH CHO ADMIN / GIẢNG VIÊN -->
@@ -197,7 +387,14 @@ const rankDescription: Record<number, string> = {
       <!-- Cột phụ bên phải -->
       <div class="side-column">
         <div class="lms-card profile-card">
-          <div class="profile-avatar"><i class="pi pi-user"></i></div>
+          <div class="profile-avatar editable" :class="{ 'uploading': uploadingAvatar }" @click="triggerAvatarUpload">
+            <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" alt="Avatar" class="avatar-img" />
+            <i v-else class="pi pi-user"></i>
+            <div class="avatar-overlay">
+              <i v-if="uploadingAvatar" class="pi pi-spin pi-spinner"></i>
+              <i v-else class="pi pi-camera"></i>
+            </div>
+          </div>
           <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
           <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
           <div class="profile-divider"></div>
@@ -214,6 +411,65 @@ const rankDescription: Record<number, string> = {
         </div>
       </div>
     </div>
+
+    <!-- Modal xem bài giảng bài học cho Sinh viên -->
+    <div v-if="activeClassForLessons" class="modal-overlay" @click.self="closeLessonsModal">
+      <div class="modal-content-premium">
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <span class="modal-pre-title">LỚP HỌC: {{ activeClassForLessons.name }}</span>
+            <h2 class="modal-title">{{ activeClassForLessons.subject?.name }}</h2>
+          </div>
+          <button @click="closeLessonsModal" class="btn-close"><i class="pi pi-times"></i></button>
+        </div>
+        
+        <div class="modal-body-premium">
+          <div v-if="loadingLessons" class="loading-center-lessons">
+            <i class="pi pi-spin pi-spinner spinner-purple" style="font-size:2rem;color:#7c3aed"></i>
+            <span style="margin-top:0.5rem;font-size:0.875rem;color:#6b7280">Đang tải danh sách bài học...</span>
+          </div>
+          <div v-else-if="classLessons.length === 0" class="empty-lessons">
+            <i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af;margin-bottom:1rem"></i>
+            <h3>Giảng viên chưa đăng tải bài giảng nào cho lớp này.</h3>
+            <p>Vui lòng quay lại sau!</p>
+          </div>
+          <div v-else class="student-lessons-list">
+            <div v-for="(l, idx) in classLessons" :key="l.id" class="student-lesson-item">
+              <div class="student-lesson-header" @click="toggleStudentLessonExpand(l.id)">
+                <div class="student-lesson-title">
+                  <span class="lesson-index">Bài {{ idx + 1 }}</span>
+                  <span class="lesson-name">{{ l.title }}</span>
+                  <span v-if="parseLessonContent(l.content).youtubeId" class="badge-video ml-2"><i class="pi pi-video mr-1"></i>Video</span>
+                </div>
+                <i class="pi" :class="expandedStudentLessons.includes(l.id) ? 'pi-chevron-up text-purple-600' : 'pi-chevron-down'"></i>
+              </div>
+              
+              <div v-if="expandedStudentLessons.includes(l.id)" class="student-lesson-body">
+                <!-- Video player -->
+                <div v-if="parseLessonContent(l.content).youtubeId" class="student-video-wrapper mb-3">
+                  <iframe 
+                    :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                  </iframe>
+                </div>
+                <!-- Description -->
+                <div v-if="parseLessonContent(l.content).description" class="student-lesson-desc">
+                  {{ parseLessonContent(l.content).description }}
+                </div>
+                <div v-else-if="!parseLessonContent(l.content).youtubeId" class="empty-desc">
+                  Không có ghi chú hay nội dung đính kèm.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Hidden File Input for Avatar Upload -->
+    <input type="file" ref="avatarInput" style="display: none" accept="image/*" @change="onAvatarSelected" />
   </div>
 </template>
 
@@ -279,7 +535,53 @@ const rankDescription: Record<number, string> = {
 
 /* Profile Card */
 .profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.profile-avatar { width: 80px; height: 80px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #9ca3af; margin-bottom: 1rem; border: 4px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #9ca3af;
+  margin-bottom: 1rem;
+  border: 4px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.profile-avatar.editable {
+  cursor: pointer;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border-radius: 50%;
+}
+.profile-avatar.editable:hover .avatar-overlay {
+  opacity: 1;
+}
+.profile-avatar.uploading .avatar-overlay {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.6);
+}
 .profile-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem; color: #111827; }
 .profile-role { margin-bottom: 1.5rem; }
 .profile-divider { width: 100%; height: 1px; background: #e5e7eb; margin-bottom: 1rem; }
@@ -305,6 +607,58 @@ const rankDescription: Record<number, string> = {
 .action-arrow { color: #9ca3af; transition: transform 0.2s; }
 .action-card:hover .action-arrow { color: #2563eb; transform: translateX(2px); }
 
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .stats-row { grid-template-columns: 1fr; } .actions-grid { grid-template-columns: 1fr; } }
+/* Student Classes list style */
+.my-classes-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.my-class-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer; background: #fff; transition: all 0.2s ease; }
+.my-class-row:hover { border-color: #7c3aed; background: #fbfbfe; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(124, 58, 237, 0.05); }
+.my-class-info { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.my-class-code { font-size: 0.75rem; font-weight: 700; color: #7c3aed; letter-spacing: 0.05em; text-transform: uppercase; }
+.my-class-name { font-size: 0.95rem; color: #111827; }
+.my-class-teacher { font-size: 0.8rem; color: #6b7280; }
+.btn-learn { background: #7c3aed; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; transition: background 0.2s; }
+.btn-learn:hover { background: #6d28d9; }
+
+/* Premium Modal Overlay & Content */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(17, 24, 39, 0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeInModal 0.25s ease-out; }
+.modal-content-premium { background: #fff; width: 90%; max-width: 700px; max-height: 85vh; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e5e7eb; animation: slideUpModal 0.25s ease-out; }
+.modal-header { padding: 1.25rem 1.5rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: flex-start; }
+.modal-header-info { display: flex; flex-direction: column; }
+.modal-pre-title { font-size: 0.75rem; font-weight: 700; color: #6b7280; letter-spacing: 0.05em; margin-bottom: 2px; }
+.modal-title { font-size: 1.25rem; font-weight: 600; color: #111827; margin: 0; }
+.btn-close { background: none; border: none; font-size: 1.1rem; color: #9ca3af; cursor: pointer; padding: 0.25rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-close:hover { background: #f3f4f6; color: #111827; }
+.modal-body-premium { padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; }
+
+/* Student Lessons viewer specific styles */
+.loading-center-lessons { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem; color: #7c3aed; }
+.spinner-purple { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.empty-lessons { text-align: center; padding: 3rem 1.5rem; color: #6b7280; }
+.empty-lessons h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.25rem; color: #111827; }
+.empty-lessons p { font-size: 0.875rem; color: #9ca3af; }
+
+.student-lessons-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.student-lesson-item { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; transition: all 0.2s; }
+.student-lesson-header { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: #f9fafb; cursor: pointer; }
+.student-lesson-header:hover { background: #f3f4f6; }
+.student-lesson-title { display: flex; align-items: center; font-weight: 600; color: #111827; }
+.lesson-index { font-size: 0.8rem; background: #e5e7eb; padding: 0.15rem 0.45rem; border-radius: 4px; color: #4b5563; font-weight: 700; margin-right: 0.75rem; text-transform: uppercase; }
+.lesson-name { font-size: 0.95rem; }
+.student-lesson-body { padding: 1.25rem; border-top: 1px solid #e5e7eb; background: #fff; }
+
+.student-video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.07); border: 1px solid #e5e7eb; background: #000; }
+.student-video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.student-lesson-desc { font-size: 0.9rem; color: #4b5563; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.empty-desc { font-size: 0.85rem; color: #9ca3af; font-style: italic; }
+.badge-video { display: inline-flex; align-items: center; font-size: 0.7rem; background: #f3e8ff; color: #6b21a8; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600; }
+
+@keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUpModal { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }

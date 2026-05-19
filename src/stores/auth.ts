@@ -150,34 +150,45 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  let initializePromise: Promise<void> | null = null
+
   /**
    * Khởi tạo auth state từ session Supabase hiện tại (nếu có).
-   * Gọi một lần khi app mount.
+   * Gọi một lần khi app mount hoặc trong router guard.
    */
   async function initialize(): Promise<void> {
-    loading.value = true
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
+    if (initializePromise) return initializePromise
 
-      if (session?.user) {
-        user.value = session.user as unknown as Record<string, unknown>
-        await fetchCurrentProfile()
-      }
-    } catch (err) {
-      console.error('[AuthStore] Lỗi khởi tạo:', (err as Error).message)
-    } finally {
-      loading.value = false
-    }
+    initializePromise = (async () => {
+      loading.value = true
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
 
-    // Lắng nghe thay đổi auth state (token refresh, logout từ tab khác, ...)
-    supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        user.value = session.user as unknown as Record<string, unknown>
-      } else {
-        user.value = null
-        profile.value = null
+        if (session?.user) {
+          user.value = session.user as unknown as Record<string, unknown>
+          await fetchCurrentProfile()
+        }
+      } catch (err) {
+        console.error('[AuthStore] Lỗi khởi tạo:', (err as Error).message)
+      } finally {
+        loading.value = false
       }
-    })
+
+      // Lắng nghe thay đổi auth state (đăng ký duy nhất một lần)
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session?.user) {
+          user.value = session.user as unknown as Record<string, unknown>
+          if (!profile.value || profile.value.id !== session.user.id) {
+            await fetchCurrentProfile()
+          }
+        } else {
+          user.value = null
+          profile.value = null
+        }
+      })
+    })()
+
+    return initializePromise
   }
 
   return {

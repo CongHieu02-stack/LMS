@@ -33,7 +33,7 @@ const {
   fetchPermissions,
   initPermissionsForUser,
   saveUserPermissions,
-  resetToDefault
+  resetToDefault,
 } = useUserPermissions()
 
 // Tìm kiếm nhân sự
@@ -41,16 +41,17 @@ const searchQuery = ref('')
 const filteredProfiles = computed(() => {
   if (!searchQuery.value) return profiles.value
   const query = searchQuery.value.toLowerCase()
-  return profiles.value.filter(p => 
-    p.full_name.toLowerCase().includes(query) || 
-    p.email.toLowerCase().includes(query) ||
-    p.role.toLowerCase().includes(query)
+  return profiles.value.filter(
+    (p) =>
+      p.full_name.toLowerCase().includes(query) ||
+      p.email.toLowerCase().includes(query) ||
+      p.role.toLowerCase().includes(query),
   )
 })
 
 const canEdit = computed(() => {
-  if (!selectedUserProfile.value || !authStore.profile) return false;
-  return authStore.profile.rank > selectedUserProfile.value.rank;
+  if (!selectedUserProfile.value || !authStore.profile) return false
+  return authStore.profile.rank > selectedUserProfile.value.rank
 })
 
 function handleUserChange(userId: string) {
@@ -59,26 +60,46 @@ function handleUserChange(userId: string) {
 
 async function handleSave() {
   if (!selectedUserId.value || !selectedUserProfile.value) {
-    toast.add({ severity: 'error', summary: 'Cảnh báo', detail: 'Vui lòng chọn nhân sự.', life: 3000 })
+    toast.add({
+      severity: 'error',
+      summary: 'Cảnh báo',
+      detail: 'Vui lòng chọn nhân sự.',
+      life: 3000,
+    })
     return
   }
 
   const success = await saveUserPermissions(
     selectedUserId.value,
     selectedUserProfile.value.role,
-    selectedPermissionIds.value
+    selectedPermissionIds.value,
   )
 
   if (success) {
-    toast.add({ severity: 'success', summary: 'Thành công', detail: successMessage.value || 'Cập nhật phân quyền thành công!', life: 4000 })
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: successMessage.value || 'Cập nhật phân quyền thành công!',
+      life: 4000,
+    })
   } else {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: errorMessage.value || 'Giao dịch bị từ chối.', life: 5000 })
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: errorMessage.value || 'Giao dịch bị từ chối.',
+      life: 5000,
+    })
   }
 }
 
 function handleReset() {
   resetToDefault()
-  toast.add({ severity: 'info', summary: 'Khôi phục', detail: 'Đã tải mẫu quyền của vai trò gốc lên UI.', life: 4000 })
+  toast.add({
+    severity: 'info',
+    summary: 'Khôi phục',
+    detail: 'Đã tải mẫu quyền của vai trò gốc lên UI.',
+    life: 4000,
+  })
 }
 
 onMounted(async () => {
@@ -93,55 +114,53 @@ onMounted(async () => {
   <div class="permission-editor-wrapper">
     <!-- Header -->
     <div class="page-header">
-      <div class="breadcrumb">
-        Quản trị / <span>Phân quyền Nhân sự</span>
-      </div>
+      <div class="breadcrumb">Quản trị / <span>Phân quyền Nhân sự</span></div>
       <h1 class="page-title">Phân Quyền Hệ Thống</h1>
     </div>
 
     <!-- Main Split Layout -->
     <div class="split-layout">
-      
       <!-- CỘT TRÁI: DANH SÁCH NHÂN SỰ -->
       <div class="left-pane">
         <div class="search-header">
           <h3>Lựa chọn nhân sự</h3>
           <div class="search-box">
             <i class="pi pi-search search-icon"></i>
-            <input 
-              type="text" 
-              v-model="searchQuery" 
-              placeholder="Tìm tên, email, vai trò..." 
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Tìm tên, email, vai trò..."
               class="search-input"
             />
           </div>
         </div>
 
         <div class="user-list custom-scrollbar">
-          <div 
-            v-for="profile in filteredProfiles" 
+          <div
+            v-for="profile in filteredProfiles"
             :key="profile.id"
             @click="handleUserChange(profile.id)"
             class="user-item"
-            :class="{ 'active': selectedUserId === profile.id }"
+            :class="{ active: selectedUserId === profile.id }"
           >
             <div class="active-indicator"></div>
-            
-            <div class="avatar" :class="{ 'active': selectedUserId === profile.id }">
-              {{ profile.full_name.charAt(0).toUpperCase() }}
+
+            <div class="avatar" :class="{ active: selectedUserId === profile.id }">
+              <img v-if="profile.avatarUrl || profile.avatar_url" :src="profile.avatarUrl || profile.avatar_url" alt="Avatar" class="avatar-img-small" />
+              <span v-else>{{ (profile.fullName || profile.full_name || 'U').charAt(0).toUpperCase() }}</span>
             </div>
-            
+
             <div class="user-info">
-              <div class="user-name" :class="{ 'active': selectedUserId === profile.id }">
-                {{ profile.full_name }}
+              <div class="user-name" :class="{ active: selectedUserId === profile.id }">
+                {{ profile.fullName || profile.full_name }}
               </div>
               <div class="user-email">{{ profile.email }}</div>
-              <span class="role-badge" :class="{ 'active': selectedUserId === profile.id }">
-                {{ profile.role }}
+              <span class="role-badge" :class="{ active: selectedUserId === profile.id }">
+                {{ profile.displayRole || profile.role }}
               </span>
             </div>
           </div>
-          
+
           <div v-if="filteredProfiles.length === 0" class="empty-list">
             Không tìm thấy nhân sự phù hợp.
           </div>
@@ -150,13 +169,15 @@ onMounted(async () => {
 
       <!-- CỘT PHẢI: MA TRẬN QUYỀN HẠN -->
       <div class="right-pane">
-        
         <div v-if="!selectedUserId" class="empty-state">
           <div class="empty-icon">
             <i class="pi pi-user-edit"></i>
           </div>
           <h2>Chưa chọn nhân sự</h2>
-          <p>Vui lòng chọn một tài khoản từ danh sách bên trái để xem và cấu hình phân quyền hệ thống.</p>
+          <p>
+            Vui lòng chọn một tài khoản từ danh sách bên trái để xem và cấu hình phân quyền hệ
+            thống.
+          </p>
         </div>
 
         <div v-else-if="loading" class="loading-state">
@@ -165,7 +186,6 @@ onMounted(async () => {
         </div>
 
         <div v-else class="config-content">
-          
           <div class="user-config-header">
             <div class="header-left">
               <div class="header-label">Đang cấu hình quyền cho</div>
@@ -181,14 +201,16 @@ onMounted(async () => {
           <div v-if="!canEdit" class="hierarchy-warning">
             <i class="pi pi-shield"></i>
             <div>
-              <strong>Phân tầng quyền lực:</strong> Cấp bậc của bạn (Rank {{ authStore.profile?.rank }}) không đủ để chỉnh sửa tài khoản này (Rank {{ selectedUserProfile?.rank }}).
+              <strong>Phân tầng quyền lực:</strong> Cấp bậc của bạn (Rank
+              {{ authStore.profile?.rank }}) không đủ để chỉnh sửa tài khoản này (Rank
+              {{ selectedUserProfile?.rank }}).
             </div>
           </div>
 
           <div class="matrix-container custom-scrollbar">
             <div class="matrix-grid">
-              <pv-card 
-                v-for="(perms, groupName) in groupedPermissions" 
+              <pv-card
+                v-for="(perms, groupName) in groupedPermissions"
                 :key="groupName"
                 class="monochrome-card"
               >
@@ -198,14 +220,10 @@ onMounted(async () => {
                     <i class="pi pi-shield"></i>
                   </div>
                 </template>
-                
+
                 <template #content>
                   <div class="card-body">
-                    <div 
-                      v-for="perm in perms" 
-                      :key="perm.id"
-                      class="permission-item"
-                    >
+                    <div v-for="perm in perms" :key="perm.id" class="permission-item">
                       <pv-checkbox
                         v-model="selectedPermissionIds"
                         :inputId="'perm_' + perm.id"
@@ -213,7 +231,7 @@ onMounted(async () => {
                         class="purple-checkbox"
                         :disabled="!canEdit"
                       />
-                      
+
                       <div class="permission-label-wrap">
                         <label :for="'perm_' + perm.id" class="permission-label">
                           {{ perm.name }}
@@ -232,12 +250,13 @@ onMounted(async () => {
 
           <div class="action-footer">
             <div class="footer-note">
-              <strong>Lưu ý:</strong> Người dùng phải giữ ít nhất một chức năng thuộc vai trò mặc định của họ.
+              <strong>Lưu ý:</strong> Người dùng phải giữ ít nhất một chức năng thuộc vai trò mặc
+              định của họ.
             </div>
-            
+
             <div class="footer-buttons">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 class="btn-reset"
                 @click="handleReset"
                 :disabled="saving || !canEdit"
@@ -245,8 +264,8 @@ onMounted(async () => {
                 Khôi phục mặc định
               </button>
 
-              <button 
-                type="button" 
+              <button
+                type="button"
                 class="btn-save"
                 @click="handleSave"
                 :disabled="saving || !canEdit"
@@ -256,7 +275,6 @@ onMounted(async () => {
               </button>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -315,10 +333,13 @@ onMounted(async () => {
   width: 320px;
   display: flex;
   flex-direction: column;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background-color: #fff;
   overflow: hidden;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
   flex-shrink: 0;
 }
 .search-header {
@@ -346,7 +367,8 @@ onMounted(async () => {
 }
 .search-input {
   width: 100%;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   padding: 0.5rem 0.75rem 0.5rem 2.25rem;
   font-size: 0.875rem;
   outline: none;
@@ -400,8 +422,12 @@ onMounted(async () => {
 .avatar {
   width: 40px;
   height: 40px;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  background-color: #f9fafb; color: #111827; border-top-left-radius: 8px; border-top-right-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  color: #111827;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -409,6 +435,13 @@ onMounted(async () => {
   font-size: 1.125rem;
   flex-shrink: 0;
   transition: all 0.2s;
+  overflow: hidden;
+}
+.avatar-img-small {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
 }
 .user-item:hover .avatar {
   background-color: #a855f7;
@@ -449,7 +482,7 @@ onMounted(async () => {
 .role-badge {
   display: inline-block;
   font-size: 0.625rem;
-  
+
   /* text-transform: removed */
   padding: 0.125rem 0.5rem;
   font-weight: 500;
@@ -481,12 +514,16 @@ onMounted(async () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background-color: #fff;
   overflow: hidden;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
 }
-.empty-state, .loading-state {
+.empty-state,
+.loading-state {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -567,7 +604,7 @@ onMounted(async () => {
 .header-email {
   font-size: 0.875rem;
   color: #4b5563;
-  
+
   margin-top: 0.25rem;
 }
 .header-right {
@@ -580,7 +617,10 @@ onMounted(async () => {
   font-size: 0.75rem;
   font-weight: 600;
   /* text-transform: removed */
-  background-color: #f9fafb; color: #111827; border-top-left-radius: 8px; border-top-right-radius: 8px;
+  background-color: #f9fafb;
+  color: #111827;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   padding: 0.25rem 0.75rem;
 }
 .badge-rank {
@@ -630,13 +670,17 @@ onMounted(async () => {
 
 .monochrome-card {
   background: #fff;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 .card-header {
-  background-color: #f9fafb; color: #111827; border-top-left-radius: 8px; border-top-right-radius: 8px;
+  background-color: #f9fafb;
+  color: #111827;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   padding: 0.75rem 1rem;
   font-weight: 600;
   /* text-transform: removed */
@@ -732,7 +776,8 @@ onMounted(async () => {
   /* text-transform: removed */
   letter-spacing: normal;
   color: #111827;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background-color: #fff;
   padding: 0.75rem 1.5rem;
   cursor: pointer;
@@ -747,7 +792,8 @@ onMounted(async () => {
   /* text-transform: removed */
   letter-spacing: normal;
   color: #fff;
-  border: 1px solid #9333ea; border-radius: 8px;
+  border: 1px solid #9333ea;
+  border-radius: 8px;
   background-color: #7c3aed;
   padding: 0.75rem 2rem;
   cursor: pointer;
@@ -767,14 +813,14 @@ onMounted(async () => {
   width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1; 
+  background: #f1f1f1;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1; 
+  background: #cbd5e1;
   border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8; 
+  background: #94a3b8;
 }
 
 /* PrimeVue Overrides */
@@ -806,13 +852,17 @@ onMounted(async () => {
   color: #fff !important;
   border: 2px solid #9333ea !important;
   border-radius: 0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
 }
 :deep(.p-toast-message-content) {
   background: #000 !important;
   color: #fff !important;
 }
-:deep(.p-toast-message-text), :deep(.p-toast-summary), :deep(.p-toast-detail) {
+:deep(.p-toast-message-text),
+:deep(.p-toast-summary),
+:deep(.p-toast-detail) {
   color: #fff !important;
 }
 :deep(.p-toast-icon-close) {
@@ -830,7 +880,13 @@ button:disabled {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

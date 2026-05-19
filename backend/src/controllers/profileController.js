@@ -47,7 +47,11 @@ export async function updateRole(req, res) {
   try {
     const { role } = req.body
     const targetId = req.params.id
-    const actorRank = req.profile.rank
+    
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
 
     // Kiểm tra role hợp lệ
     const validRoles = [
@@ -65,9 +69,9 @@ export async function updateRole(req, res) {
     }
 
     // Bảo vệ phân tầng: actor phải có rank CAO HƠN target
-    if (actorRank <= targetProfile.rank) {
+    if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Rank của bạn (${actorRank}) không đủ quyền tác động đối tượng có rank (${targetProfile.rank}).`
+        error: `Quyền của bạn (hiệu lực rank ${effectiveRank}) không đủ tác động đối tượng có rank (${targetProfile.rank}).`
       })
     }
 
@@ -76,9 +80,9 @@ export async function updateRole(req, res) {
       ADMIN: 100, HIEU_TRUONG: 90, HR: 80,
       PHONG_DAO_TAO: 70, TRUONG_BO_MON: 60, GIANG_VIEN: 50, SINH_VIEN: 10
     }
-    if (RANK_MAP[role] >= actorRank) {
+    if (RANK_MAP[role] >= effectiveRank) {
       return res.status(403).json({
-        error: `Bạn không thể gán role ${role} (rank ${RANK_MAP[role]}) vì rank bạn chỉ là ${actorRank}.`
+        error: `Bạn không thể gán role ${role} (rank ${RANK_MAP[role]}) vì quyền của bạn chỉ giới hạn ở rank ${effectiveRank}.`
       })
     }
 
@@ -103,8 +107,13 @@ export async function updateInfo(req, res) {
     const targetId = req.params.id
     const actorId = req.user.id
 
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
+
     // Chỉ chính chủ hoặc rank >= 80 mới được sửa
-    if (targetId !== actorId && req.profile.rank < 80) {
+    if (targetId !== actorId && effectiveRank < 80) {
       return res.status(403).json({ error: 'Bạn không có quyền sửa hồ sơ này.' })
     }
 
@@ -126,14 +135,10 @@ export async function updateInfo(req, res) {
 export async function createProfile(req, res) {
   try {
     const { email, password, fullName, role } = req.body
-    const actorRank = req.profile.rank
-
-    // Bảo vệ: Chỉ Admin & Hiệu trưởng (rank >= 90) mới được quyền tạo tài khoản
-    if (actorRank < 90) {
-      return res.status(403).json({
-        error: 'Chỉ Admin tối cao hoặc Hiệu trưởng mới có quyền tạo tài khoản nhân sự mới.'
-      })
-    }
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
 
     const validRoles = [
       'ADMIN', 'HIEU_TRUONG', 'HR', 'PHONG_DAO_TAO',
@@ -148,9 +153,9 @@ export async function createProfile(req, res) {
       ADMIN: 100, HIEU_TRUONG: 90, HR: 80,
       PHONG_DAO_TAO: 70, TRUONG_BO_MON: 60, GIANG_VIEN: 50, SINH_VIEN: 10
     }
-    if (RANK_MAP[role] > actorRank) {
+    if (RANK_MAP[role] > effectiveRank) {
       return res.status(403).json({
-        error: `Bạn không thể tạo tài khoản có vai trò ${role} (rank ${RANK_MAP[role]}) vì rank của bạn chỉ là ${actorRank}.`
+        error: `Bạn không thể tạo tài khoản có vai trò ${role} (rank ${RANK_MAP[role]}) vì quyền của bạn giới hạn ở rank ${effectiveRank}.`
       })
     }
 
@@ -195,7 +200,11 @@ export async function createProfile(req, res) {
 export async function deleteProfile(req, res) {
   try {
     const targetId = req.params.id
-    const actorRank = req.profile.rank
+    
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
 
     const targetProfile = await profileModel.findById(targetId)
     if (!targetProfile) {
@@ -208,9 +217,9 @@ export async function deleteProfile(req, res) {
     }
 
     // Kiểm tra phân tầng: actor phải có rank CAO HƠN target
-    if (actorRank <= targetProfile.rank) {
+    if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền hạn của bạn (rank ${actorRank}) không đủ để xóa tài khoản này (rank ${targetProfile.rank}).`
+        error: `Quyền hạn của bạn (rank hiệu lực ${effectiveRank}) không đủ để xóa tài khoản này (rank ${targetProfile.rank}).`
       })
     }
 
@@ -239,4 +248,88 @@ export async function deleteProfile(req, res) {
     return res.status(500).json({ error: 'Lỗi khi xóa hồ sơ.' })
   }
 }
+
+/**
+ * POST /api/profiles/:id/avatar — Tải lên avatar dạng base64
+ * Chỉ chính chủ hoặc admin (rank >= 80) mới được phép.
+ */
+export async function uploadAvatar(req, res) {
+  try {
+    const targetId = req.params.id
+    const actorId = req.user.id
+    const { avatarData } = req.body
+
+    if (!avatarData) {
+      return res.status(400).json({ error: 'Thiếu dữ liệu ảnh (avatarData dạng base64).' })
+    }
+
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
+
+    // Chỉ chính chủ hoặc rank >= 80 mới được sửa
+    if (targetId !== actorId && effectiveRank < 80) {
+      return res.status(403).json({ error: 'Bạn không có quyền cập nhật ảnh đại diện của hồ sơ này.' })
+    }
+
+    // 1. Giải mã base64
+    const matches = avatarData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+    if (!matches || matches.length !== 3) {
+      return res.status(400).json({ error: 'Định dạng ảnh Base64 không hợp lệ.' })
+    }
+
+    const contentType = matches[1]
+    const buffer = Buffer.from(matches[2], 'base64')
+
+    // Lấy phần mở rộng của file dựa trên content type
+    let extension = 'png'
+    if (contentType.includes('jpeg') || contentType.includes('jpg')) extension = 'jpg'
+    else if (contentType.includes('gif')) extension = 'gif'
+    else if (contentType.includes('webp')) extension = 'webp'
+
+    const fileName = `${targetId}-${Date.now()}.${extension}`
+
+    // 2. Kiểm tra/Tạo bucket 'avatars' public nếu chưa có
+    try {
+      await supabaseAdmin.storage.createBucket('avatars', { public: true })
+    } catch (e) {
+      // Bỏ qua lỗi nếu đã tồn tại
+    }
+
+    // 3. Upload file lên bucket
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from('avatars')
+      .upload(fileName, buffer, {
+        contentType,
+        upsert: true
+      })
+
+    if (uploadError) {
+      console.error('[ProfileController.uploadAvatar] Upload error:', uploadError)
+      return res.status(500).json({ error: 'Lỗi khi tải ảnh lên storage.' })
+    }
+
+    // 4. Lấy public URL
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('avatars')
+      .getPublicUrl(fileName)
+
+    const avatarUrl = publicUrlData.publicUrl
+
+    // 5. Cập nhật avatar_url trong CSDL
+    const updated = await profileModel.updateInfo(targetId, { avatar_url: avatarUrl })
+
+    return res.json({
+      success: true,
+      message: 'Tải lên ảnh đại diện thành công.',
+      avatarUrl,
+      profile: profileView.formatProfile(updated)
+    })
+  } catch (err) {
+    console.error('[ProfileController.uploadAvatar]', err.message)
+    return res.status(500).json({ error: 'Lỗi máy chủ khi cập nhật ảnh đại diện.' })
+  }
+}
+
 

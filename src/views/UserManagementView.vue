@@ -26,7 +26,7 @@ const rolesList = [
   { label: 'Phòng đào tạo', value: 'PHONG_DAO_TAO' },
   { label: 'Trưởng bộ môn', value: 'TRUONG_BO_MON' },
   { label: 'Giảng viên', value: 'GIANG_VIEN' },
-  { label: 'Sinh viên', value: 'SINH_VIEN' }
+  { label: 'Sinh viên', value: 'SINH_VIEN' },
 ]
 
 const RANK_MAP: Record<string, number> = {
@@ -36,12 +36,18 @@ const RANK_MAP: Record<string, number> = {
   PHONG_DAO_TAO: 70,
   TRUONG_BO_MON: 60,
   GIANG_VIEN: 50,
-  SINH_VIEN: 10
+  SINH_VIEN: 10,
 }
 
+const effectiveRank = computed(() => {
+  let rank = authStore.profile?.rank || 0
+  if (authStore.hasPermission('user_manage_senior')) rank = Math.max(rank, 90)
+  else if (authStore.hasPermission('user_manage_staff')) rank = Math.max(rank, 80)
+  return rank
+})
+
 const availableRoles = computed(() => {
-  const actorRank = authStore.profile?.rank || 0
-  return rolesList.filter(role => RANK_MAP[role.value] <= actorRank)
+  return rolesList.filter((role) => RANK_MAP[role.value] <= effectiveRank.value)
 })
 
 // Hàm fetch danh sách profiles
@@ -60,7 +66,12 @@ async function fetchProfiles() {
 
 // Xử lý tạo mới user
 async function handleCreateUser() {
-  if (!formEmail.value || !formPassword.value || !formConfirmPassword.value || !formFullName.value) {
+  if (
+    !formEmail.value ||
+    !formPassword.value ||
+    !formConfirmPassword.value ||
+    !formFullName.value
+  ) {
     errorMessage.value = 'Vui lòng điền đầy đủ thông tin.'
     return
   }
@@ -79,7 +90,7 @@ async function handleCreateUser() {
       email: formEmail.value,
       password: formPassword.value,
       fullName: formFullName.value,
-      role: formRole.value
+      role: formRole.value,
     })
 
     if (res.success) {
@@ -111,7 +122,9 @@ async function handleDeleteUser(user: any) {
     return
   }
 
-  const confirmDelete = confirm(`Bạn có chắc chắn muốn xóa tài khoản "${user.fullName}" (${user.email}) không?`)
+  const confirmDelete = confirm(
+    `Bạn có chắc chắn muốn xóa tài khoản "${user.fullName}" (${user.email}) không?`,
+  )
   if (!confirmDelete) return
 
   loading.value = true
@@ -135,7 +148,7 @@ function openCreateModal() {
   errorMessage.value = null
   successMessage.value = null
   showCreateModal.value = true
-  
+
   if (availableRoles.value.length > 0) {
     formRole.value = availableRoles.value[0].value
   } else {
@@ -153,9 +166,7 @@ onMounted(() => {
     <!-- Header -->
     <div class="page-header">
       <div>
-        <div class="breadcrumb">
-          Quản trị / <span>Quản lý Nhân sự</span>
-        </div>
+        <div class="breadcrumb">Quản trị / <span>Quản lý Nhân sự</span></div>
         <h1 class="page-title">Quản lý Nhân sự</h1>
         <div class="page-subtitle">Tạo, phân quyền và quản lý tài khoản nhân viên trường học.</div>
       </div>
@@ -198,7 +209,12 @@ onMounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in profiles" :key="user.id" class="table-row" :class="{ 'row-self': user.id === authStore.profile?.id }">
+            <tr
+              v-for="user in profiles"
+              :key="user.id"
+              class="table-row"
+              :class="{ 'row-self': user.id === authStore.profile?.id }"
+            >
               <td>
                 <div class="user-name">{{ user.fullName }}</div>
                 <div v-if="user.id === authStore.profile?.id" class="self-tag">(Bạn hiện tại)</div>
@@ -211,10 +227,16 @@ onMounted(() => {
               </td>
               <td class="text-center font-black rank-cell">{{ user.rank }}</td>
               <td class="text-right">
-                <button 
+                <button
                   class="btn-icon btn-delete"
-                  :disabled="user.rank >= (authStore.profile?.rank || 0) || user.id === authStore.profile?.id"
-                  :title="user.rank >= (authStore.profile?.rank || 0) ? 'Không có quyền xóa cấp bậc bằng/cao hơn' : 'Xóa tài khoản'"
+                  :disabled="
+                    user.rank >= effectiveRank || user.id === authStore.profile?.id
+                  "
+                  :title="
+                    user.rank >= effectiveRank
+                      ? 'Không có quyền xóa cấp bậc bằng/cao hơn'
+                      : 'Xóa tài khoản'
+                  "
                   @click="handleDeleteUser(user)"
                 >
                   <i class="pi pi-trash"></i>
@@ -231,7 +253,9 @@ onMounted(() => {
       <div class="mono-modal">
         <div class="modal-header">
           <span>Thêm Nhân Viên</span>
-          <button class="btn-close" @click="showCreateModal = false"><i class="pi pi-times"></i></button>
+          <button class="btn-close" @click="showCreateModal = false">
+            <i class="pi pi-times"></i>
+          </button>
         </div>
 
         <form @submit.prevent="handleCreateUser" autocomplete="off" class="modal-form">
@@ -242,22 +266,49 @@ onMounted(() => {
 
             <div class="form-group">
               <label class="form-label">Họ tên đầy đủ</label>
-              <input v-model="formFullName" type="text" class="mono-input" placeholder="Nguyễn Văn A" required />
+              <input
+                v-model="formFullName"
+                type="text"
+                class="mono-input"
+                placeholder="Nguyễn Văn A"
+                required
+              />
             </div>
 
             <div class="form-group">
               <label class="form-label">Địa chỉ Email</label>
-              <input v-model="formEmail" type="email" class="mono-input" placeholder="email@example.com" required autocomplete="off" />
+              <input
+                v-model="formEmail"
+                type="email"
+                class="mono-input"
+                placeholder="email@example.com"
+                required
+                autocomplete="off"
+              />
             </div>
 
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label">Mật khẩu</label>
-                <input v-model="formPassword" type="password" class="mono-input" placeholder="Tối thiểu 6 ký tự" required autocomplete="new-password" />
+                <input
+                  v-model="formPassword"
+                  type="password"
+                  class="mono-input"
+                  placeholder="Tối thiểu 6 ký tự"
+                  required
+                  autocomplete="new-password"
+                />
               </div>
               <div class="form-group">
                 <label class="form-label">Xác nhận</label>
-                <input v-model="formConfirmPassword" type="password" class="mono-input" placeholder="Nhập lại mật khẩu" required autocomplete="new-password" />
+                <input
+                  v-model="formConfirmPassword"
+                  type="password"
+                  class="mono-input"
+                  placeholder="Nhập lại mật khẩu"
+                  required
+                  autocomplete="new-password"
+                />
               </div>
             </div>
 
@@ -333,8 +384,11 @@ onMounted(() => {
 .btn-create {
   background: #7c3aed;
   color: #fff;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
   padding: 0.75rem 1.5rem;
   font-weight: 600;
   /* text-transform: removed */
@@ -348,7 +402,9 @@ onMounted(() => {
 }
 .btn-create:hover {
   transform: translate(2px, 2px);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
   background: #7e22ce;
 }
 
@@ -361,31 +417,43 @@ onMounted(() => {
   margin-bottom: 1.5rem;
   font-size: 0.875rem;
 }
-.mono-alert i { font-size: 1.25rem; }
+.mono-alert i {
+  font-size: 1.25rem;
+}
 .alert-error {
   background-color: #fef2f2;
   border: 2px solid #ef4444;
   color: #b91c1c;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
 }
 .alert-success {
   background-color: #f0fdf4;
   border: 2px solid #22c55e;
   color: #15803d;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
 }
 
 /* Card */
 .mono-card {
   background: #fff;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 .card-header {
-  background-color: #f9fafb; color: #111827; border-top-left-radius: 8px; border-top-right-radius: 8px;
+  background-color: #f9fafb;
+  color: #111827;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   padding: 1rem 1.5rem;
   font-weight: 600;
   /* text-transform: removed */
@@ -395,11 +463,19 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 }
-.card-header i { color: #9ca3af; }
+.card-header i {
+  color: #9ca3af;
+}
 
 /* Table */
-.table-container { overflow-x: auto; }
-.mono-table { width: 100%; border-collapse: collapse; text-align: left; }
+.table-container {
+  overflow-x: auto;
+}
+.mono-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
 .mono-table th {
   background-color: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
@@ -415,18 +491,45 @@ onMounted(() => {
   border-bottom: 1px solid #e5e7eb;
   vertical-align: middle;
 }
-.table-row { transition: background-color 0.2s; }
-.table-row:hover { background-color: #f9fafb; }
-.row-self { background-color: #faf5ff !important; }
+.table-row {
+  transition: background-color 0.2s;
+}
+.table-row:hover {
+  background-color: #f9fafb;
+}
+.row-self {
+  background-color: #faf5ff !important;
+}
 
 /* Cell Content */
-.user-name { font-weight: 600; color: #111827; font-size: 0.95rem; }
-.self-tag { font-size: 0.75rem; color: #9333ea; font-weight: 500; margin-top: 0.25rem; }
-.email-cell { font-size: 0.875rem; color: #4b5563; }
-.rank-cell {  font-size: 1.1rem; color: #111827; }
-.text-center { text-align: center; }
-.text-right { text-align: right; }
-.font-black { font-weight: 600; }
+.user-name {
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.95rem;
+}
+.self-tag {
+  font-size: 0.75rem;
+  color: #9333ea;
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+.email-cell {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+.rank-cell {
+  font-size: 1.1rem;
+  color: #111827;
+}
+.text-center {
+  text-align: center;
+}
+.text-right {
+  text-align: right;
+}
+.font-black {
+  font-weight: 600;
+}
 
 /* Badges */
 .mono-badge {
@@ -438,11 +541,33 @@ onMounted(() => {
   padding: 0.25rem 0.75rem;
   border: 1px solid #000;
 }
-.badge-rank-100 { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
-.badge-rank-90 { background: #dbeafe; color: #1e40af; border-color: #1e40af; }
-.badge-rank-80 { background: #dcfce7; color: #166534; border-color: #166534; }
-.badge-rank-70, .badge-rank-60 { background: #fef08a; color: #854d0e; border-color: #854d0e; }
-.badge-rank-50, .badge-rank-10 { background: #f3f4f6; color: #374151; border-color: #374151; }
+.badge-rank-100 {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #991b1b;
+}
+.badge-rank-90 {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #1e40af;
+}
+.badge-rank-80 {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #166534;
+}
+.badge-rank-70,
+.badge-rank-60 {
+  background: #fef08a;
+  color: #854d0e;
+  border-color: #854d0e;
+}
+.badge-rank-50,
+.badge-rank-10 {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #374151;
+}
 
 /* Action Buttons */
 .btn-icon {
@@ -451,18 +576,29 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background-color: #fff;
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-delete { color: #dc2626; }
+.btn-delete {
+  color: #dc2626;
+}
 .btn-delete:hover:not(:disabled) {
   background-color: #fee2e2;
-  transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.08),
+    0 4px 6px -4px rgba(0, 0, 0, 0.04);
   border-color: #dc2626;
 }
-.btn-delete:disabled { opacity: 0.3; cursor: not-allowed; border-color: #d1d5db; color: #d1d5db; }
+.btn-delete:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #d1d5db;
+  color: #d1d5db;
+}
 
 /* Modal */
 .mono-modal-overlay {
@@ -478,8 +614,11 @@ onMounted(() => {
 }
 .mono-modal {
   background: #fff;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
   width: 100%;
   max-width: 500px;
   display: flex;
@@ -487,7 +626,10 @@ onMounted(() => {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .modal-header {
-  background: #f9fafb; color: #111827; border-top-left-radius: 8px; border-top-right-radius: 8px;
+  background: #f9fafb;
+  color: #111827;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   padding: 1rem 1.5rem;
   display: flex;
   justify-content: space-between;
@@ -503,8 +645,15 @@ onMounted(() => {
   cursor: pointer;
   padding: 0.25rem;
 }
-.btn-close:hover { color: #fff; }
-.modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.btn-close:hover {
+  color: #fff;
+}
+.modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
 .modal-footer {
   padding: 1.5rem;
   border-top: 1px solid #e5e7eb;
@@ -515,48 +664,114 @@ onMounted(() => {
 }
 
 /* Modal Form Elements */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.form-group { display: flex; flex-direction: column; gap: 0.5rem; }
-.form-label { font-size: 0.8rem; font-weight: 600; /* text-transform: removed */ color: #111827; }
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600; /* text-transform: removed */
+  color: #111827;
+}
 .mono-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
   font-size: 0.95rem;
   outline: none;
   box-sizing: border-box;
 }
-.mono-input:focus { border-color: #7c3aed; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03); }
-.select-wrapper { position: relative; }
-.select-wrapper::after { content: "▼"; position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); font-size: 0.7rem; pointer-events: none; }
-select.mono-input { appearance: none; padding-right: 2.5rem; }
-.mb-4 { margin-bottom: 1rem; }
+.mono-input:focus {
+  border-color: #7c3aed;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.03);
+}
+.select-wrapper {
+  position: relative;
+}
+.select-wrapper::after {
+  content: '▼';
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+select.mono-input {
+  appearance: none;
+  padding-right: 2.5rem;
+}
+.mb-4 {
+  margin-bottom: 1rem;
+}
 
 /* Modal Buttons */
 .btn-cancel {
   padding: 0.75rem 1.5rem;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background: #fff;
   font-weight: 600;
   /* text-transform: removed */
   cursor: pointer;
 }
-.btn-cancel:hover { background: #f3f4f6; }
+.btn-cancel:hover {
+  background: #f3f4f6;
+}
 .btn-submit {
   padding: 0.75rem 1.5rem;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  background: #f9fafb; color: #fff; border-top-left-radius: 8px; border-top-right-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #fff;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   font-weight: 600;
   /* text-transform: removed */
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
- background: #111827; border: 1px solid #111827;}
-.btn-submit:hover:not(:disabled) { background: #7c3aed; border-color: #7c3aed; }
-.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  background: #111827;
+  border: 1px solid #111827;
+}
+.btn-submit:hover:not(:disabled) {
+  background: #7c3aed;
+  border-color: #7c3aed;
+}
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 </style>

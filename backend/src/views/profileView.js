@@ -14,7 +14,7 @@ const ROLE_DISPLAY = {
   PHONG_DAO_TAO: 'Phòng Đào tạo',
   TRUONG_BO_MON: 'Trưởng Bộ môn',
   GIANG_VIEN: 'Giảng viên',
-  SINH_VIEN: 'Sinh viên'
+  SINH_VIEN: 'Sinh viên',
 }
 
 /**
@@ -35,7 +35,7 @@ export function formatProfile(raw, permissions = []) {
     avatarUrl: raw.avatar_url,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
-    permissions: permissions
+    permissions: permissions,
   }
 }
 
@@ -47,7 +47,7 @@ export function formatProfile(raw, permissions = []) {
 export function formatProfileList(rawList) {
   return {
     data: (rawList || []).map(formatProfile),
-    total: rawList?.length || 0
+    total: rawList?.length || 0,
   }
 }
 
@@ -60,6 +60,6 @@ export function formatDeleteResult(deletedProfile) {
   return {
     success: true,
     message: `Đã xóa hồ sơ "${deletedProfile.full_name}" thành công.`,
-    deletedId: deletedProfile.id
+    deletedId: deletedProfile.id,
   }
 }
