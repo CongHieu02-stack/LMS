@@ -45,6 +45,30 @@ export async function api<T = unknown>(
   const data = await response.json()
 
   if (!response.ok) {
+    if (response.status === 401) {
+      // 1. Token có thể đã hết hạn, thử yêu cầu Supabase cấp lại Session mới
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      
+      if (refreshData?.session && !refreshError) {
+        // 2. Refresh thành công -> Cập nhật token và GỌI LẠI request một lần nữa
+        headers['Authorization'] = `Bearer ${refreshData.session.access_token}`
+        const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
+          ...options,
+          headers
+        })
+        const retryData = await retryResponse.json()
+        if (!retryResponse.ok) {
+          throw new Error(retryData.error || `Lỗi HTTP ${retryResponse.status}`)
+        }
+        return retryData as T
+      } else {
+        // 3. Refresh thất bại (Refresh token hết hạn) -> Buộc đăng xuất và về trang Login
+        await supabase.auth.signOut()
+        window.location.href = '/login?expired=1'
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+      }
+    }
+
     throw new Error(data.error || `Lỗi HTTP ${response.status}`)
   }
 
