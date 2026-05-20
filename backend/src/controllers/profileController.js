@@ -47,7 +47,7 @@ export async function updateRole(req, res) {
   try {
     const { role } = req.body
     const targetId = req.params.id
-    
+
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
     if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
@@ -55,8 +55,13 @@ export async function updateRole(req, res) {
 
     // Kiểm tra role hợp lệ
     const validRoles = [
-      'ADMIN', 'HIEU_TRUONG', 'HR', 'PHONG_DAO_TAO',
-      'TRUONG_BO_MON', 'GIANG_VIEN', 'SINH_VIEN'
+      'ADMIN',
+      'HIEU_TRUONG',
+      'HR',
+      'PHONG_DAO_TAO',
+      'TRUONG_BO_MON',
+      'GIANG_VIEN',
+      'SINH_VIEN',
     ]
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: `Role không hợp lệ: ${role}` })
@@ -71,18 +76,23 @@ export async function updateRole(req, res) {
     // Bảo vệ phân tầng: actor phải có rank CAO HƠN target
     if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền của bạn (hiệu lực rank ${effectiveRank}) không đủ tác động đối tượng có rank (${targetProfile.rank}).`
+        error: `Quyền của bạn (hiệu lực rank ${effectiveRank}) không đủ tác động đối tượng có rank (${targetProfile.rank}).`,
       })
     }
 
     // Không cho phép tạo user có rank >= actor
     const RANK_MAP = {
-      ADMIN: 100, HIEU_TRUONG: 90, HR: 80,
-      PHONG_DAO_TAO: 70, TRUONG_BO_MON: 60, GIANG_VIEN: 50, SINH_VIEN: 10
+      ADMIN: 100,
+      HIEU_TRUONG: 90,
+      HR: 80,
+      PHONG_DAO_TAO: 70,
+      TRUONG_BO_MON: 60,
+      GIANG_VIEN: 50,
+      SINH_VIEN: 10,
     }
     if (RANK_MAP[role] >= effectiveRank) {
       return res.status(403).json({
-        error: `Bạn không thể gán role ${role} (rank ${RANK_MAP[role]}) vì quyền của bạn chỉ giới hạn ở rank ${effectiveRank}.`
+        error: `Bạn không thể gán role ${role} (rank ${RANK_MAP[role]}) vì quyền của bạn chỉ giới hạn ở rank ${effectiveRank}.`,
       })
     }
 
@@ -90,7 +100,7 @@ export async function updateRole(req, res) {
     return res.json({
       success: true,
       message: `Đã cập nhật role thành ${role}.`,
-      profile: profileView.formatProfile(updated)
+      profile: profileView.formatProfile(updated),
     })
   } catch (err) {
     console.error('[ProfileController.updateRole]', err.message)
@@ -120,7 +130,7 @@ export async function updateInfo(req, res) {
     const updated = await profileModel.updateInfo(targetId, req.body)
     return res.json({
       success: true,
-      profile: profileView.formatProfile(updated)
+      profile: profileView.formatProfile(updated),
     })
   } catch (err) {
     console.error('[ProfileController.updateInfo]', err.message)
@@ -141,8 +151,13 @@ export async function createProfile(req, res) {
     else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
 
     const validRoles = [
-      'ADMIN', 'HIEU_TRUONG', 'HR', 'PHONG_DAO_TAO',
-      'TRUONG_BO_MON', 'GIANG_VIEN', 'SINH_VIEN'
+      'ADMIN',
+      'HIEU_TRUONG',
+      'HR',
+      'PHONG_DAO_TAO',
+      'TRUONG_BO_MON',
+      'GIANG_VIEN',
+      'SINH_VIEN',
     ]
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: `Role không hợp lệ: ${role}` })
@@ -150,12 +165,17 @@ export async function createProfile(req, res) {
 
     // Bảo vệ nghiêm ngặt: Không được phép tạo tài khoản có rank >= actor
     const RANK_MAP = {
-      ADMIN: 100, HIEU_TRUONG: 90, HR: 80,
-      PHONG_DAO_TAO: 70, TRUONG_BO_MON: 60, GIANG_VIEN: 50, SINH_VIEN: 10
+      ADMIN: 100,
+      HIEU_TRUONG: 90,
+      HR: 80,
+      PHONG_DAO_TAO: 70,
+      TRUONG_BO_MON: 60,
+      GIANG_VIEN: 50,
+      SINH_VIEN: 10,
     }
     if (RANK_MAP[role] > effectiveRank) {
       return res.status(403).json({
-        error: `Bạn không thể tạo tài khoản có vai trò ${role} (rank ${RANK_MAP[role]}) vì quyền của bạn giới hạn ở rank ${effectiveRank}.`
+        error: `Bạn không thể tạo tài khoản có vai trò ${role} (rank ${RANK_MAP[role]}) vì quyền của bạn giới hạn ở rank ${effectiveRank}.`,
       })
     }
 
@@ -164,7 +184,7 @@ export async function createProfile(req, res) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: fullName }
+      user_metadata: { full_name: fullName },
     })
 
     if (authError) {
@@ -174,17 +194,12 @@ export async function createProfile(req, res) {
     const newUser = data.user
 
     // 2. Tạo profile row tương ứng
-    const profile = await profileModel.createProfile(
-      newUser.id,
-      email,
-      fullName,
-      role
-    )
+    const profile = await profileModel.createProfile(newUser.id, email, fullName, role)
 
     return res.status(201).json({
       success: true,
       message: `Tạo tài khoản "${fullName}" với vai trò ${role} thành công.`,
-      profile: profileView.formatProfile(profile)
+      profile: profileView.formatProfile(profile),
     })
   } catch (err) {
     console.error('[ProfileController.createProfile]', err.message)
@@ -200,7 +215,7 @@ export async function createProfile(req, res) {
 export async function deleteProfile(req, res) {
   try {
     const targetId = req.params.id
-    
+
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
     if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
@@ -213,21 +228,29 @@ export async function deleteProfile(req, res) {
 
     // ADMIN được bảo vệ tuyệt đối
     if (targetProfile.rank === 100 || targetProfile.role === 'ADMIN') {
-      return res.status(403).json({ error: 'Tài khoản ADMIN được bảo vệ tuyệt đối, không thể xóa.' })
+      return res
+        .status(403)
+        .json({ error: 'Tài khoản ADMIN được bảo vệ tuyệt đối, không thể xóa.' })
     }
 
     // Kiểm tra phân tầng: actor phải có rank CAO HƠN target
     if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền hạn của bạn (rank hiệu lực ${effectiveRank}) không đủ để xóa tài khoản này (rank ${targetProfile.rank}).`
+        error: `Quyền hạn của bạn (rank hiệu lực ${effectiveRank}) không đủ để xóa tài khoản này (rank ${targetProfile.rank}).`,
       })
     }
 
     // 1. Xóa tài khoản trong auth.users bằng Admin API
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(targetId)
     if (authError) {
-      console.warn('[ProfileController.deleteProfile] Không thể xóa ở Supabase Auth:', authError.message)
-      if (!authError.message.toLowerCase().includes('user not found') && !authError.message.toLowerCase().includes('does not exist')) {
+      console.warn(
+        '[ProfileController.deleteProfile] Không thể xóa ở Supabase Auth:',
+        authError.message,
+      )
+      if (
+        !authError.message.toLowerCase().includes('user not found') &&
+        !authError.message.toLowerCase().includes('does not exist')
+      ) {
         return res.status(400).json({ error: `Lỗi xóa tài khoản Auth: ${authError.message}` })
       }
     }
@@ -239,7 +262,10 @@ export async function deleteProfile(req, res) {
     try {
       deleted = await profileModel.deleteById(targetId)
     } catch (dbErr) {
-      console.log('[ProfileController.deleteProfile] Profile đã được cascade delete hoặc lỗi db:', dbErr.message)
+      console.log(
+        '[ProfileController.deleteProfile] Profile đã được cascade delete hoặc lỗi db:',
+        dbErr.message,
+      )
       deleted = targetProfile
     }
     return res.json(profileView.formatDeleteResult(deleted))
@@ -270,7 +296,9 @@ export async function uploadAvatar(req, res) {
 
     // Chỉ chính chủ hoặc rank >= 80 mới được sửa
     if (targetId !== actorId && effectiveRank < 80) {
-      return res.status(403).json({ error: 'Bạn không có quyền cập nhật ảnh đại diện của hồ sơ này.' })
+      return res
+        .status(403)
+        .json({ error: 'Bạn không có quyền cập nhật ảnh đại diện của hồ sơ này.' })
     }
 
     // 1. Giải mã base64
@@ -302,7 +330,7 @@ export async function uploadAvatar(req, res) {
       .from('avatars')
       .upload(fileName, buffer, {
         contentType,
-        upsert: true
+        upsert: true,
       })
 
     if (uploadError) {
@@ -311,9 +339,7 @@ export async function uploadAvatar(req, res) {
     }
 
     // 4. Lấy public URL
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
+    const { data: publicUrlData } = supabaseAdmin.storage.from('avatars').getPublicUrl(fileName)
 
     const avatarUrl = publicUrlData.publicUrl
 
@@ -324,12 +350,10 @@ export async function uploadAvatar(req, res) {
       success: true,
       message: 'Tải lên ảnh đại diện thành công.',
       avatarUrl,
-      profile: profileView.formatProfile(updated)
+      profile: profileView.formatProfile(updated),
     })
   } catch (err) {
     console.error('[ProfileController.uploadAvatar]', err.message)
     return res.status(500).json({ error: 'Lỗi máy chủ khi cập nhật ảnh đại diện.' })
   }
 }
-
-

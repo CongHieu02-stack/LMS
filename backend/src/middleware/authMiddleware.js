@@ -18,19 +18,25 @@ export async function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
-        error: 'Thiếu token xác thực. Vui lòng đăng nhập.'
+        error: 'Thiếu token xác thực. Vui lòng đăng nhập.',
       })
     }
 
     const token = authHeader.replace('Bearer ', '')
 
     // Bước 2: Verify token với Supabase
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token)
 
     if (authError || !user) {
-      console.warn('[authMiddleware] Supabase auth.getUser failed:', authError?.message || 'No user')
+      console.warn(
+        '[authMiddleware] Supabase auth.getUser failed:',
+        authError?.message || 'No user',
+      )
       return res.status(401).json({
-        error: 'Token không hợp lệ hoặc đã hết hạn.'
+        error: 'Token không hợp lệ hoặc đã hết hạn.',
       })
     }
 
@@ -43,7 +49,7 @@ export async function authMiddleware(req, res, next) {
 
     if (profileError || !profile) {
       return res.status(403).json({
-        error: 'Không tìm thấy hồ sơ người dùng.'
+        error: 'Không tìm thấy hồ sơ người dùng.',
       })
     }
 
@@ -67,7 +73,7 @@ export function requireRank(minRank) {
   return (req, res, next) => {
     if (!req.profile || req.profile.rank < minRank) {
       return res.status(403).json({
-        error: `Yêu cầu rank tối thiểu ${minRank}. Rank hiện tại: ${req.profile?.rank || 0}.`
+        error: `Yêu cầu rank tối thiểu ${minRank}. Rank hiện tại: ${req.profile?.rank || 0}.`,
       })
     }
     next()
@@ -83,19 +89,22 @@ export function requirePermissionOrRank(permissionCode, minRank = 100) {
     if (!req.profile) {
       return res.status(403).json({ error: 'Không tìm thấy hồ sơ người dùng.' })
     }
-    
+
     try {
       // Lấy quyền cụ thể của user
-      const permissions = await profileModel.findPermissionsByUserId(req.profile.id, req.profile.role)
+      const permissions = await profileModel.findPermissionsByUserId(
+        req.profile.id,
+        req.profile.role,
+      )
       req.permissions = permissions // Gắn vào request để controller dùng
-      
+
       // Nếu đạt yêu cầu về Rank HOẶC có quyền -> Cho qua
       if (req.profile.rank >= minRank || permissions.includes(permissionCode)) {
         return next()
       }
-      
+
       return res.status(403).json({
-        error: `Bạn không có quyền thực hiện chức năng này. Yêu cầu quyền: ${permissionCode}`
+        error: `Bạn không có quyền thực hiện chức năng này. Yêu cầu quyền: ${permissionCode}`,
       })
     } catch (err) {
       console.error('[requirePermissionOrRank]', err.message)

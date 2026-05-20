@@ -12,11 +12,7 @@ import { supabaseAdmin } from '../config/supabase.js'
  * @returns {object|null} — Profile row hoặc null
  */
 export async function findById(id) {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const { data, error } = await supabaseAdmin.from('profiles').select('*').eq('id', id).single()
 
   if (error) throw error
   return data
@@ -108,7 +104,7 @@ export async function createProfile(id, email, fullName, role) {
       id,
       email,
       full_name: fullName,
-      role
+      role,
     })
     .select()
     .single()
@@ -134,7 +130,7 @@ export async function findPermissionsByUserId(userId, role) {
 
   // Nếu có cấu hình ghi đè quyền cá nhân, trả về luôn
   if (userPerms && userPerms.length > 0) {
-    return userPerms.map(p => p.permissions.code)
+    return userPerms.map((p) => p.permissions.code)
   }
 
   // 2. Nếu bảng user_permissions trống (chưa cấu hình), lấy khuôn mẫu mặc định của role
@@ -144,6 +140,5 @@ export async function findPermissionsByUserId(userId, role) {
     .eq('role', role)
 
   if (err2) throw err2
-  return rolePerms.map(p => p.permissions.code)
+  return rolePerms.map((p) => p.permissions.code)
 }
-

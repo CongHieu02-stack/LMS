@@ -229,9 +229,7 @@ onMounted(() => {
               <td class="text-right">
                 <button
                   class="btn-icon btn-delete"
-                  :disabled="
-                    user.rank >= effectiveRank || user.id === authStore.profile?.id
-                  "
+                  :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
                   :title="
                     user.rank >= effectiveRank
                       ? 'Không có quyền xóa cấp bậc bằng/cao hơn'

@@ -19,19 +19,19 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/dashboard'
+      redirect: '/dashboard',
     },
     {
       path: '/login',
       name: 'login',
       component: LoginView,
-      meta: { requiresGuest: true }
+      meta: { requiresGuest: true },
     },
     {
       path: '/dashboard',
       name: 'dashboard',
       component: DashboardView,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
 
     // ---- ADMIN & HR ----
@@ -39,19 +39,19 @@ const router = createRouter({
       path: '/admin/users',
       name: 'user-management',
       component: UserManagementView,
-      meta: { requiresAuth: true, requirePermission: 'user_manage_staff' }
+      meta: { requiresAuth: true, requirePermission: 'user_manage_staff' },
     },
     {
       path: '/admin/permissions',
       name: 'user-permissions',
       component: UserPermissionEditor,
-      meta: { requiresAuth: true, requirePermission: 'user_manage_senior' }
+      meta: { requiresAuth: true, requirePermission: 'user_manage_senior' },
     },
     {
       path: '/admin/configs',
       name: 'school-config',
       component: SchoolConfigView,
-      meta: { requiresAuth: true, minRank: 90 }
+      meta: { requiresAuth: true, minRank: 90 },
     },
 
     // ---- QUẢN LÝ MÔN HỌC ----
@@ -59,13 +59,19 @@ const router = createRouter({
       path: '/subjects/propose',
       name: 'subject-propose',
       component: () => import('@/views/SubjectProposeView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'subject_propose' }
+      meta: { requiresAuth: true, requirePermission: 'subject_propose' },
     },
     {
       path: '/admin/subjects',
       name: 'subject-approval',
       component: SubjectApprovalView,
-      meta: { requiresAuth: true, requirePermission: 'subject_approve' }
+      meta: { requiresAuth: true, requirePermission: 'subject_approve' },
+    },
+    {
+      path: '/admin/subjects/list',
+      name: 'subject-list',
+      component: () => import('@/views/admin/SubjectListView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'subject_approve' },
     },
 
     // ---- QUẢN LÝ LỚP HỌC ----
@@ -73,25 +79,25 @@ const router = createRouter({
       path: '/classes/propose',
       name: 'class-propose',
       component: () => import('@/views/ClassProposalView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'class_quantity_propose' }
+      meta: { requiresAuth: true, requirePermission: 'class_quantity_propose' },
     },
     {
       path: '/admin/classes/approve',
       name: 'class-approve',
       component: () => import('@/views/admin/ClassApprovalView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'class_quantity_approve' }
+      meta: { requiresAuth: true, requirePermission: 'class_quantity_approve' },
     },
     {
       path: '/admin/classes',
       name: 'class-management',
       component: () => import('@/views/admin/ClassManagementView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'class_create' }
+      meta: { requiresAuth: true, requirePermission: 'class_create' },
     },
     {
       path: '/admin/classes/assign',
       name: 'instructor-assign',
       component: () => import('@/views/admin/InstructorAssignView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'instructor_assign' }
+      meta: { requiresAuth: true, requirePermission: 'instructor_assign' },
     },
 
     // ---- ĐÀO TẠO & KHẢO THÍ ----
@@ -99,7 +105,7 @@ const router = createRouter({
       path: '/lessons',
       name: 'lesson-exam-manage',
       component: () => import('@/views/LessonExamManageView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'lesson_exam_manage' }
+      meta: { requiresAuth: true, requirePermission: 'lesson_exam_manage' },
     },
 
     // ---- PHÂN HỆ SINH VIÊN ----
@@ -107,26 +113,28 @@ const router = createRouter({
       path: '/registration',
       name: 'registration',
       component: () => import('@/views/RegistrationView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'class_register' }
+      meta: { requiresAuth: true, requirePermission: 'class_register' },
     },
     {
       path: '/exam',
       name: 'exam-take',
       component: () => import('@/views/ExamTakeView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'exam_take' }
+      meta: { requiresAuth: true, requirePermission: 'exam_take' },
     },
     {
       path: '/grades',
       name: 'grades',
       component: () => import('@/views/GradeView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'grade_view' }
-    }
-  ]
+      meta: { requiresAuth: true, requirePermission: 'grade_view' },
+    },
+  ],
 })
 
 // ─── NAVIGATION GUARDS ───
 router.beforeEach(async (to, _from, next) => {
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
   const isAuthenticated = !!session
 
   const authStore = useAuthStore()
@@ -141,7 +149,11 @@ router.beforeEach(async (to, _from, next) => {
     next({ name: 'dashboard' })
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
     next({ name: 'dashboard' })
-  } else if (to.meta.requirePermission && !authStore.hasPermission(to.meta.requirePermission as string) && !authStore.hasPermission('user_manage_senior')) {
+  } else if (
+    to.meta.requirePermission &&
+    !authStore.hasPermission(to.meta.requirePermission as string) &&
+    !authStore.hasPermission('user_manage_senior')
+  ) {
     next({ name: 'dashboard' })
   } else if (to.meta.minRank && (authStore.profile?.rank || 0) < (to.meta.minRank as number)) {
     next({ name: 'dashboard' })

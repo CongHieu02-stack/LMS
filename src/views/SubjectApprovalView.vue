@@ -11,6 +11,12 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
+// Modal State
+const showRejectModal = ref(false)
+const rejectReason = ref('')
+const selectedSubject = ref<any>(null)
+const submittingReject = ref(false)
+
 // Fetch danh sách môn học
 async function fetchSubjects() {
   loading.value = true
@@ -18,6 +24,9 @@ async function fetchSubjects() {
   try {
     const res = await apiGet<any>('/subjects')
     if (res.success) {
+      // Chỉ lấy các môn học chưa duyệt nếu đây là trang Duyệt Môn Học
+      // Nhưng theo backend thì trả về tất cả. Frontend có thể tự lọc hoặc hiển thị tất cả.
+      // Dựa trên UI cũ, ta hiển thị tất cả.
       subjects.value = res.data
     }
   } catch (err) {
@@ -27,10 +36,9 @@ async function fetchSubjects() {
   }
 }
 
-// Xử lý phê duyệt / từ chối môn học
-async function handleApproval(subject: any, newStatus: 'approved' | 'rejected') {
-  const actionText = newStatus === 'approved' ? 'Phê duyệt' : 'Từ chối'
-  const confirmAction = confirm(`Bạn có chắc chắn muốn ${actionText} môn học "${subject.name}" (${subject.code}) không?`)
+// Xử lý phê duyệt
+async function handleApprove(subject: any) {
+  const confirmAction = confirm(`Bạn có chắc chắn muốn PHÊ DUYỆT môn học "${subject.name}" (${subject.code}) không?`)
   if (!confirmAction) return
 
   loading.value = true
@@ -39,17 +47,59 @@ async function handleApproval(subject: any, newStatus: 'approved' | 'rejected') 
 
   try {
     const res = await apiPut<any>(`/subjects/${subject.id}/status`, {
-      status: newStatus
+      status: 'approved'
     })
 
     if (res.success) {
-      successMessage.value = `Đã ${actionText} thành công môn học "${subject.name}".`
+      successMessage.value = `Đã phê duyệt thành công môn học "${subject.name}".`
       await fetchSubjects()
     }
   } catch (err) {
-    errorMessage.value = (err as Error).message || `Gặp lỗi khi ${actionText} môn học.`
+    errorMessage.value = (err as Error).message || `Gặp lỗi khi phê duyệt môn học.`
   } finally {
     loading.value = false
+  }
+}
+
+// Xử lý mở Modal từ chối
+function openRejectModal(subject: any) {
+  selectedSubject.value = subject
+  rejectReason.value = ''
+  showRejectModal.value = true
+}
+
+function closeRejectModal() {
+  showRejectModal.value = false
+  selectedSubject.value = null
+  rejectReason.value = ''
+}
+
+// Gửi yêu cầu từ chối
+async function submitReject() {
+  if (!rejectReason.value.trim()) {
+    alert('Vui lòng nhập lý do từ chối.')
+    return
+  }
+
+  submittingReject.value = true
+  errorMessage.value = null
+  successMessage.value = null
+
+  try {
+    const res = await apiPut<any>(`/subjects/${selectedSubject.value.id}/status`, {
+      status: 'rejected',
+      rejection_reason: rejectReason.value
+    })
+
+    if (res.success) {
+      successMessage.value = `Đã từ chối môn học "${selectedSubject.value.name}".`
+      closeRejectModal()
+      await fetchSubjects()
+    }
+  } catch (err) {
+    errorMessage.value = (err as Error).message || `Gặp lỗi khi từ chối môn học.`
+  } finally {
+    submittingReject.value = false
   }
 }
 
@@ -124,20 +174,23 @@ onMounted(() => {
                 <span class="mono-badge" :class="`badge-${sub.status}`">
                   {{ sub.status === 'pending' ? 'Chờ duyệt' : sub.status === 'approved' ? 'Đã duyệt' : 'Từ chối' }}
                 </span>
+                <div v-if="sub.status === 'rejected' && sub.rejection_reason" class="reject-reason-text">
+                  Lý do: {{ sub.rejection_reason }}
+                </div>
               </td>
               <td class="text-right">
                 <div v-if="sub.status === 'pending'" class="action-buttons">
                   <button 
                     class="btn-icon btn-approve"
                     title="Phê duyệt"
-                    @click="handleApproval(sub, 'approved')"
+                    @click="handleApprove(sub)"
                   >
                     <i class="pi pi-check"></i>
                   </button>
                   <button 
                     class="btn-icon btn-reject"
                     title="Từ chối"
-                    @click="handleApproval(sub, 'rejected')"
+                    @click="openRejectModal(sub)"
                   >
                     <i class="pi pi-times"></i>
                   </button>
@@ -147,6 +200,35 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- MODAL TỪ CHỐI -->
+    <div v-if="showRejectModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Từ chối đề xuất môn học</h2>
+          <button class="btn-close" @click="closeRejectModal"><i class="pi pi-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <p>Vui lòng cho biết lý do từ chối môn học <strong>{{ selectedSubject?.name }} ({{ selectedSubject?.code }})</strong>. Lý do này sẽ được hiển thị cho người đề xuất.</p>
+          <div class="form-group">
+            <label>Lý do từ chối <span class="text-red-500">*</span></label>
+            <textarea 
+              v-model="rejectReason" 
+              class="mono-input textarea-reason" 
+              placeholder="Ví dụ: Đề cương chưa đạt chuẩn, số tín chỉ không phù hợp..."
+              rows="4"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="closeRejectModal" :disabled="submittingReject">Hủy bỏ</button>
+          <button class="btn-danger" @click="submitReject" :disabled="submittingReject || !rejectReason.trim()">
+            <i v-if="submittingReject" class="pi pi-spin pi-spinner"></i>
+            Xác nhận từ chối
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -162,247 +244,83 @@ onMounted(() => {
 }
 
 /* Header */
-.page-header {
-  margin-bottom: 2rem;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 1rem;
-}
-.breadcrumb {
-  font-size: 0.75rem;
-  /* text-transform: removed */
-  letter-spacing: normal;
-  color: #9ca3af;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-.breadcrumb span {
-  color: #111827;
-  font-weight: 600;
-}
-.page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: normal;
-  /* text-transform: removed */
-  margin: 0 0 0.5rem 0;
-  color: #111827;
-}
-.page-subtitle {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
+.page-header { margin-bottom: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; }
+.breadcrumb { font-size: 0.75rem; color: #9ca3af; font-weight: 600; margin-bottom: 0.5rem; }
+.breadcrumb span { color: #111827; font-weight: 600; }
+.page-title { font-size: 2rem; font-weight: 600; margin: 0 0 0.5rem 0; color: #111827; }
+.page-subtitle { font-size: 0.875rem; color: #6b7280; }
 
 /* Alerts */
-.mono-alert {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.875rem;
-  border-radius: 0;
-}
-.mono-alert i {
-  font-size: 1.25rem;
-}
-.alert-error {
-  background-color: #fef2f2;
-  border: 2px solid #ef4444;
-  color: #b91c1c;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-}
-.alert-success {
-  background-color: #f0fdf4;
-  border: 2px solid #22c55e;
-  color: #15803d;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-}
+.mono-alert { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; border-radius: 8px; }
+.mono-alert i { font-size: 1.25rem; }
+.alert-error { background-color: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+.alert-success { background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
 
 /* Card */
-.mono-card {
-  background: #fff;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.card-header {
-  background-color: #f9fafb; color: #111827; border-top-left-radius: 8px; border-top-right-radius: 8px;
-  padding: 1rem 1.5rem;
-  font-weight: 600;
-  /* text-transform: removed */
-  font-size: 0.875rem;
-  letter-spacing: normal;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.card-header i {
-  color: #9ca3af;
-}
+.mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+.card-header { background-color: #f9fafb; color: #111827; padding: 1rem 1.5rem; font-weight: 600; font-size: 0.875rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
 
 /* Empty & Loading States */
-.loading-state, .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem;
-}
+.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem; }
 .loading-state { color: #9333ea; }
 .loading-state .spinner { font-size: 2.5rem; margin-bottom: 1rem; }
-.loading-state div {
-  font-weight: 600;
-  /* text-transform: removed */
-  letter-spacing: normal;
-  font-size: 0.75rem;
-  color: #111827;
-}
-.empty-state .empty-icon {
-  font-size: 3rem;
-  color: #d1d5db;
-  margin-bottom: 1rem;
-}
-.empty-state h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  /* text-transform: removed */
-  margin: 0 0 0.5rem 0;
-  color: #111827;
-}
-.empty-state p {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
+.empty-state .empty-icon { font-size: 3rem; color: #d1d5db; margin-bottom: 1rem; }
+.empty-state h2 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem 0; color: #111827; }
+.empty-state p { font-size: 0.875rem; color: #6b7280; }
 
 /* Table */
-.table-container {
-  overflow-x: auto;
-}
-.mono-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-.mono-table th {
-  background-color: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  /* text-transform: removed */
-  letter-spacing: normal;
-  color: #111827;
-}
-.mono-table td {
-  padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  vertical-align: middle;
-}
-.table-row {
-  transition: background-color 0.2s;
-}
-.table-row:hover {
-  background-color: #faf5ff; /* purple-50 */
-}
-.table-row:last-child td {
-  border-bottom: none;
-}
+.table-container { overflow-x: auto; }
+.mono-table { width: 100%; border-collapse: collapse; text-align: left; }
+.mono-table th { background-color: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 1rem; font-size: 0.75rem; font-weight: 600; color: #111827; }
+.mono-table td { padding: 1rem; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+.table-row:hover { background-color: #faf5ff; }
 
-/* Table Cells Typography */
-.code-cell {
-  
-  font-weight: 500;
-  color: #9333ea;
-  font-size: 0.875rem;
-}
-.subject-name {
-  font-weight: 600;
-  color: #111827;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-}
-.subject-desc {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-.user-cell {
-  font-size: 0.875rem;
-  color: #4b5563;
-  font-weight: 500;
-}
-.font-black {
-  font-weight: 600;
-}
+.code-cell { font-weight: 500; color: #9333ea; font-size: 0.875rem; }
+.subject-name { font-weight: 600; color: #111827; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.subject-desc { font-size: 0.75rem; color: #6b7280; }
+.user-cell { font-size: 0.875rem; color: #4b5563; font-weight: 500; }
+.font-black { font-weight: 600; }
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 
 /* Badges */
-.mono-badge {
-  display: inline-block;
-  font-size: 0.65rem;
-  font-weight: 600;
-  /* text-transform: removed */
-  letter-spacing: normal;
-  padding: 0.25rem 0.75rem;
-  border: 1px solid #000;
-}
-.badge-pending {
-  background-color: #fef08a; /* yellow-200 */
-  color: #854d0e;
-  border-color: #854d0e;
-}
-.badge-approved {
-  background-color: #dcfce7; /* green-100 */
-  color: #166534;
-  border-color: #166534;
-}
-.badge-rejected {
-  background-color: #fee2e2; /* red-100 */
-  color: #991b1b;
-  border-color: #991b1b;
-}
+.mono-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px; }
+.badge-pending { background-color: #fef3c7; color: #92400e; }
+.badge-approved { background-color: #dcfce7; color: #166534; }
+.badge-rejected { background-color: #fee2e2; color: #991b1b; }
+.reject-reason-text { font-size: 0.7rem; color: #ef4444; margin-top: 4px; font-style: italic; max-width: 150px; text-align: center; margin-left: auto; margin-right: auto; }
 
 /* Action Buttons */
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-.btn-icon {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  background-color: #fff;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+.action-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.btn-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #fff; cursor: pointer; transition: all 0.2s; }
 .btn-approve { color: #166534; }
-.btn-approve:hover {
-  background-color: #dcfce7;
-  border-color: #166534;
-  transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-}
+.btn-approve:hover { background-color: #dcfce7; border-color: #166534; }
 .btn-reject { color: #991b1b; }
-.btn-reject:hover {
-  background-color: #fee2e2;
-  border-color: #991b1b;
-  transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-}
-.status-done {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #9ca3af;
-  /* text-transform: removed */
-}
+.btn-reject:hover { background-color: #fee2e2; border-color: #991b1b; }
+.status-done { font-size: 0.75rem; font-weight: 600; color: #9ca3af; }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* Modal Styles */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+.modal-content { background: #fff; width: 100%; max-width: 500px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; animation: slideUp 0.3s ease-out; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+.modal-header h2 { font-size: 1.25rem; font-weight: 600; margin: 0; color: #111827; }
+.btn-close { background: none; border: none; font-size: 1.25rem; color: #9ca3af; cursor: pointer; transition: color 0.2s; }
+.btn-close:hover { color: #111827; }
+.modal-body { padding: 1.5rem; }
+.modal-body p { margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #4b5563; line-height: 1.5; }
+.form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.form-group label { font-size: 0.875rem; font-weight: 600; color: #374151; }
+.text-red-500 { color: #ef4444; }
+.mono-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; transition: all 0.2s; box-sizing: border-box; }
+.mono-input:focus { border-color: #9333ea; box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1); }
+.textarea-reason { resize: vertical; min-height: 100px; }
+.modal-footer { padding: 1.25rem 1.5rem; border-top: 1px solid #e5e7eb; background: #f9fafb; display: flex; justify-content: flex-end; gap: 1rem; }
+.btn-cancel { padding: 0.5rem 1rem; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; font-weight: 500; color: #374151; cursor: pointer; transition: all 0.2s; }
+.btn-cancel:hover:not(:disabled) { background: #f3f4f6; }
+.btn-danger { padding: 0.5rem 1.25rem; background: #ef4444; border: 1px solid #ef4444; border-radius: 6px; font-weight: 500; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+.btn-danger:hover:not(:disabled) { background: #dc2626; border-color: #dc2626; }
+.btn-danger:disabled, .btn-cancel:disabled { opacity: 0.6; cursor: not-allowed; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>

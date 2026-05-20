@@ -26,11 +26,7 @@ export async function findAll() {
  * @returns {object} — Subject vừa tạo
  */
 export async function create(subjectData) {
-  const { data, error } = await supabaseAdmin
-    .from('subjects')
-    .insert(subjectData)
-    .select()
-    .single()
+  const { data, error } = await supabaseAdmin.from('subjects').insert(subjectData).select().single()
 
   if (error) throw error
   return data
@@ -40,12 +36,43 @@ export async function create(subjectData) {
  * Cập nhật trạng thái phê duyệt môn học
  * @param {string} id — UUID môn học
  * @param {string} status — 'approved' | 'rejected'
+ * @param {string} rejection_reason — Lý do từ chối (nếu có)
  * @returns {object} — Subject sau khi cập nhật
  */
-export async function updateApproval(id, status) {
+export async function updateApproval(id, status, rejection_reason = null) {
+  const updateData = { status, updated_at: new Date().toISOString() }
+  if (status === 'rejected' && rejection_reason) {
+    updateData.rejection_reason = rejection_reason
+  } else if (status === 'approved') {
+    // Nếu được duyệt thì xóa lý do từ chối cũ nếu có
+    updateData.rejection_reason = null
+  }
+
   const { data, error } = await supabaseAdmin
     .from('subjects')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Khóa môn học (không cho mở lớp mới)
+ * @param {string} id — UUID môn học
+ * @param {string} lock_reason — Lý do khóa
+ * @returns {object} — Subject sau khi cập nhật
+ */
+export async function lockSubject(id, lock_reason) {
+  const { data, error } = await supabaseAdmin
+    .from('subjects')
+    .update({
+      is_locked: true,
+      lock_reason,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single()

@@ -26,7 +26,7 @@ export async function getAll(req, res) {
 export async function updateApproval(req, res) {
   try {
     const { id } = req.params
-    const { status } = req.body
+    const { status, rejection_reason } = req.body
     const actorRank = req.profile.rank
 
     // Kiểm tra rank
@@ -39,15 +39,50 @@ export async function updateApproval(req, res) {
       return res.status(400).json({ error: `Trạng thái không hợp lệ: ${status}` })
     }
 
-    const updatedSubject = await subjectModel.updateApproval(id, status)
+    // Nếu từ chối, bắt buộc phải có lý do
+    if (status === 'rejected' && (!rejection_reason || rejection_reason.trim() === '')) {
+      return res.status(400).json({ error: 'Bắt buộc phải nhập lý do từ chối.' })
+    }
+
+    const updatedSubject = await subjectModel.updateApproval(id, status, rejection_reason)
     return res.json({
       success: true,
       message: `Đã cập nhật trạng thái môn học thành công.`,
-      data: updatedSubject
+      data: updatedSubject,
     })
   } catch (err) {
     console.error('[SubjectController.updateApproval]', err.message)
     return res.status(500).json({ error: 'Lỗi khi cập nhật trạng thái môn học.' })
+  }
+}
+
+/**
+ * PUT /api/subjects/:id/lock — Khóa môn học.
+ * Yêu cầu: rank >= 90 (Hiệu trưởng & Admin).
+ */
+export async function lock(req, res) {
+  try {
+    const { id } = req.params
+    const { lock_reason } = req.body
+    const actorRank = req.profile.rank
+
+    if (actorRank < 90) {
+      return res.status(403).json({ error: 'Bạn không có quyền khóa môn học.' })
+    }
+
+    if (!lock_reason || lock_reason.trim() === '') {
+      return res.status(400).json({ error: 'Bắt buộc phải nhập lý do khóa môn học.' })
+    }
+
+    const updatedSubject = await subjectModel.lockSubject(id, lock_reason)
+    return res.json({
+      success: true,
+      message: `Đã khóa môn học thành công.`,
+      data: updatedSubject,
+    })
+  } catch (err) {
+    console.error('[SubjectController.lock]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi khóa môn học.' })
   }
 }
 
@@ -67,12 +102,12 @@ export async function create(req, res) {
       description: description || '',
       credits: parseInt(credits) || 3,
       creator_id: req.user.id,
-      status: 'pending'
+      status: 'pending',
     })
     return res.status(201).json({
       success: true,
       message: 'Đề xuất môn học đã được gửi tới Hiệu trưởng để phê duyệt.',
-      data: subject
+      data: subject,
     })
   } catch (err) {
     console.error('[SubjectController.create]', err.message)

@@ -1,19 +1,33 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { apiGet, apiPost } from '@/lib/api'
-import { useToast } from 'primevue/usetoast'
+import { apiGet, apiPut } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 
 const authStore = useAuthStore()
-const toast = useToast()
 
 const isStudent = computed(() => authStore.profile?.role === 'SINH_VIEN')
 
 /** Thông tin thẻ thống kê cho Admin */
 const statsCards = computed(() => [
-  { label: 'Vai trò hiện tại', value: authStore.displayRole || 'Chưa cập nhật', icon: 'pi pi-shield', primary: true },
-  { label: 'Cấp bậc (Rank)', value: String(authStore.profile?.rank || 0), icon: 'pi pi-star', primary: false },
-  { label: 'Địa chỉ Email', value: authStore.profile?.email || '', icon: 'pi pi-envelope', primary: false }
+  {
+    label: 'Vai trò hiện tại',
+    value: authStore.displayRole || 'Chưa cập nhật',
+    icon: 'pi pi-shield',
+    primary: true,
+  },
+  {
+    label: 'Cấp bậc (Rank)',
+    value: String(authStore.profile?.rank || 0),
+    icon: 'pi pi-star',
+    primary: false,
+  },
+  {
+    label: 'Địa chỉ Email',
+    value: authStore.profile?.email || '',
+    icon: 'pi pi-envelope',
+    primary: false,
+  },
 ])
 
 /** Ánh xạ rank → mô tả quyền hạn */
@@ -24,7 +38,64 @@ const rankDescription: Record<number, string> = {
   70: 'Quản lý chương trình đào tạo và lịch học.',
   60: 'Quản lý giảng viên và môn học trong bộ môn.',
   50: 'Giảng dạy và quản lý lớp học.',
-  10: 'Đăng ký lớp học và tham gia thi cử.'
+  10: 'Đăng ký lớp học và tham gia thi cử.',
+}
+
+// ==========================================
+// AVATAR UPLOAD LOGIC
+// ==========================================
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploadingAvatar = ref(false)
+
+function triggerAvatarUpload() {
+  fileInput.value?.click()
+}
+
+async function handleAvatarChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    alert('Vui lòng chọn một file hình ảnh hợp lệ.')
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Kích thước ảnh tối đa là 2MB.')
+    return
+  }
+
+  uploadingAvatar.value = true
+  try {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${authStore.profile?.id}-${Math.random()}.${fileExt}`
+    
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, file)
+
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(fileName)
+    
+    const res = await apiPut<any>(`/profiles/${authStore.profile?.id}`, {
+      avatar_url: data.publicUrl
+    })
+
+    if (res.success) {
+      if (authStore.fetchCurrentProfile) {
+        await authStore.fetchCurrentProfile()
+      } else {
+        window.location.reload()
+      }
+    }
+  } catch (error: any) {
+    console.error('Lỗi khi tải lên ảnh đại diện:', error)
+    alert('Lỗi tải ảnh: ' + error.message)
+  } finally {
+    uploadingAvatar.value = false
+    if (target) target.value = ''
+  }
 }
 
 // Student Real Data State
@@ -63,7 +134,7 @@ function closeLessonsModal() {
 
 function toggleStudentLessonExpand(id: string) {
   if (expandedStudentLessons.value.includes(id)) {
-    expandedStudentLessons.value = expandedStudentLessons.value.filter(x => x !== id)
+    expandedStudentLessons.value = expandedStudentLessons.value.filter((x) => x !== id)
   } else {
     expandedStudentLessons.value.push(id)
   }
@@ -74,12 +145,12 @@ function parseLessonContent(contentStr: string) {
     const parsed = JSON.parse(contentStr)
     return {
       youtubeId: parsed.youtubeId || '',
-      description: parsed.description || ''
+      description: parsed.description || '',
     }
   } catch {
     return {
       youtubeId: '',
-      description: contentStr || ''
+      description: contentStr || '',
     }
   }
 }
@@ -90,20 +161,21 @@ async function loadStudentData() {
   try {
     const [classRes, regRes, gradeRes] = await Promise.all([
       apiGet<any>('/classes'),
-      apiGet<{success: boolean; data: any[]}>('/classes/my-registrations'),
-      apiGet<{success: boolean; data: any[]}>('/grades/me')
+      apiGet<{ success: boolean; data: any[] }>('/classes/my-registrations'),
+      apiGet<{ success: boolean; data: any[] }>('/grades/me'),
     ])
-    
+
     // 1. Lớp đã đăng ký
     const regs = regRes.data || []
     registeredCount.value = regs.length
-    myRegisteredClasses.value = regs.map(r => r.class).filter(Boolean)
-    const myClassIds = regs.map(r => r.class?.id || r.class_id)
-    
+    myRegisteredClasses.value = regs.map((r) => r.class).filter(Boolean)
+    const myClassIds = regs.map((r) => r.class?.id || r.class_id)
+
     // 2. Điểm GPA
     const grades = gradeRes.data || []
-    let totalCredits = 0; let totalScore = 0;
-    grades.forEach(g => {
+    const totalCredits = 0
+    let totalScore = 0
+    grades.forEach((g) => {
       const tc = g.class?.subject?.credits || 0
       totalCredits += tc
       totalScore += (parseFloat(g.score) || 0) * tc
@@ -113,22 +185,28 @@ async function loadStudentData() {
     // 3. Lớp đang mở (Gợi ý 2 lớp chưa đăng ký)
     const allClasses = classRes.data || classRes
     if (Array.isArray(allClasses)) {
-      availableClasses.value = allClasses.filter(c => !myClassIds.includes(c.id) && (c.remainingSlots || c.remaining_slots || 0) > 0).slice(0, 2)
+      availableClasses.value = allClasses
+        .filter(
+          (c) => !myClassIds.includes(c.id) && (c.remainingSlots || c.remaining_slots || 0) > 0,
+        )
+        .slice(0, 2)
     }
 
     // 4. Lịch thi sắp tới (từ các lớp đã đăng ký)
     let exams: any[] = []
     for (const cId of myClassIds) {
       try {
-        const eRes = await apiGet<{success: boolean; data: any[]}>(`/exam-manage/published/${cId}`)
+        const eRes = await apiGet<{ success: boolean; data: any[] }>(
+          `/exam-manage/published/${cId}`,
+        )
         if (eRes.data && eRes.data.length > 0) {
-          const className = regs.find(r => (r.class?.id || r.class_id) === cId)?.class?.name || 'Lớp học'
-          exams.push(...eRes.data.map(e => ({ ...e, className })))
+          const className =
+            regs.find((r) => (r.class?.id || r.class_id) === cId)?.class?.name || 'Lớp học'
+          exams.push(...eRes.data.map((e) => ({ ...e, className })))
         }
       } catch (err) {}
     }
     upcomingExams.value = exams.slice(0, 3)
-
   } catch (err) {
     console.error('Failed to load student dashboard data:', err)
   }
@@ -138,62 +216,22 @@ async function loadStudentData() {
 onMounted(() => {
   if (isStudent.value) loadStudentData()
 })
-
-// ─── AVATAR UPLOAD ───
-const avatarInput = ref<HTMLInputElement | null>(null)
-const uploadingAvatar = ref(false)
-
-function triggerAvatarUpload() {
-  avatarInput.value?.click()
-}
-
-async function onAvatarSelected(event: Event) {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-
-  if (file.size > 2 * 1024 * 1024) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Kích thước ảnh tối đa là 2MB', life: 3000 })
-    return
-  }
-
-  uploadingAvatar.value = true
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    const base64Data = e.target?.result as string
-    try {
-      const res = await apiPost<{ success: boolean; avatarUrl: string }>(`/profiles/${authStore.profile?.id}/avatar`, {
-        avatarData: base64Data
-      })
-      if (res.success && res.avatarUrl) {
-        if (authStore.profile) {
-          authStore.profile.avatarUrl = res.avatarUrl
-        }
-        toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật ảnh đại diện thành công', life: 3000 })
-      }
-    } catch (err: any) {
-      toast.add({ severity: 'error', summary: 'Lỗi', detail: err.message || 'Không thể tải lên ảnh đại diện', life: 3000 })
-    } finally {
-      uploadingAvatar.value = false
-      if (avatarInput.value) avatarInput.value.value = ''
-    }
-  }
-  reader.readAsDataURL(file)
-}
 </script>
 
 <template>
   <div class="dashboard">
     <!-- Breadcrumb -->
-    <div class="breadcrumb">
-      Tổng quan / <span>Bảng điều khiển</span>
-    </div>
+    <div class="breadcrumb">Tổng quan / <span>Bảng điều khiển</span></div>
 
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">Chào mừng trở lại, {{ authStore.profile?.fullName }}</h1>
       <div class="page-subtitle">
-        {{ isStudent ? 'Dưới đây là các thông tin tổng quan về học tập của bạn.' : 'Xem thông tin hồ sơ và các truy cập nhanh bên dưới.' }}
+        {{
+          isStudent
+            ? 'Dưới đây là các thông tin tổng quan về học tập của bạn.'
+            : 'Xem thông tin hồ sơ và các truy cập nhanh bên dưới.'
+        }}
       </div>
     </div>
 
@@ -202,27 +240,33 @@ async function onAvatarSelected(event: Event) {
     <!-- ============================================== -->
     <div v-if="isStudent" class="student-dashboard">
       <div v-if="loadingStudent" class="loading-center">
-        <i class="pi pi-spin pi-spinner" style="font-size:2rem;color:#6b7280"></i>
+        <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: #6b7280"></i>
       </div>
       <template v-else>
         <!-- 3 thẻ thống kê nhanh -->
         <div class="stats-row mb-xl">
           <div class="lms-card stat-card">
-            <div class="stat-icon-wrapper bg-blue-100 text-blue-600"><i class="pi pi-book"></i></div>
+            <div class="stat-icon-wrapper bg-blue-100 text-blue-600">
+              <i class="pi pi-book"></i>
+            </div>
             <div class="stat-content">
               <div class="stat-value">{{ registeredCount }}</div>
               <div class="stat-label">Lớp đã đăng ký</div>
             </div>
           </div>
           <div class="lms-card stat-card">
-            <div class="stat-icon-wrapper bg-purple-100 text-purple-600"><i class="pi pi-clock"></i></div>
+            <div class="stat-icon-wrapper bg-purple-100 text-purple-600">
+              <i class="pi pi-clock"></i>
+            </div>
             <div class="stat-content">
               <div class="stat-value">{{ upcomingExams.length }}</div>
               <div class="stat-label">Bài thi đang mở</div>
             </div>
           </div>
           <div class="lms-card stat-card">
-            <div class="stat-icon-wrapper bg-green-100 text-green-600"><i class="pi pi-chart-line"></i></div>
+            <div class="stat-icon-wrapper bg-green-100 text-green-600">
+              <i class="pi pi-chart-line"></i>
+            </div>
             <div class="stat-content">
               <div class="stat-value">{{ gpaDisplay }}</div>
               <div class="stat-label">Điểm GPA hiện tại</div>
@@ -232,48 +276,87 @@ async function onAvatarSelected(event: Event) {
 
         <div class="dashboard-grid">
           <div class="main-column">
-
             <!-- Widget 0: Lớp học của tôi -->
             <div class="lms-card mb-xl">
               <div class="card-header-flex">
-                <h3 class="card-title"><i class="pi pi-bookmark-fill text-purple-600 mr-2"></i> Lớp học của tôi</h3>
+                <h3 class="card-title">
+                  <i class="pi pi-bookmark-fill text-purple-600 mr-2"></i> Lớp học của tôi
+                </h3>
                 <span class="text-sm text-gray-500 font-medium">Bấm vào để vào lớp học</span>
               </div>
-              
-              <div v-if="myRegisteredClasses.length === 0" class="text-gray-500 py-6 text-center text-sm">
+
+              <div
+                v-if="myRegisteredClasses.length === 0"
+                class="text-gray-500 py-6 text-center text-sm"
+              >
                 Bạn chưa đăng ký lớp học nào. Hãy xem danh sách đăng ký ở dưới!
               </div>
-              
+
               <div v-else class="my-classes-list">
-                <div v-for="cls in myRegisteredClasses" :key="cls.id" class="my-class-row" @click="viewLessons(cls)">
+                <div
+                  v-for="cls in myRegisteredClasses"
+                  :key="cls.id"
+                  class="my-class-row"
+                  @click="viewLessons(cls)"
+                >
                   <div class="my-class-info">
                     <span class="my-class-code">{{ cls.subject?.code }}</span>
                     <strong class="my-class-name">{{ cls.name }} - {{ cls.subject?.name }}</strong>
-                    <span class="my-class-teacher">GV: {{ cls.instructor?.fullName || cls.instructor?.full_name || 'Chưa phân công' }}</span>
+                    <span class="my-class-teacher"
+                      >GV:
+                      {{
+                        cls.instructor?.fullName || cls.instructor?.full_name || 'Chưa phân công'
+                      }}</span
+                    >
                   </div>
                   <button class="btn-learn"><i class="pi pi-play mr-1"></i> Vào học</button>
                 </div>
               </div>
             </div>
-            
+
             <!-- Widget 1: Lớp học gợi ý đăng ký -->
             <div class="lms-card mb-xl">
               <div class="card-header-flex">
-                <h3 class="card-title"><i class="pi pi-bell text-blue-600 mr-2"></i> Lớp học đang mở đăng ký</h3>
+                <h3 class="card-title">
+                  <i class="pi pi-bell text-blue-600 mr-2"></i> Lớp học đang mở đăng ký
+                </h3>
                 <RouterLink to="/registration" class="link-more">Xem tất cả</RouterLink>
               </div>
-              
-              <div v-if="availableClasses.length === 0" class="text-gray-500 py-4 text-center text-sm">
+
+              <div
+                v-if="availableClasses.length === 0"
+                class="text-gray-500 py-4 text-center text-sm"
+              >
                 Không có lớp mới nào đang mở đăng ký.
               </div>
-              
-              <div v-for="(cls, idx) in availableClasses" :key="cls.id" class="notification-item" :class="{ 'no-border-bottom': idx === availableClasses.length - 1 }">
+
+              <div
+                v-for="(cls, idx) in availableClasses"
+                :key="cls.id"
+                class="notification-item"
+                :class="{ 'no-border-bottom': idx === availableClasses.length - 1 }"
+              >
                 <div class="notif-content">
-                  <div class="notif-title">{{ cls.name || cls.subject?.code }} - {{ cls.subject?.name }}</div>
-                  <div class="notif-desc"><i class="pi pi-calendar mr-1"></i> {{ cls.schedule || 'Chưa xếp lịch' }} &nbsp; | &nbsp; <i class="pi pi-user mr-1"></i> {{ cls.instructor?.fullName || cls.instructor?.full_name || 'Chưa phân công' }}</div>
+                  <div class="notif-title">
+                    {{ cls.name || cls.subject?.code }} - {{ cls.subject?.name }}
+                  </div>
+                  <div class="notif-desc">
+                    <i class="pi pi-calendar mr-1"></i> {{ cls.schedule || 'Chưa xếp lịch' }} &nbsp;
+                    | &nbsp; <i class="pi pi-user mr-1"></i>
+                    {{ cls.instructor?.fullName || cls.instructor?.full_name || 'Chưa phân công' }}
+                  </div>
                 </div>
                 <div class="notif-action text-right">
-                  <div class="text-sm font-semibold mb-2" :class="(cls.remainingSlots || cls.remaining_slots || 0) < 10 ? 'text-orange-600' : 'text-green-600'">Còn: {{ cls.remainingSlots || cls.remaining_slots || 0 }} slot</div>
+                  <div
+                    class="text-sm font-semibold mb-2"
+                    :class="
+                      (cls.remainingSlots || cls.remaining_slots || 0) < 10
+                        ? 'text-orange-600'
+                        : 'text-green-600'
+                    "
+                  >
+                    Còn: {{ cls.remainingSlots || cls.remaining_slots || 0 }} slot
+                  </div>
                   <RouterLink to="/registration" class="btn-primary-small">Đăng ký</RouterLink>
                 </div>
               </div>
@@ -282,14 +365,16 @@ async function onAvatarSelected(event: Event) {
             <!-- Widget 2: Bài thi sắp tới -->
             <div class="lms-card">
               <div class="card-header-flex">
-                <h3 class="card-title"><i class="pi pi-pencil text-purple-600 mr-2"></i> Bài thi đang mở</h3>
+                <h3 class="card-title">
+                  <i class="pi pi-pencil text-purple-600 mr-2"></i> Bài thi đang mở
+                </h3>
                 <RouterLink to="/exam" class="link-more">Đến trang Khảo thí</RouterLink>
               </div>
-              
+
               <div v-if="upcomingExams.length === 0" class="text-gray-500 py-4 text-center text-sm">
                 Bạn chưa có bài kiểm tra nào sắp diễn ra.
               </div>
-              
+
               <div v-for="e in upcomingExams" :key="e.id" class="exam-item">
                 <div class="exam-date">
                   <span class="exam-day">Đang mở</span>
@@ -297,7 +382,9 @@ async function onAvatarSelected(event: Event) {
                 </div>
                 <div class="exam-info">
                   <div class="exam-name">{{ e.title }}</div>
-                  <div class="exam-rules"><i class="pi pi-info-circle"></i> {{ e.className }} (Bắt buộc Full-screen)</div>
+                  <div class="exam-rules">
+                    <i class="pi pi-info-circle"></i> {{ e.className }} (Bắt buộc Full-screen)
+                  </div>
                 </div>
                 <div class="exam-action">
                   <RouterLink to="/exam" class="btn-purple-small">Vào phòng thi</RouterLink>
@@ -309,14 +396,15 @@ async function onAvatarSelected(event: Event) {
           <!-- Cột Profile (Dùng chung) -->
           <div class="side-column">
             <div class="lms-card profile-card">
-              <div class="profile-avatar editable" :class="{ 'uploading': uploadingAvatar }" @click="triggerAvatarUpload">
-                <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" alt="Avatar" class="avatar-img" />
-                <i v-else class="pi pi-user"></i>
+              <div class="profile-avatar-container" @click="triggerAvatarUpload" :class="{ uploading: uploadingAvatar }">
+                <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile?.avatarUrl" class="profile-avatar-img" />
+                <div v-else class="profile-avatar"><i class="pi pi-user"></i></div>
                 <div class="avatar-overlay">
                   <i v-if="uploadingAvatar" class="pi pi-spin pi-spinner"></i>
                   <i v-else class="pi pi-camera"></i>
                 </div>
               </div>
+              <input type="file" accept="image/*" ref="fileInput" hidden @change="handleAvatarChange" />
               <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
               <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
               <div class="profile-divider"></div>
@@ -336,7 +424,6 @@ async function onAvatarSelected(event: Event) {
       </template>
     </div>
 
-
     <!-- ============================================== -->
     <!-- DASHBOARD DÀNH CHO ADMIN / GIẢNG VIÊN -->
     <!-- ============================================== -->
@@ -344,7 +431,12 @@ async function onAvatarSelected(event: Event) {
       <div class="main-column">
         <!-- Stats Row -->
         <div class="stats-row">
-          <div v-for="(stat, index) in statsCards" :key="index" class="lms-card stat-card" :class="{ 'stat-card-primary': stat.primary }">
+          <div
+            v-for="(stat, index) in statsCards"
+            :key="index"
+            class="lms-card stat-card"
+            :class="{ 'stat-card-primary': stat.primary }"
+          >
             <div class="stat-icon-wrapper"><i :class="stat.icon"></i></div>
             <div class="stat-content">
               <div class="stat-value">{{ stat.value }}</div>
@@ -387,14 +479,15 @@ async function onAvatarSelected(event: Event) {
       <!-- Cột phụ bên phải -->
       <div class="side-column">
         <div class="lms-card profile-card">
-          <div class="profile-avatar editable" :class="{ 'uploading': uploadingAvatar }" @click="triggerAvatarUpload">
-            <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" alt="Avatar" class="avatar-img" />
-            <i v-else class="pi pi-user"></i>
+          <div class="profile-avatar-container" @click="triggerAvatarUpload" :class="{ uploading: uploadingAvatar }">
+            <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile?.avatarUrl" class="profile-avatar-img" />
+            <div v-else class="profile-avatar"><i class="pi pi-user"></i></div>
             <div class="avatar-overlay">
               <i v-if="uploadingAvatar" class="pi pi-spin pi-spinner"></i>
               <i v-else class="pi pi-camera"></i>
             </div>
           </div>
+          <input type="file" accept="image/*" ref="fileInput" hidden @change="handleAvatarChange" />
           <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
           <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
           <div class="profile-divider"></div>
@@ -422,14 +515,19 @@ async function onAvatarSelected(event: Event) {
           </div>
           <button @click="closeLessonsModal" class="btn-close"><i class="pi pi-times"></i></button>
         </div>
-        
+
         <div class="modal-body-premium">
           <div v-if="loadingLessons" class="loading-center-lessons">
-            <i class="pi pi-spin pi-spinner spinner-purple" style="font-size:2rem;color:#7c3aed"></i>
-            <span style="margin-top:0.5rem;font-size:0.875rem;color:#6b7280">Đang tải danh sách bài học...</span>
+            <i
+              class="pi pi-spin pi-spinner spinner-purple"
+              style="font-size: 2rem; color: #7c3aed"
+            ></i>
+            <span style="margin-top: 0.5rem; font-size: 0.875rem; color: #6b7280"
+              >Đang tải danh sách bài học...</span
+            >
           </div>
           <div v-else-if="classLessons.length === 0" class="empty-lessons">
-            <i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af;margin-bottom:1rem"></i>
+            <i class="pi pi-inbox" style="font-size: 3rem; color: #9ca3af; margin-bottom: 1rem"></i>
             <h3>Giảng viên chưa đăng tải bài giảng nào cho lớp này.</h3>
             <p>Vui lòng quay lại sau!</p>
           </div>
@@ -439,19 +537,41 @@ async function onAvatarSelected(event: Event) {
                 <div class="student-lesson-title">
                   <span class="lesson-index">Bài {{ idx + 1 }}</span>
                   <span class="lesson-name">{{ l.title }}</span>
-                  <span v-if="parseLessonContent(l.content).youtubeId" class="badge-video ml-2"><i class="pi pi-video mr-1"></i>Video</span>
+                  <span v-if="parseLessonContent(l.content).youtubeId" class="badge-video ml-2"
+                    ><i class="pi pi-video mr-1"></i>Video</span
+                  >
                 </div>
-                <i class="pi" :class="expandedStudentLessons.includes(l.id) ? 'pi-chevron-up text-purple-600' : 'pi-chevron-down'"></i>
+                <i
+                  class="pi"
+                  :class="
+                    expandedStudentLessons.includes(l.id)
+                      ? 'pi-chevron-up text-purple-600'
+                      : 'pi-chevron-down'
+                  "
+                ></i>
               </div>
-              
+
               <div v-if="expandedStudentLessons.includes(l.id)" class="student-lesson-body">
                 <!-- Video player -->
-                <div v-if="parseLessonContent(l.content).youtubeId" class="student-video-wrapper mb-3">
-                  <iframe 
-                    :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" 
-                    frameborder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowfullscreen>
+                <div
+                  v-if="parseLessonContent(l.content).youtubeId"
+                  class="student-video-wrapper mb-3"
+                >
+                  <iframe
+                    :src="
+                      'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId
+                    "
+                    frameborder="0"
+                    allow="
+                      accelerometer;
+                      autoplay;
+                      clipboard-write;
+                      encrypted-media;
+                      gyroscope;
+                      picture-in-picture;
+                    "
+                    allowfullscreen
+                  >
                   </iframe>
                 </div>
                 <!-- Description -->
@@ -467,97 +587,280 @@ async function onAvatarSelected(event: Event) {
         </div>
       </div>
     </div>
-    
-    <!-- Hidden File Input for Avatar Upload -->
-    <input type="file" ref="avatarInput" style="display: none" accept="image/*" @change="onAvatarSelected" />
   </div>
 </template>
 
 <style scoped>
-.dashboard { width: 100%; animation: fadeIn 0.3s ease-out; }
-.breadcrumb { font-size: 0.85rem; color: #6b7280; margin-bottom: 1.5rem; }
-.breadcrumb span { color: #111827; font-weight: 500; }
-.page-header { margin-bottom: 2rem; }
-.page-title { margin-bottom: 4px; font-weight: 600; font-size: 1.75rem; color: #111827; }
-.page-subtitle { color: #6b7280; font-size: 0.95rem; }
+.dashboard {
+  width: 100%;
+  animation: fadeIn 0.3s ease-out;
+}
+.breadcrumb {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+.breadcrumb span {
+  color: #111827;
+  font-weight: 500;
+}
+.page-header {
+  margin-bottom: 2rem;
+}
+.page-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+  font-size: 1.75rem;
+  color: #111827;
+}
+.page-subtitle {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
 
-.dashboard-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; }
-.mb-xl { margin-bottom: 2rem; }
-.mt-lg { margin-top: 1.5rem; }
-.mt-xl { margin-top: 2rem; }
-.mr-2 { margin-right: 0.5rem; }
-.mr-1 { margin-right: 0.25rem; }
-.text-right { text-align: right; }
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 1.5rem;
+}
+.mb-xl {
+  margin-bottom: 2rem;
+}
+.mt-lg {
+  margin-top: 1.5rem;
+}
+.mt-xl {
+  margin-top: 2rem;
+}
+.mr-2 {
+  margin-right: 0.5rem;
+}
+.mr-1 {
+  margin-right: 0.25rem;
+}
+.text-right {
+  text-align: right;
+}
 
 /* Colors */
-.text-blue-600 { color: #2563eb; } .bg-blue-100 { background: #dbeafe; }
-.text-purple-600 { color: #9333ea; } .bg-purple-100 { background: #f3e8ff; }
-.text-green-600 { color: #166534; } .bg-green-100 { background: #dcfce7; }
-.text-orange-600 { color: #ea580c; }
+.text-blue-600 {
+  color: #2563eb;
+}
+.bg-blue-100 {
+  background: #dbeafe;
+}
+.text-purple-600 {
+  color: #9333ea;
+}
+.bg-purple-100 {
+  background: #f3e8ff;
+}
+.text-green-600 {
+  color: #166534;
+}
+.bg-green-100 {
+  background: #dcfce7;
+}
+.text-orange-600 {
+  color: #ea580c;
+}
 
 /* Card System */
 .lms-card {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 1.5rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
 }
 
 /* Stats */
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-.stat-card { display: flex; align-items: center; gap: 1.25rem; padding: 1.25rem; }
-.stat-icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: #f3f4f6; color: #4b5563; }
-.stat-value { font-size: 1.5rem; font-weight: 600; color: #111827; line-height: 1.2; margin-bottom: 2px; }
-.stat-label { font-size: 0.8rem; color: #6b7280; font-weight: 500; }
-
-/* Dashboard Widgets */
-.card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid #f3f4f6; }
-.card-title { font-size: 1.1rem; font-weight: 600; color: #111827; display: flex; align-items: center; }
-.link-more { font-size: 0.85rem; color: #2563eb; font-weight: 500; text-decoration: none; }
-.link-more:hover { text-decoration: underline; }
-
-/* Notification Items */
-.notification-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px dashed #e5e7eb; }
-.no-border-bottom { border-bottom: none; padding-bottom: 0; }
-.notif-title { font-weight: 600; color: #111827; font-size: 1.05rem; margin-bottom: 0.25rem; }
-.notif-desc { font-size: 0.85rem; color: #6b7280; display: flex; align-items: center; }
-.btn-primary-small { background: #111827; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; display: inline-block; text-decoration: none; transition: background 0.2s; }
-.btn-primary-small:hover { background: #374151; }
-
-/* Exam Item */
-.exam-item { display: flex; align-items: center; gap: 1.5rem; padding: 1rem; background: #f9fafb; border-radius: 8px; border: 1px solid #f3f4f6; }
-.exam-date { display: flex; flex-direction: column; align-items: center; background: #fff; padding: 0.75rem 1rem; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; min-width: 80px; }
-.exam-day { font-size: 0.75rem; font-weight: 600; color: #dc2626; text-transform: uppercase; margin-bottom: 0.25rem; }
-.exam-time { font-size: 1.25rem; font-weight: 700; color: #111827; }
-.exam-info { flex: 1; }
-.exam-name { font-weight: 600; font-size: 1.1rem; color: #111827; margin-bottom: 0.25rem; }
-.exam-rules { font-size: 0.85rem; color: #ea580c; display: flex; align-items: center; gap: 0.35rem; }
-.btn-purple-small { background: #7c3aed; color: #fff; padding: 0.6rem 1.25rem; border-radius: 6px; font-size: 0.9rem; font-weight: 500; text-decoration: none; transition: background 0.2s; }
-.btn-purple-small:hover { background: #6d28d9; }
-
-/* Profile Card */
-.profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.profile-avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #f3f4f6;
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem;
+}
+.stat-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  color: #9ca3af;
-  margin-bottom: 1rem;
-  border: 4px solid #fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  font-size: 1.5rem;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+.stat-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Dashboard Widgets */
+.card-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+}
+.link-more {
+  font-size: 0.85rem;
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+}
+.link-more:hover {
+  text-decoration: underline;
+}
+
+/* Notification Items */
+.notification-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px dashed #e5e7eb;
+}
+.no-border-bottom {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.notif-title {
+  font-weight: 600;
+  color: #111827;
+  font-size: 1.05rem;
+  margin-bottom: 0.25rem;
+}
+.notif-desc {
+  font-size: 0.85rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
+.btn-primary-small {
+  background: #111827;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-block;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.btn-primary-small:hover {
+  background: #374151;
+}
+
+/* Exam Item */
+.exam-item {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+}
+.exam-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  min-width: 80px;
+}
+.exam-day {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #dc2626;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+.exam-time {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+.exam-info {
+  flex: 1;
+}
+.exam-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+.exam-rules {
+  font-size: 0.85rem;
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.btn-purple-small {
+  background: #7c3aed;
+  color: #fff;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.btn-purple-small:hover {
+  background: #6d28d9;
+}
+
+/* Profile Card */
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.profile-avatar-container {
   position: relative;
-  overflow: hidden;
-}
-.profile-avatar.editable {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 1rem;
   cursor: pointer;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
-.avatar-img {
+.profile-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
 }
 .avatar-overlay {
   position: absolute;
@@ -566,101 +869,478 @@ async function onAvatarSelected(event: Event) {
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.4);
-  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+.profile-avatar-container:hover .avatar-overlay {
+  opacity: 1;
+}
+.profile-avatar-container.uploading .avatar-overlay {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.6);
+}
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #9ca3af;
+}
+.profile-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: #111827;
+}
+.profile-role {
+  margin-bottom: 1.5rem;
+}
+.profile-divider {
+  width: 100%;
+  height: 1px;
+  background: #e5e7eb;
+  margin-bottom: 1rem;
+}
+.profile-detail {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.detail-label {
+  color: #6b7280;
+}
+.detail-value {
+  color: #111827;
+  font-weight: 500;
+}
+.lms-tag {
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.lms-tag-primary {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.lms-tag-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* Actions (Admin) */
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #111827;
+}
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.action-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-decoration: none;
+  padding: 1.25rem;
+  transition: all 0.2s;
+}
+.action-card:hover {
+  border-color: #d1d5db;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.action-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  border-radius: 50%;
+  flex-shrink: 0;
 }
-.profile-avatar.editable:hover .avatar-overlay {
-  opacity: 1;
+.action-icon-wrapper.blue {
+  background: #e0f2fe;
+  color: #0284c7;
 }
-.profile-avatar.uploading .avatar-overlay {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.6);
+.action-icon-wrapper.purple {
+  background: #f3e8ff;
+  color: #9333ea;
 }
-.profile-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem; color: #111827; }
-.profile-role { margin-bottom: 1.5rem; }
-.profile-divider { width: 100%; height: 1px; background: #e5e7eb; margin-bottom: 1rem; }
-.profile-detail { width: 100%; display: flex; flex-direction: column; gap: 0.75rem; }
-.detail-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
-.detail-label { color: #6b7280; }
-.detail-value { color: #111827; font-weight: 500; }
-.lms-tag { padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-.lms-tag-primary { background: #dbeafe; color: #1e40af; }
-.lms-tag-success { background: #dcfce7; color: #166534; }
+.action-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.action-label {
+  font-weight: 600;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+.action-desc {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+.action-arrow {
+  color: #9ca3af;
+  transition: transform 0.2s;
+}
+.action-card:hover .action-arrow {
+  color: #2563eb;
+  transform: translateX(2px);
+}
 
-/* Actions (Admin) */
-.section-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #111827; }
-.actions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-.action-card { display: flex; align-items: center; gap: 1rem; text-decoration: none; padding: 1.25rem; transition: all 0.2s; }
-.action-card:hover { border-color: #d1d5db; transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-.action-icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
-.action-icon-wrapper.blue { background: #e0f2fe; color: #0284c7; }
-.action-icon-wrapper.purple { background: #f3e8ff; color: #9333ea; }
-.action-content { flex: 1; display: flex; flex-direction: column; }
-.action-label { font-weight: 600; color: #111827; font-size: 1rem; margin-bottom: 2px; }
-.action-desc { font-size: 0.85rem; color: #6b7280; }
-.action-arrow { color: #9ca3af; transition: transform 0.2s; }
-.action-card:hover .action-arrow { color: #2563eb; transform: translateX(2px); }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-@media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
-@media (max-width: 768px) { .stats-row { grid-template-columns: 1fr; } .actions-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
 /* Student Classes list style */
-.my-classes-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.my-class-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer; background: #fff; transition: all 0.2s ease; }
-.my-class-row:hover { border-color: #7c3aed; background: #fbfbfe; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(124, 58, 237, 0.05); }
-.my-class-info { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
-.my-class-code { font-size: 0.75rem; font-weight: 700; color: #7c3aed; letter-spacing: 0.05em; text-transform: uppercase; }
-.my-class-name { font-size: 0.95rem; color: #111827; }
-.my-class-teacher { font-size: 0.8rem; color: #6b7280; }
-.btn-learn { background: #7c3aed; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; transition: background 0.2s; }
-.btn-learn:hover { background: #6d28d9; }
+.my-classes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.my-class-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+.my-class-row:hover {
+  border-color: #7c3aed;
+  background: #fbfbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(124, 58, 237, 0.05);
+}
+.my-class-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+.my-class-code {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #7c3aed;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.my-class-name {
+  font-size: 0.95rem;
+  color: #111827;
+}
+.my-class-teacher {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+.btn-learn {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.2s;
+}
+.btn-learn:hover {
+  background: #6d28d9;
+}
 
 /* Premium Modal Overlay & Content */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(17, 24, 39, 0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeInModal 0.25s ease-out; }
-.modal-content-premium { background: #fff; width: 90%; max-width: 700px; max-height: 85vh; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e5e7eb; animation: slideUpModal 0.25s ease-out; }
-.modal-header { padding: 1.25rem 1.5rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: flex-start; }
-.modal-header-info { display: flex; flex-direction: column; }
-.modal-pre-title { font-size: 0.75rem; font-weight: 700; color: #6b7280; letter-spacing: 0.05em; margin-bottom: 2px; }
-.modal-title { font-size: 1.25rem; font-weight: 600; color: #111827; margin: 0; }
-.btn-close { background: none; border: none; font-size: 1.1rem; color: #9ca3af; cursor: pointer; padding: 0.25rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-.btn-close:hover { background: #f3f4f6; color: #111827; }
-.modal-body-premium { padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; }
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeInModal 0.25s ease-out;
+}
+.modal-content-premium {
+  background: #fff;
+  width: 90%;
+  max-width: 700px;
+  max-height: 85vh;
+  border-radius: 16px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  animation: slideUpModal 0.25s ease-out;
+}
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.modal-header-info {
+  display: flex;
+  flex-direction: column;
+}
+.modal-pre-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.btn-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+.modal-body-premium {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
 /* Student Lessons viewer specific styles */
-.loading-center-lessons { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem; color: #7c3aed; }
-.spinner-purple { animation: spin 1s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.loading-center-lessons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: #7c3aed;
+}
+.spinner-purple {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-.empty-lessons { text-align: center; padding: 3rem 1.5rem; color: #6b7280; }
-.empty-lessons h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.25rem; color: #111827; }
-.empty-lessons p { font-size: 0.875rem; color: #9ca3af; }
+.empty-lessons {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: #6b7280;
+}
+.empty-lessons h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: #111827;
+}
+.empty-lessons p {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
 
-.student-lessons-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.student-lesson-item { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; transition: all 0.2s; }
-.student-lesson-header { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: #f9fafb; cursor: pointer; }
-.student-lesson-header:hover { background: #f3f4f6; }
-.student-lesson-title { display: flex; align-items: center; font-weight: 600; color: #111827; }
-.lesson-index { font-size: 0.8rem; background: #e5e7eb; padding: 0.15rem 0.45rem; border-radius: 4px; color: #4b5563; font-weight: 700; margin-right: 0.75rem; text-transform: uppercase; }
-.lesson-name { font-size: 0.95rem; }
-.student-lesson-body { padding: 1.25rem; border-top: 1px solid #e5e7eb; background: #fff; }
+.student-lessons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.student-lesson-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  transition: all 0.2s;
+}
+.student-lesson-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background: #f9fafb;
+  cursor: pointer;
+}
+.student-lesson-header:hover {
+  background: #f3f4f6;
+}
+.student-lesson-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #111827;
+}
+.lesson-index {
+  font-size: 0.8rem;
+  background: #e5e7eb;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  color: #4b5563;
+  font-weight: 700;
+  margin-right: 0.75rem;
+  text-transform: uppercase;
+}
+.lesson-name {
+  font-size: 0.95rem;
+}
+.student-lesson-body {
+  padding: 1.25rem;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+}
 
-.student-video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.07); border: 1px solid #e5e7eb; background: #000; }
-.student-video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-.student-lesson-desc { font-size: 0.9rem; color: #4b5563; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.empty-desc { font-size: 0.85rem; color: #9ca3af; font-style: italic; }
-.badge-video { display: inline-flex; align-items: center; font-size: 0.7rem; background: #f3e8ff; color: #6b21a8; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600; }
+.student-video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e5e7eb;
+  background: #000;
+}
+.student-video-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.student-lesson-desc {
+  font-size: 0.9rem;
+  color: #4b5563;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.empty-desc {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+.badge-video {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #f3e8ff;
+  color: #6b21a8;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
 
-@keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUpModal { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInModal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideUpModal {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-@media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
-@media (max-width: 768px) { .stats-row { grid-template-columns: 1fr; } .actions-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

@@ -35,9 +35,11 @@ export async function create(req, res) {
       proposed_by: req.user.id,
       quantity: parseInt(quantity),
       semester,
-      reason: reason || ''
+      reason: reason || '',
     })
-    return res.status(201).json({ success: true, message: 'Đề xuất đã được gửi thành công.', data: proposal })
+    return res
+      .status(201)
+      .json({ success: true, message: 'Đề xuất đã được gửi thành công.', data: proposal })
   } catch (err) {
     console.error('[ClassProposalController.create]', err.message)
     return res.status(500).json({ error: 'Lỗi khi tạo đề xuất.' })
@@ -49,10 +51,16 @@ export async function approve(req, res) {
     const { id } = req.params
     const { status } = req.body
     if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ error: 'Status không hợp lệ. Chỉ chấp nhận: approved, rejected.' })
+      return res
+        .status(400)
+        .json({ error: 'Status không hợp lệ. Chỉ chấp nhận: approved, rejected.' })
     }
     const updated = await classProposalModel.updateStatus(id, status, req.user.id)
-    return res.json({ success: true, message: `Đề xuất đã được ${status === 'approved' ? 'phê duyệt' : 'từ chối'}.`, data: updated })
+    return res.json({
+      success: true,
+      message: `Đề xuất đã được ${status === 'approved' ? 'phê duyệt' : 'từ chối'}.`,
+      data: updated,
+    })
   } catch (err) {
     console.error('[ClassProposalController.approve]', err.message)
     return res.status(500).json({ error: 'Lỗi khi xử lý đề xuất.' })

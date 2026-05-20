@@ -146,17 +146,16 @@ onMounted(async () => {
             <div class="active-indicator"></div>
 
             <div class="avatar" :class="{ active: selectedUserId === profile.id }">
-              <img v-if="profile.avatarUrl || profile.avatar_url" :src="profile.avatarUrl || profile.avatar_url" alt="Avatar" class="avatar-img-small" />
-              <span v-else>{{ (profile.fullName || profile.full_name || 'U').charAt(0).toUpperCase() }}</span>
+              {{ profile.full_name.charAt(0).toUpperCase() }}
             </div>
 
             <div class="user-info">
               <div class="user-name" :class="{ active: selectedUserId === profile.id }">
-                {{ profile.fullName || profile.full_name }}
+                {{ profile.full_name }}
               </div>
               <div class="user-email">{{ profile.email }}</div>
               <span class="role-badge" :class="{ active: selectedUserId === profile.id }">
-                {{ profile.displayRole || profile.role }}
+                {{ profile.role }}
               </span>
             </div>
           </div>
@@ -435,13 +434,6 @@ onMounted(async () => {
   font-size: 1.125rem;
   flex-shrink: 0;
   transition: all 0.2s;
-  overflow: hidden;
-}
-.avatar-img-small {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 8px;
 }
 .user-item:hover .avatar {
   background-color: #a855f7;

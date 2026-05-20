@@ -19,4 +19,7 @@ router.post('/', requireRank(60), subjectController.create)
 // PUT /api/subjects/:id/status — Duyệt môn học (Hiệu trưởng trở lên)
 router.put('/:id/status', requireRank(90), subjectController.updateApproval)
 
+// PUT /api/subjects/:id/lock — Khóa môn học (Hiệu trưởng trở lên)
+router.put('/:id/lock', requireRank(90), subjectController.lock)
+
 export { router }

@@ -38,3 +38,29 @@ ALTER TABLE public.class_registrations
   DROP CONSTRAINT IF EXISTS class_registrations_class_id_fkey,
   ADD CONSTRAINT class_registrations_class_id_fkey 
   FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE CASCADE;
+
+-- 6. BỔ SUNG CÁC CỘT CHO BẢNG subjects (Quản lý học phần nâng cao)
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS lock_reason TEXT;
+
+-- 7. TẠO BUCKET CHO ẢNH ĐẠI DIỆN (AVATARS) TRONG SUPABASE STORAGE
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Thiết lập RLS policy cho bảng storage.objects (Chỉ áp dụng cho bucket avatars)
+-- Cho phép mọi người đọc (xem ảnh)
+CREATE POLICY "Avatar Images are publicly accessible." 
+ON storage.objects FOR SELECT 
+USING ( bucket_id = 'avatars' );
+
+-- Cho phép user đã đăng nhập tự upload ảnh của mình
+CREATE POLICY "Users can upload their own avatar." 
+ON storage.objects FOR INSERT 
+WITH CHECK ( bucket_id = 'avatars' AND auth.role() = 'authenticated' );
+
+-- Cho phép user đã đăng nhập tự cập nhật ảnh của mình
+CREATE POLICY "Users can update their own avatar."
+ON storage.objects FOR UPDATE
+WITH CHECK ( bucket_id = 'avatars' AND auth.role() = 'authenticated' );
