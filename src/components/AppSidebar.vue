@@ -187,14 +187,6 @@ function toggleGroup(targetGroup: MainMenuGroup) {
     menuGroups.value.forEach((g) => (g.isOpen = false))
     // Đảo ngược trạng thái của nhóm được click
     originalGroup.isOpen = !wasOpen
-
-    // Tự động điều hướng đến mục con đầu tiên khi mở Group
-    if (!wasOpen) {
-      const filteredGroup = filteredMenuGroups.value.find((g) => g.label === targetGroup.label)
-      if (filteredGroup && filteredGroup.items.length > 0) {
-        router.push(filteredGroup.items[0].to)
-      }
-    }
   }
 }
 
