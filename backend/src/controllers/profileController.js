@@ -357,3 +357,91 @@ export async function uploadAvatar(req, res) {
     return res.status(500).json({ error: 'Lỗi máy chủ khi cập nhật ảnh đại diện.' })
   }
 }
+
+/**
+ * PUT /api/profiles/:id/lock — Khóa hoặc mở khóa tài khoản người dùng
+ */
+export async function lockProfile(req, res) {
+  try {
+    const targetId = req.params.id
+    const { isLocked, reason } = req.body
+
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
+
+    const targetProfile = await profileModel.findById(targetId)
+    if (!targetProfile) {
+      return res.status(404).json({ error: 'Không tìm thấy hồ sơ người dùng.' })
+    }
+
+    if (effectiveRank <= targetProfile.rank) {
+      return res.status(403).json({
+        error: `Quyền của bạn không đủ để khóa/mở khóa tài khoản này.`
+      })
+    }
+
+    if (isLocked && (!reason || reason.trim() === '')) {
+      return res.status(400).json({ error: 'Khóa tài khoản bắt buộc phải nhập lý do.' })
+    }
+
+    const updated = await profileModel.updateLockStatus(targetId, !!isLocked, isLocked ? reason.trim() : null)
+
+    return res.json({
+      success: true,
+      message: isLocked ? 'Đã khóa tài khoản thành công.' : 'Đã mở khóa tài khoản thành công.',
+      profile: profileView.formatProfile(updated)
+    })
+  } catch (err) {
+    console.error('[ProfileController.lockProfile]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi cập nhật trạng thái khóa.' })
+  }
+}
+
+/**
+ * POST /api/profiles/:id/reset-password — Reset mật khẩu người dùng
+ */
+export async function resetPassword(req, res) {
+  try {
+    const targetId = req.params.id
+    const { newPassword } = req.body
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Mật khẩu mới phải có tối thiểu 6 ký tự.' })
+    }
+
+    let effectiveRank = req.profile.rank
+    const perms = req.permissions || []
+    if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
+    else if (perms.includes('user_manage_staff')) effectiveRank = Math.max(effectiveRank, 80)
+
+    const targetProfile = await profileModel.findById(targetId)
+    if (!targetProfile) {
+      return res.status(404).json({ error: 'Không tìm thấy hồ sơ người dùng.' })
+    }
+
+    if (effectiveRank <= targetProfile.rank) {
+      return res.status(403).json({
+        error: `Quyền của bạn không đủ để reset mật khẩu cho tài khoản này.`
+      })
+    }
+
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
+      password: newPassword
+    })
+
+    if (authError) {
+      return res.status(400).json({ error: authError.message })
+    }
+
+    return res.json({
+      success: true,
+      message: `Đã đặt lại mật khẩu cho tài khoản "${targetProfile.full_name}" thành công.`
+    })
+  } catch (err) {
+    console.error('[ProfileController.resetPassword]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi reset mật khẩu.' })
+  }
+}
+

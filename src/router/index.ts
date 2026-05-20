@@ -74,6 +74,20 @@ const router = createRouter({
       meta: { requiresAuth: true, requirePermission: 'subject_approve' },
     },
 
+    // ---- QUẢN LÝ BỘ MÔN ----
+    {
+      path: '/admin/departments/add-subject',
+      name: 'department-add-subject',
+      component: () => import('@/views/admin/DepartmentAddSubjectView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'department_manage' },
+    },
+    {
+      path: '/admin/departments/approve',
+      name: 'department-approve',
+      component: () => import('@/views/admin/DepartmentApproveView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'department_manage' },
+    },
+
     // ---- QUẢN LÝ LỚP HỌC ----
     {
       path: '/classes/propose',
@@ -91,6 +105,12 @@ const router = createRouter({
       path: '/admin/classes',
       name: 'class-management',
       component: () => import('@/views/admin/ClassManagementView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'class_create' },
+    },
+    {
+      path: '/admin/classes/search',
+      name: 'class-search',
+      component: () => import('@/views/admin/ClassSearchView.vue'),
       meta: { requiresAuth: true, requirePermission: 'class_create' },
     },
     {

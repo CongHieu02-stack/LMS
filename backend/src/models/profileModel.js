@@ -142,3 +142,23 @@ export async function findPermissionsByUserId(userId, role) {
   if (err2) throw err2
   return rolePerms.map((p) => p.permissions.code)
 }
+
+/**
+ * Cập nhật trạng thái khóa của một profile
+ * @param {string} id - UUID của user
+ * @param {boolean} isLocked - Trạng thái khóa
+ * @param {string|null} lockReason - Lý do khóa
+ * @returns {object} - Profile sau khi cập nhật
+ */
+export async function updateLockStatus(id, isLocked, lockReason) {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .update({ is_locked: isLocked, lock_reason: lockReason })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+

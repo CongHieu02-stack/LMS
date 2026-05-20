@@ -14,6 +14,7 @@ import { router as classProposalRoutes } from './classProposalRoutes.js'
 import { router as lessonRoutes } from './lessonRoutes.js'
 import { router as examManageRoutes } from './examManageRoutes.js'
 import { router as gradeRoutes } from './gradeRoutes.js'
+import { router as adminRoutes } from './adminRoutes.js'
 
 const router = Router()
 
@@ -28,5 +29,6 @@ router.use('/class-proposals', classProposalRoutes)
 router.use('/lessons', lessonRoutes)
 router.use('/exam-manage', examManageRoutes)
 router.use('/grades', gradeRoutes)
+router.use('/admin', adminRoutes)
 
 export { router }

@@ -33,6 +33,8 @@ export function formatProfile(raw, permissions = []) {
     rank: raw.rank,
     displayRole: ROLE_DISPLAY[raw.role] || raw.role,
     avatarUrl: raw.avatar_url,
+    isLocked: raw.is_locked || false,
+    lockReason: raw.lock_reason || null,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
     permissions: permissions,

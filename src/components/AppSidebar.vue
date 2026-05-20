@@ -45,8 +45,8 @@ const menuGroups = ref<MainMenuGroup[]>([
     isOpen: false,
     items: [
       {
-        label: 'Tạo tài khoản',
-        to: '/admin/users/create',
+        label: 'Tạo tài khoản (Hiệu trưởng/HR)',
+        to: '/admin/users?action=create',
         requiredPermission: ['user_manage_senior', 'user_manage_staff'],
       },
       {
@@ -55,8 +55,8 @@ const menuGroups = ref<MainMenuGroup[]>([
         requiredPermission: ['user_manage_senior', 'user_manage_staff'],
       },
       {
-        label: 'Phân quyền Nhân sự',
-        to: '/admin/permissions',
+        label: 'Quản lý trạng thái (Khóa & Reset)',
+        to: '/admin/users',
         requiredPermission: ['user_manage_senior', 'user_manage_staff'],
       },
     ],
@@ -66,19 +66,18 @@ const menuGroups = ref<MainMenuGroup[]>([
     icon: 'pi pi-book',
     isOpen: false,
     items: [
-      { label: 'Tạo học phần mới', to: '/subjects/propose', requiredPermission: 'subject_propose' },
+      { 
+        label: 'Tạo học phần mới', 
+        to: '/subjects/propose', 
+        requiredPermission: 'subject_propose' 
+      },
       {
-        label: 'Duyệt đề xuất học phần',
+        label: 'Phê duyệt học phần (Duyệt/Từ chối)',
         to: '/admin/subjects',
         requiredPermission: 'subject_approve',
       },
       {
-        label: 'Cấu hình trường',
-        to: '/admin/configs',
-        requiredPermission: 'school_config_manage',
-      },
-      {
-        label: 'Danh sách học phần',
+        label: 'Danh sách & Khóa học phần',
         to: '/admin/subjects/list',
         requiredPermission: 'subject_approve',
       },
@@ -89,21 +88,20 @@ const menuGroups = ref<MainMenuGroup[]>([
     icon: 'pi pi-sitemap',
     isOpen: false,
     items: [
-      { label: 'Tạo lớp học', to: '/admin/classes', requiredPermission: 'class_create' },
+      { 
+        label: 'Tạo lớp học (Khung)', 
+        to: '/admin/classes', 
+        requiredPermission: 'class_create' 
+      },
       {
-        label: 'Duyệt mở lớp học',
+        label: 'Phê duyệt lớp (Duyệt/Từ chối)',
         to: '/admin/classes/approve',
         requiredPermission: 'class_quantity_approve',
       },
       {
-        label: 'Đề xuất SL lớp',
-        to: '/classes/propose',
-        requiredPermission: 'class_quantity_propose',
-      },
-      {
-        label: 'Phân công Giảng viên',
-        to: '/admin/classes/assign',
-        requiredPermission: 'instructor_assign',
+        label: 'Tra cứu lớp (Bộ lọc)',
+        to: '/admin/classes/search',
+        requiredPermission: 'class_create',
       },
     ],
   },
@@ -113,18 +111,13 @@ const menuGroups = ref<MainMenuGroup[]>([
     isOpen: false,
     items: [
       {
-        label: 'Thêm môn vào bộ môn',
+        label: 'Thêm môn học',
         to: '/admin/departments/add-subject',
         requiredPermission: 'department_manage',
       },
       {
-        label: 'Duyệt môn học',
+        label: 'Phê duyệt môn',
         to: '/admin/departments/approve',
-        requiredPermission: 'department_manage',
-      },
-      {
-        label: 'Xem cấu trúc bộ môn',
-        to: '/admin/departments/structure',
         requiredPermission: 'department_manage',
       },
     ],
@@ -134,25 +127,6 @@ const menuGroups = ref<MainMenuGroup[]>([
 // Thêm các menu độc lập cho Sinh viên / Giảng viên (Không thuộc 4 nhóm trên)
 const standaloneMenus = ref<SubMenuItem & { icon?: string }>([
   { label: 'Tổng quan', to: '/dashboard', icon: 'pi pi-th-large' },
-  {
-    label: 'Soạn Bài & Thi',
-    to: '/lessons',
-    icon: 'pi pi-align-justify',
-    requiredPermission: 'lesson_exam_manage',
-  },
-  {
-    label: 'Đăng ký lớp học',
-    to: '/registration',
-    icon: 'pi pi-calendar-plus',
-    requiredPermission: 'class_register',
-  },
-  { label: 'Làm bài kiểm tra', to: '/exam', icon: 'pi pi-pencil', requiredPermission: 'exam_take' },
-  {
-    label: 'Xem bảng điểm',
-    to: '/grades',
-    icon: 'pi pi-chart-line',
-    requiredPermission: 'grade_view',
-  },
 ])
 
 // ----------------------------------------------------------------------------
@@ -191,6 +165,26 @@ const filteredMenuGroups = computed(() => {
     })
     .filter((group) => group.items.length > 0) // CHỈ giữ lại các nhóm có ít nhất 1 mục con hiển thị được
 })
+
+function isSubItemActive(subItem: SubMenuItem) {
+  if (subItem.to.includes('?')) {
+    return route.fullPath === subItem.to
+  }
+  if (route.fullPath.includes('?')) {
+    return false
+  }
+  if (route.path === subItem.to) {
+    return true
+  }
+  if (route.path.startsWith(subItem.to + '/')) {
+    // Chỉ kích hoạt prefix match nếu không có menu con nào khác trùng khớp tuyệt đối với route hiện tại
+    const hasExactSiblingMatch = menuGroups.value.some(group => 
+      group.items.some(item => route.path === item.to)
+    )
+    return !hasExactSiblingMatch
+  }
+  return false
+}
 
 // ----------------------------------------------------------------------------
 // 3. HÀM ĐIỀU KHIỂN LOGIC ĐÓNG/MỞ (ACCORDION TOGGLE)
@@ -271,7 +265,7 @@ function toggleSidebar() {
             :to="subItem.to"
             class="submenu-item"
             :class="{
-              'active-sub': route.path === subItem.to || route.path.startsWith(subItem.to + '/'),
+              'active-sub': isSubItemActive(subItem),
             }"
           >
             <!-- KHÔNG CÓ DẤU CHẤM HOẶC GẠCH ĐẦU DÒNG NỮA -->

@@ -2,9 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { apiGet, apiPost } from '@/lib/api'
 
+// States
 const subjects = ref<any[]>([])
 const managers = ref<any[]>([])
-const classes = ref<any[]>([])
 const loading = ref(true)
 const submitting = ref(false)
 const msg = ref<string | null>(null)
@@ -23,14 +23,11 @@ const form = ref({
 async function loadData() {
   loading.value = true
   try {
-    const [subRes, classRes, profRes] = await Promise.all([
+    const [subRes, profRes] = await Promise.all([
       apiGet<{ success: boolean; data: any[] }>('/subjects'),
-      apiGet<any>('/classes'),
       apiGet<{ success: boolean; data: any[] }>('/profiles'),
     ])
     subjects.value = (subRes.data || []).filter((s: any) => s.status === 'approved')
-    const classData = classRes.data || classRes
-    classes.value = Array.isArray(classData) ? classData : []
     managers.value = (profRes.data || []).filter((p: any) => p.role === 'TRUONG_BO_MON')
   } catch (err: any) {
     errMsg.value = err.message
@@ -56,7 +53,6 @@ async function handleCreate() {
       semester: 'HK1-2026',
       managerId: '',
     }
-    loadData()
   } catch (err: any) {
     errMsg.value = err.message
   }
@@ -68,92 +64,89 @@ async function handleCreate() {
   <div class="mono-wrapper">
     <div class="page-header">
       <div>
-        <div class="breadcrumb">Quản lý Lớp học / <span>Tạo lớp & Gán quản lý</span></div>
-        <h1 class="page-title">Tạo Lớp Học & Gán Quản Lý</h1>
+        <div class="breadcrumb">Quản lý Lớp học / <span>Tạo lớp học mới</span></div>
+        <h1 class="page-title">Khởi Tạo Khung Lớp Học</h1>
         <div class="page-subtitle">
-          Phòng đào tạo tạo lớp cho môn đã duyệt và gán Trưởng bộ môn quản lý.
+          Tạo lớp mới dựa trên học phần gốc đã được phê duyệt và chỉ định Trưởng bộ môn quản lý.
         </div>
       </div>
     </div>
 
-    <div v-if="msg" class="alert alert-s"><i class="pi pi-check-circle"></i> {{ msg }}</div>
-    <div v-if="errMsg" class="alert alert-e"><i class="pi pi-times-circle"></i> {{ errMsg }}</div>
-    <div v-if="loading" class="loading"><i class="pi pi-spin pi-spinner"></i></div>
+    <!-- Alert Notifications -->
+    <div v-if="msg" class="alert alert-s">
+      <i class="pi pi-check-circle"></i> {{ msg }}
+    </div>
+    <div v-if="errMsg" class="alert alert-e">
+      <i class="pi pi-times-circle"></i> {{ errMsg }}
+    </div>
 
-    <div v-else class="split">
-      <div class="mono-card flex-1">
-        <div class="card-header"><span>Tạo lớp mới</span></div>
+    <!-- Loading Spinner -->
+    <div v-if="loading" class="loading">
+      <i class="pi pi-spin pi-spinner"></i>
+    </div>
+
+    <!-- Creation Card Form -->
+    <div v-else class="form-container">
+      <div class="mono-card">
+        <div class="card-header">
+          <span>Thông tin lớp học mới</span>
+        </div>
         <form @submit.prevent="handleCreate" class="card-body">
           <div class="fg">
-            <label>Môn học</label>
+            <label>Học phần gốc</label>
             <select v-model="form.subjectId" class="mono-input" required>
-              <option value="" disabled>-- Chọn --</option>
+              <option value="" disabled>-- Chọn học phần gốc --</option>
               <option v-for="s in subjects" :key="s.id" :value="s.id">
                 {{ s.code }} — {{ s.name }}
               </option>
             </select>
           </div>
+
           <div class="row-2">
             <div class="fg">
-              <label>Tên lớp</label
-              ><input v-model="form.name" class="mono-input" placeholder="VD: INT101-01" required />
+              <label>Tên lớp</label>
+              <input v-model="form.name" class="mono-input" placeholder="VD: INT101-01" required />
             </div>
             <div class="fg">
-              <label>Sĩ số tối đa</label
-              ><input v-model="form.maxSlots" type="number" min="1" class="mono-input" required />
+              <label>Sĩ số tối đa</label>
+              <input v-model="form.maxSlots" type="number" min="1" class="mono-input" required />
             </div>
           </div>
+
           <div class="row-2">
             <div class="fg">
-              <label>Lịch học</label
-              ><input v-model="form.schedule" class="mono-input" placeholder="T2 (T1-3)" />
+              <label>Lịch học</label>
+              <input v-model="form.schedule" class="mono-input" placeholder="T2 (T1-3)" />
             </div>
             <div class="fg">
-              <label>Phòng</label
-              ><input v-model="form.room" class="mono-input" placeholder="A101" />
+              <label>Phòng học</label>
+              <input v-model="form.room" class="mono-input" placeholder="VD: A101" />
             </div>
           </div>
+
           <div class="row-2">
             <div class="fg">
-              <label>Học kỳ</label><input v-model="form.semester" class="mono-input" />
+              <label>Học kỳ</label>
+              <input v-model="form.semester" class="mono-input" placeholder="VD: HK1-2026" />
             </div>
             <div class="fg">
-              <label>TBM quản lý</label>
+              <label>Trưởng bộ môn quản lý</label>
               <select v-model="form.managerId" class="mono-input">
-                <option value="">-- Không chọn --</option>
-                <option v-for="m in managers" :key="m.id" :value="m.id">{{ m.fullName }}</option>
+                <option value="">-- Không chỉ định --</option>
+                <option v-for="m in managers" :key="m.id" :value="m.id">
+                  {{ m.fullName }}
+                </option>
               </select>
             </div>
           </div>
+
           <div class="af">
             <button type="submit" class="btn" :disabled="submitting">
-              <i v-if="submitting" class="pi pi-spin pi-spinner"></i
-              ><i v-else class="pi pi-plus"></i> Tạo lớp
+              <i v-if="submitting" class="pi pi-spin pi-spinner"></i>
+              <i v-else class="pi pi-plus"></i> Tạo lớp học mới
             </button>
           </div>
         </form>
-      </div>
-
-      <div class="side">
-        <div class="mono-card">
-          <div class="card-header">
-            <span>Lớp đã tạo ({{ classes.length }})</span>
-          </div>
-          <div class="card-body list">
-            <div v-if="classes.length === 0" class="empty">Chưa có lớp nào.</div>
-            <div v-for="c in classes" :key="c.id" class="list-item">
-              <div>
-                <div class="li-title">{{ c.name || c.subject?.code }}</div>
-                <div class="li-meta">
-                  {{ c.subject?.name || '' }} | {{ c.maxSlots || c.max_slots }} slots
-                </div>
-              </div>
-              <span class="badge" :class="c.instructor_id ? 'bg-green' : 'bg-yellow'">{{
-                c.instructor_id ? 'Đã gán GV' : 'Chưa gán'
-              }}</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -188,6 +181,8 @@ async function handleCreate() {
   font-size: 0.875rem;
   color: #6b7280;
 }
+
+/* Alert */
 .alert {
   display: flex;
   align-items: center;
@@ -207,24 +202,11 @@ async function handleCreate() {
   border: 1px solid #fecaca;
   color: #991b1b;
 }
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 4rem;
-  font-size: 2rem;
-  color: #6b7280;
-}
-.split {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
-}
-.flex-1 {
-  flex: 1;
-}
-.side {
-  width: 400px;
-  flex-shrink: 0;
+
+/* Centered Form Layout */
+.form-container {
+  max-width: 680px;
+  margin: 0 auto;
 }
 .mono-card {
   background: #fff;
@@ -298,61 +280,20 @@ async function handleCreate() {
   opacity: 0.6;
   cursor: not-allowed;
 }
-.list {
-  gap: 0.75rem;
-}
-.list-item {
+.loading {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-.li-title {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #111827;
-}
-.li-meta {
-  font-size: 0.8rem;
+  justify-content: center;
+  padding: 4rem;
+  font-size: 2rem;
   color: #6b7280;
 }
-.badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px;
-}
-.bg-green {
-  background: #dcfce7;
-  color: #166534;
-}
-.bg-yellow {
-  background: #fef3c7;
-  color: #92400e;
-}
-.empty {
-  color: #9ca3af;
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 1rem;
-}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
-  }
-}
-@media (max-width: 1024px) {
-  .split {
-    flex-direction: column;
-  }
-  .side {
-    width: 100%;
   }
 }
 </style>

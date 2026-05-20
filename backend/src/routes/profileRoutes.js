@@ -38,4 +38,19 @@ router.delete(
   profileController.deleteProfile,
 )
 
+// PUT /api/profiles/:id/lock — Khóa (HR trở lên HOẶC có quyền user_manage_staff)
+router.put(
+  '/:id/lock',
+  requirePermissionOrRank('user_manage_staff', 80),
+  profileController.lockProfile,
+)
+
+// POST /api/profiles/:id/reset-password — Reset mật khẩu (HR trở lên HOẶC có quyền user_manage_staff)
+router.post(
+  '/:id/reset-password',
+  requirePermissionOrRank('user_manage_staff', 80),
+  profileController.resetPassword,
+)
+
 export { router }
+
