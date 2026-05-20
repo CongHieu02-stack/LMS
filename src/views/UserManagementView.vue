@@ -219,6 +219,29 @@ async function handleUnlockUser(user: any) {
   }
 }
 
+// Gửi email đặt lại mật khẩu cho người dùng
+async function handleResetPasswordEmail(user: any) {
+  const confirmReset = confirm(
+    `Bạn có chắc chắn muốn gửi email liên kết đặt lại mật khẩu đến tài khoản "${user.fullName}" (${user.email}) không?`
+  )
+  if (!confirmReset) return
+
+  loading.value = true
+  errorMessage.value = null
+  successMessage.value = null
+
+  try {
+    const res = await apiPost<any>(`/profiles/${user.id}/reset-password`, {})
+    if (res.success) {
+      successMessage.value = res.message || `Đã gửi liên kết khôi phục mật khẩu đến email "${user.email}".`
+    }
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Lỗi khi gửi yêu cầu đặt lại mật khẩu.'
+  } finally {
+    loading.value = false
+  }
+}
+
 function openCreateModal() {
   errorMessage.value = null
   successMessage.value = null
@@ -394,8 +417,8 @@ onMounted(() => {
                 <button
                   class="btn-icon btn-reset"
                   :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  title="Đặt lại mật khẩu mới"
-                  @click="openReasonModal(user.id, 'user', 'RESET_PASSWORD')"
+                  title="Gửi email đặt lại mật khẩu"
+                  @click="handleResetPasswordEmail(user)"
                 >
                   <i class="pi pi-key"></i>
                 </button>

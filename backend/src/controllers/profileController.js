@@ -405,11 +405,6 @@ export async function lockProfile(req, res) {
 export async function resetPassword(req, res) {
   try {
     const targetId = req.params.id
-    const { newPassword } = req.body
-
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Mật khẩu mới phải có tối thiểu 6 ký tự.' })
-    }
 
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
@@ -423,12 +418,14 @@ export async function resetPassword(req, res) {
 
     if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền của bạn không đủ để reset mật khẩu cho tài khoản này.`
+        error: `Quyền của bạn không đủ để gửi email đặt lại mật khẩu cho tài khoản này.`
       })
     }
 
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
-      password: newPassword
+    // Gửi email khôi phục mật khẩu từ Supabase GoTrue
+    const redirectToUrl = `${req.headers.origin || 'http://localhost:5173'}/reset-password`
+    const { error: authError } = await supabaseAdmin.auth.resetPasswordForEmail(targetProfile.email, {
+      redirectTo: redirectToUrl,
     })
 
     if (authError) {
@@ -437,11 +434,11 @@ export async function resetPassword(req, res) {
 
     return res.json({
       success: true,
-      message: `Đã đặt lại mật khẩu cho tài khoản "${targetProfile.full_name}" thành công.`
+      message: `Đã gửi liên kết đặt lại mật khẩu đến email "${targetProfile.email}" thành công.`
     })
   } catch (err) {
     console.error('[ProfileController.resetPassword]', err.message)
-    return res.status(500).json({ error: 'Lỗi khi reset mật khẩu.' })
+    return res.status(500).json({ error: 'Lỗi khi gửi email đặt lại mật khẩu.' })
   }
 }
 
