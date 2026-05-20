@@ -45,17 +45,7 @@ const menuGroups = ref<MainMenuGroup[]>([
     isOpen: false,
     items: [
       {
-        label: 'Tạo tài khoản (Hiệu trưởng/HR)',
-        to: '/admin/users?action=create',
-        requiredPermission: ['user_manage_senior', 'user_manage_staff'],
-      },
-      {
         label: 'Danh sách người dùng',
-        to: '/admin/users',
-        requiredPermission: ['user_manage_senior', 'user_manage_staff'],
-      },
-      {
-        label: 'Quản lý trạng thái (Khóa & Reset)',
         to: '/admin/users',
         requiredPermission: ['user_manage_senior', 'user_manage_staff'],
       },
