@@ -15,11 +15,12 @@ const selectedDepartment = ref('')
 const selectedStatus = ref('pending') // default to show pending first
 
 const departments = [
-  'Công nghệ thông tin',
-  'Hệ thống thông tin',
-  'Khoa học máy tính',
-  'Kỹ thuật phần mềm',
-  'An toàn thông tin'
+  'Khoa Công nghệ thông tin',
+  'Khoa Quản trị - Marketing',
+  'Khoa Tài chính - Thương mại',
+  'Khoa Khoa học Xã hội & Ngôn ngữ Quốc tế',
+  'Khoa Truyền thông số',
+  'Khoa Khoa học Sức khỏe'
 ]
 
 // Modal & Actions Composables

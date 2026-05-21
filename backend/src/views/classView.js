@@ -20,6 +20,7 @@ export function formatClass(raw) {
     room: raw.room,
     semester: raw.semester,
     isActive: raw.is_active,
+    instructorId: raw.instructor_id || null,
     subject: raw.subject ? {
       id: raw.subject.id,
       code: raw.subject.code,

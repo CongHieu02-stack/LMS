@@ -92,7 +92,7 @@ export async function lock(req, res) {
  */
 export async function create(req, res) {
   try {
-    const { code, name, description, credits } = req.body
+    const { code, name, description, credits, department } = req.body
     if (!code || !name) {
       return res.status(400).json({ error: 'Thiếu mã môn học hoặc tên.' })
     }
@@ -101,6 +101,7 @@ export async function create(req, res) {
       name,
       description: description || '',
       credits: parseInt(credits) || 3,
+      department: department || 'Khoa Công nghệ thông tin',
       creator_id: req.user.id,
       status: 'pending',
     })
