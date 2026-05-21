@@ -42,7 +42,17 @@ export async function api<T = unknown>(
     headers
   })
 
-  const data = await response.json()
+  // Parse JSON an toàn — tránh crash khi server trả về body rỗng hoặc không phải JSON
+  let data: any
+  try {
+    data = await response.json()
+  } catch {
+    // Body rỗng hoặc không hợp lệ
+    if (!response.ok) {
+      throw new Error(`Lỗi HTTP ${response.status}: Server không trả về dữ liệu hợp lệ.`)
+    }
+    data = {}
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -56,7 +66,12 @@ export async function api<T = unknown>(
           ...options,
           headers
         })
-        const retryData = await retryResponse.json()
+        let retryData: any
+        try {
+          retryData = await retryResponse.json()
+        } catch {
+          throw new Error(`Lỗi HTTP ${retryResponse.status}: Server không trả về dữ liệu hợp lệ.`)
+        }
         if (!retryResponse.ok) {
           throw new Error(retryData.error || `Lỗi HTTP ${retryResponse.status}`)
         }

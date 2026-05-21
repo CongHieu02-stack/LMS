@@ -179,6 +179,23 @@ export async function createProfile(req, res) {
       })
     }
 
+    // Validate mật khẩu mạnh: ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường, 1 chữ số, 1 ký tự đặc biệt
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự.' })
+    }
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa (A-Z).' })
+    }
+    if (!/[a-z]/.test(password)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết thường (a-z).' })
+    }
+    if (!/[0-9]/.test(password)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ số (0-9).' })
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
+    }
+
     // 1. Tạo tài khoản trong auth.users bằng Admin API (tự xác thực email)
     const { data, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -400,11 +417,12 @@ export async function lockProfile(req, res) {
 }
 
 /**
- * POST /api/profiles/:id/reset-password — Reset mật khẩu người dùng
+ * POST /api/profiles/:id/reset-password — Đặt lại mật khẩu người dùng
  */
 export async function resetPassword(req, res) {
   try {
     const targetId = req.params.id
+    const { newPassword } = req.body
 
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
@@ -418,14 +436,30 @@ export async function resetPassword(req, res) {
 
     if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền của bạn không đủ để gửi email đặt lại mật khẩu cho tài khoản này.`
+        error: `Quyền của bạn không đủ để đặt lại mật khẩu cho tài khoản này.`
       })
     }
 
-    // Gửi email khôi phục mật khẩu từ Supabase GoTrue
-    const redirectToUrl = `${req.headers.origin || 'http://localhost:5173'}/reset-password`
-    const { error: authError } = await supabaseAdmin.auth.resetPasswordForEmail(targetProfile.email, {
-      redirectTo: redirectToUrl,
+    // Validate mật khẩu mạnh: ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường, 1 chữ số, 1 ký tự đặc biệt
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự.' })
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa (A-Z).' })
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết thường (a-z).' })
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ số (0-9).' })
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassword)) {
+      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
+    }
+
+    // Cập nhật mật khẩu trực tiếp qua Admin API
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
+      password: newPassword
     })
 
     if (authError) {
@@ -434,11 +468,11 @@ export async function resetPassword(req, res) {
 
     return res.json({
       success: true,
-      message: `Đã gửi liên kết đặt lại mật khẩu đến email "${targetProfile.email}" thành công.`
+      message: `Đã đặt lại mật khẩu cho tài khoản "${targetProfile.full_name || targetProfile.email}" thành công.`
     })
   } catch (err) {
     console.error('[ProfileController.resetPassword]', err.message)
-    return res.status(500).json({ error: 'Lỗi khi gửi email đặt lại mật khẩu.' })
+    return res.status(500).json({ error: 'Lỗi khi đặt lại mật khẩu.' })
   }
 }
 

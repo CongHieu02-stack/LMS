@@ -5,8 +5,11 @@ import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiDelete, apiPut } from '@/lib/api'
 import { useAdminActions } from '@/composables/useAdminActions'
 import ReasonDialog from '@/components/ReasonDialog.vue'
+import ConfirmDialog from 'primevue/confirmdialog'
+import { useConfirm } from 'primevue/useconfirm'
 
 const authStore = useAuthStore()
+const confirmPrime = useConfirm()
 
 // State
 const profiles = ref<any[]>([])
@@ -26,6 +29,20 @@ const formPassword = ref('')
 const formConfirmPassword = ref('')
 const formFullName = ref('')
 const formRole = ref('HR')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+// Password strength validation rules
+const passwordRules = computed(() => [
+  { label: 'Ít nhất 8 ký tự', valid: formPassword.value.length >= 8 },
+  { label: 'Chứa chữ cái viết hoa (A-Z)', valid: /[A-Z]/.test(formPassword.value) },
+  { label: 'Chứa chữ cái viết thường (a-z)', valid: /[a-z]/.test(formPassword.value) },
+  { label: 'Chứa chữ số (0-9)', valid: /[0-9]/.test(formPassword.value) },
+  { label: 'Chứa ký tự đặc biệt (!@#$%...)', valid: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(formPassword.value) },
+])
+
+const isPasswordStrong = computed(() => passwordRules.value.every(r => r.valid))
+const passwordsMatch = computed(() => formPassword.value && formConfirmPassword.value && formPassword.value === formConfirmPassword.value)
 
 const rolesList = [
   { label: 'Hiệu trưởng', value: 'HIEU_TRUONG' },
@@ -127,6 +144,11 @@ async function handleCreateUser() {
     return
   }
 
+  if (!isPasswordStrong.value) {
+    errorMessage.value = 'Mật khẩu chưa đủ mạnh. Vui lòng đáp ứng tất cả yêu cầu bên dưới.'
+    return
+  }
+
   if (formPassword.value !== formConfirmPassword.value) {
     errorMessage.value = 'Mật khẩu xác nhận không khớp!'
     return
@@ -173,73 +195,58 @@ async function handleDeleteUser(user: any) {
     return
   }
 
-  const confirmDelete = confirm(
-    `Bạn có chắc chắn muốn xóa tài khoản "${user.fullName}" (${user.email}) không?`,
-  )
-  if (!confirmDelete) return
+  confirmPrime.require({
+    message: `Bạn có chắc chắn muốn xóa tài khoản "${user.fullName}" (${user.email}) không?`,
+    header: 'Xác nhận xóa tài khoản',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      loading.value = true
+      errorMessage.value = null
+      successMessage.value = null
 
-  loading.value = true
-  errorMessage.value = null
-  successMessage.value = null
-
-  try {
-    const res = await apiDelete<any>(`/profiles/${user.id}`)
-    if (res.success) {
-      successMessage.value = res.message || 'Xóa tài khoản thành công.'
-      await fetchProfiles()
+      try {
+        const res = await apiDelete<any>(`/profiles/${user.id}`)
+        if (res.success) {
+          successMessage.value = res.message || 'Xóa tài khoản thành công.'
+          await fetchProfiles()
+        }
+      } catch (err) {
+        errorMessage.value = (err as Error).message || 'Lỗi khi xóa tài khoản.'
+      } finally {
+        loading.value = false
+      }
     }
-  } catch (err) {
-    errorMessage.value = (err as Error).message || 'Lỗi khi xóa tài khoản.'
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 // Mở khóa người dùng trực tiếp
 async function handleUnlockUser(user: any) {
-  const confirmUnlock = confirm(`Bạn có muốn MỞ KHÓA tài khoản "${user.fullName}" không?`)
-  if (!confirmUnlock) return
+  confirmPrime.require({
+    message: `Bạn có muốn MỞ KHÓA tài khoản "${user.fullName}" không?`,
+    header: 'Xác nhận mở khóa',
+    icon: 'pi pi-unlock',
+    acceptClass: 'p-button-success',
+    accept: async () => {
+      loading.value = true
+      errorMessage.value = null
+      successMessage.value = null
 
-  loading.value = true
-  errorMessage.value = null
-  successMessage.value = null
-
-  try {
-    const res = await apiPut<any>(`/profiles/${user.id}/lock`, {
-      isLocked: false
-    })
-    if (res.success) {
-      successMessage.value = `Đã mở khóa tài khoản "${user.fullName}" thành công.`
-      await fetchProfiles()
+      try {
+        const res = await apiPut<any>(`/profiles/${user.id}/lock`, {
+          isLocked: false
+        })
+        if (res.success) {
+          successMessage.value = `Đã mở khóa tài khoản "${user.fullName}" thành công.`
+          await fetchProfiles()
+        }
+      } catch (err) {
+        errorMessage.value = (err as Error).message || 'Gặp lỗi khi mở khóa tài khoản.'
+      } finally {
+        loading.value = false
+      }
     }
-  } catch (err) {
-    errorMessage.value = (err as Error).message || 'Gặp lỗi khi mở khóa tài khoản.'
-  } finally {
-    loading.value = false
-  }
-}
-
-// Gửi email đặt lại mật khẩu cho người dùng
-async function handleResetPasswordEmail(user: any) {
-  const confirmReset = confirm(
-    `Bạn có chắc chắn muốn gửi email liên kết đặt lại mật khẩu đến tài khoản "${user.fullName}" (${user.email}) không?`
-  )
-  if (!confirmReset) return
-
-  loading.value = true
-  errorMessage.value = null
-  successMessage.value = null
-
-  try {
-    const res = await apiPost<any>(`/profiles/${user.id}/reset-password`, {})
-    if (res.success) {
-      successMessage.value = res.message || `Đã gửi liên kết khôi phục mật khẩu đến email "${user.email}".`
-    }
-  } catch (err: any) {
-    errorMessage.value = err.message || 'Lỗi khi gửi yêu cầu đặt lại mật khẩu.'
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 function openCreateModal() {
@@ -417,8 +424,8 @@ onMounted(() => {
                 <button
                   class="btn-icon btn-reset"
                   :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  title="Gửi email đặt lại mật khẩu"
-                  @click="handleResetPasswordEmail(user)"
+                  title="Đặt lại mật khẩu mới"
+                  @click="openReasonModal(user.id, 'user', 'RESET_PASSWORD')"
                 >
                   <i class="pi pi-key"></i>
                 </button>
@@ -485,26 +492,53 @@ onMounted(() => {
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label">Mật khẩu</label>
-                <input
-                  v-model="formPassword"
-                  type="password"
-                  class="mono-input"
-                  placeholder="Tối thiểu 6 ký tự"
-                  required
-                  autocomplete="new-password"
-                />
+                <div class="input-password-wrapper">
+                  <input
+                    v-model="formPassword"
+                    :type="showPassword ? 'text' : 'password'"
+                    class="mono-input"
+                    placeholder="Mật khẩu mạnh"
+                    required
+                    autocomplete="new-password"
+                  />
+                  <button type="button" class="btn-toggle-pw" @click="showPassword = !showPassword" tabindex="-1">
+                    <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+                  </button>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Xác nhận</label>
-                <input
-                  v-model="formConfirmPassword"
-                  type="password"
-                  class="mono-input"
-                  placeholder="Nhập lại mật khẩu"
-                  required
-                  autocomplete="new-password"
-                />
+                <div class="input-password-wrapper">
+                  <input
+                    v-model="formConfirmPassword"
+                    :type="showConfirmPassword ? 'text' : 'password'"
+                    class="mono-input"
+                    placeholder="Nhập lại mật khẩu"
+                    required
+                    autocomplete="new-password"
+                  />
+                  <button type="button" class="btn-toggle-pw" @click="showConfirmPassword = !showConfirmPassword" tabindex="-1">
+                    <i :class="showConfirmPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+                  </button>
+                </div>
+                <div v-if="formConfirmPassword && !passwordsMatch" class="pw-mismatch">
+                  <i class="pi pi-times-circle"></i> Mật khẩu không khớp
+                </div>
+                <div v-if="passwordsMatch" class="pw-match">
+                  <i class="pi pi-check-circle"></i> Mật khẩu khớp
+                </div>
               </div>
+            </div>
+
+            <!-- Password strength checklist -->
+            <div v-if="formPassword" class="pw-strength-box">
+              <div class="pw-strength-title">Yêu cầu mật khẩu:</div>
+              <ul class="pw-rules-list">
+                <li v-for="(rule, idx) in passwordRules" :key="idx" :class="{ 'rule-pass': rule.valid, 'rule-fail': !rule.valid }">
+                  <i :class="rule.valid ? 'pi pi-check-circle' : 'pi pi-circle'"></i>
+                  {{ rule.label }}
+                </li>
+              </ul>
             </div>
 
             <div class="form-group">
@@ -521,7 +555,7 @@ onMounted(() => {
 
           <div class="modal-footer">
             <button type="button" class="btn-cancel" @click="showCreateModal = false">Hủy</button>
-            <button type="submit" class="btn-submit" :disabled="submitLoading">
+            <button type="submit" class="btn-submit" :disabled="submitLoading || (formPassword && !isPasswordStrong) || (formConfirmPassword && !passwordsMatch)">
               <i v-if="submitLoading" class="pi pi-spin pi-spinner"></i>
               Tạo tài khoản
             </button>
@@ -541,6 +575,9 @@ onMounted(() => {
       @submit="submitAction"
       @close="showAdminModal = false"
     />
+
+    <!-- PrimeVue ConfirmDialog for Delete & Unlock -->
+    <ConfirmDialog></ConfirmDialog>
   </div>
 </template>
 
@@ -814,6 +851,12 @@ onMounted(() => {
   transform: translateY(-2px);
   border-color: #d97706;
 }
+.btn-lock:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #d1d5db;
+  color: #d1d5db;
+}
 .btn-unlock {
   color: #10b981;
 }
@@ -822,6 +865,12 @@ onMounted(() => {
   transform: translateY(-2px);
   border-color: #10b981;
 }
+.btn-unlock:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #d1d5db;
+  color: #d1d5db;
+}
 .btn-reset {
   color: #3b82f6;
 }
@@ -829,6 +878,12 @@ onMounted(() => {
   background-color: #dbeafe;
   transform: translateY(-2px);
   border-color: #3b82f6;
+}
+.btn-reset:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #d1d5db;
+  color: #d1d5db;
 }
 
 /* Modal */
@@ -1004,5 +1059,92 @@ select.mono-input {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Password input wrapper */
+.input-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-password-wrapper .mono-input {
+  padding-right: 2.5rem;
+}
+.btn-toggle-pw {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-toggle-pw:hover {
+  color: #6b7280;
+}
+
+/* Password strength checklist */
+.pw-strength-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+.pw-strength-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+.pw-rules-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.pw-rules-list li {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.2s;
+}
+.pw-rules-list li i {
+  font-size: 0.85rem;
+}
+.rule-pass {
+  color: #16a34a;
+}
+.rule-pass i {
+  color: #16a34a;
+}
+.rule-fail {
+  color: #94a3b8;
+}
+.rule-fail i {
+  color: #cbd5e1;
+}
+
+/* Password match indicators */
+.pw-mismatch {
+  font-size: 0.75rem;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+.pw-match {
+  font-size: 0.75rem;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
 }
 </style>

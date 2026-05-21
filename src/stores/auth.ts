@@ -97,7 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Bước 1: Xác thực qua Supabase Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       })
 
       if (authError) {
@@ -107,7 +107,25 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = data.user as unknown as Record<string, unknown>
 
-      // Bước 2: Fetch profile từ backend API
+      // Bước 2: Kiểm tra trạng thái khóa tài khoản trực tiếp từ DB
+      const { data: lockCheck } = await supabase
+        .from('profiles')
+        .select('is_locked, lock_reason')
+        .eq('id', data.user.id)
+        .single()
+
+      if (lockCheck?.is_locked) {
+        // Tài khoản bị khóa → đăng xuất ngay lập tức
+        await supabase.auth.signOut()
+        user.value = null
+        profile.value = null
+        error.value = lockCheck.lock_reason
+          ? `Tài khoản đã bị khóa. Lý do: ${lockCheck.lock_reason}`
+          : 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.'
+        return false
+      }
+
+      // Bước 3: Fetch profile đầy đủ từ backend API
       await fetchCurrentProfile()
 
       return true
@@ -157,11 +175,27 @@ export const useAuthStore = defineStore('auth', () => {
   async function initialize(): Promise<void> {
     loading.value = true
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
       if (session?.user) {
-        user.value = session.user as unknown as Record<string, unknown>
-        await fetchCurrentProfile()
+        // Kiểm tra trạng thái khóa tài khoản trước khi restore session
+        const { data: lockCheck } = await supabase
+          .from('profiles')
+          .select('is_locked, lock_reason')
+          .eq('id', session.user.id)
+          .single()
+
+        if (lockCheck?.is_locked) {
+          // Tài khoản bị khóa → buộc đăng xuất
+          await supabase.auth.signOut()
+          user.value = null
+          profile.value = null
+        } else {
+          user.value = session.user as unknown as Record<string, unknown>
+          await fetchCurrentProfile()
+        }
       }
     } catch (err) {
       console.error('[AuthStore] Lỗi khởi tạo:', (err as Error).message)
@@ -201,6 +235,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     fetchCurrentProfile,
-    initialize
+    initialize,
   }
 })

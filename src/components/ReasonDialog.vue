@@ -18,9 +18,14 @@ const emit = defineEmits<{
 }>()
 
 const textVal = computed({
-  get: () => props.modelValue,
+  get: () => props.modelValue || '',
   set: (val) => emit('update:modelValue', val)
 })
+
+function handleSubmit() {
+  if (props.submitting || !textVal.value.trim()) return
+  emit('submit')
+}
 </script>
 
 <template>
@@ -90,7 +95,7 @@ const textVal = computed({
         <button
           type="button"
           class="lms-btn lms-btn-primary"
-          @click="emit('submit')"
+          @click="handleSubmit"
           :disabled="submitting || !textVal.trim()"
         >
           <span v-if="submitting">
