@@ -173,7 +173,7 @@ async function loadStudentData() {
 
     // 2. Điểm GPA
     const grades = gradeRes.data || []
-    const totalCredits = 0
+    let totalCredits = 0
     let totalScore = 0
     grades.forEach((g) => {
       const tc = g.class?.subject?.credits || 0

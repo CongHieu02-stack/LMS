@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { apiGet } from '@/lib/api'
+import { apiGet, apiPost } from '@/lib/api'
 import { useAdminActions } from '@/composables/useAdminActions'
 import ReasonDialog from '@/components/ReasonDialog.vue'
 
@@ -25,15 +25,20 @@ const departments = [
 
 // Modal & Actions Composables
 const {
-  showDialog,
-  dialogTitle,
-  dialogPlaceholder,
-  isPasswordMode,
-  dialogInput,
-  openDialog,
-  closeDialog,
-  confirmAction
-} = useAdminActions()
+  showModal,
+  actionType,
+  reason,
+  submitting,
+  errorMsg,
+  openReasonModal,
+  closeReasonModal,
+  submitAction
+} = useAdminActions(async () => {
+  successMessage.value = actionType.value === 'TU_CHOI' 
+    ? 'Đã từ chối môn học thành công.' 
+    : 'Đã khóa môn học thành công.'
+  await fetchSubjects()
+})
 
 async function fetchSubjects() {
   loading.value = true
@@ -69,8 +74,13 @@ async function handleApprove(subject: any) {
   successMessage.value = null
 
   try {
-    const success = await confirmAction('department', subject.id, 'DUYET')
-    if (success) {
+    const res = await apiPost<{ success: boolean; message: string }>('/admin/action', {
+      entity: 'department',
+      targetId: subject.id,
+      action: 'DUYET',
+      reason: null
+    })
+    if (res && res.success) {
       successMessage.value = `Đã duyệt thành công môn học "${subject.name}".`
       await fetchSubjects()
     }
@@ -82,45 +92,11 @@ async function handleApprove(subject: any) {
 }
 
 function handleReject(subject: any) {
-  openDialog(
-    `Từ chối môn học: ${subject.name}`,
-    'Vui lòng nhập lý do từ chối môn học này...',
-    async (reason) => {
-      loading.value = true
-      try {
-        const success = await confirmAction('department', subject.id, 'TU_CHOI', reason)
-        if (success) {
-          successMessage.value = `Đã từ chối môn học "${subject.name}".`
-          await fetchSubjects()
-        }
-      } catch (err: any) {
-        errorMessage.value = err.message || 'Lỗi khi từ chối môn học.'
-      } finally {
-        loading.value = false
-      }
-    }
-  )
+  openReasonModal(subject.id, 'department', 'TU_CHOI')
 }
 
 function handleLock(subject: any) {
-  openDialog(
-    `Khóa môn học: ${subject.name}`,
-    'Vui lòng nhập lý do khóa môn học này...',
-    async (reason) => {
-      loading.value = true
-      try {
-        const success = await confirmAction('department', subject.id, 'KHOA', reason)
-        if (success) {
-          successMessage.value = `Đã khóa môn học "${subject.name}".`
-          await fetchSubjects()
-        }
-      } catch (err: any) {
-        errorMessage.value = err.message || 'Lỗi khi khóa môn học.'
-      } finally {
-        loading.value = false
-      }
-    }
-  )
+  openReasonModal(subject.id, 'department', 'KHOA')
 }
 
 function getStatusBadge(s: any) {
@@ -252,12 +228,14 @@ function getStatusBadge(s: any) {
 
     <!-- Unified Dialog Component -->
     <ReasonDialog
-      v-model="showDialog"
-      :title="dialogTitle"
-      :placeholder="dialogPlaceholder"
-      :isPasswordMode="isPasswordMode"
-      v-model:inputVal="dialogInput"
-      @close="closeDialog"
+      :visible="showModal"
+      :title="actionType === 'KHOA' ? 'Khóa môn học' : 'Từ chối môn học'"
+      :action-type="actionType"
+      v-model="reason"
+      :submitting="submitting"
+      :error="errorMsg"
+      @submit="submitAction"
+      @close="closeReasonModal"
     />
   </div>
 </template>

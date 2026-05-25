@@ -21,6 +21,9 @@ export function formatClass(raw) {
     semester: raw.semester,
     isActive: raw.is_active,
     instructorId: raw.instructor_id || null,
+    status: raw.status || 'draft',
+    maxStudents: raw.max_students || null,
+    roomId: raw.room_id || null,
     subject: raw.subject ? {
       id: raw.subject.id,
       code: raw.subject.code,
@@ -31,6 +34,11 @@ export function formatClass(raw) {
       id: raw.instructor.id,
       fullName: raw.instructor.full_name,
       email: raw.instructor.email
+    } : null,
+    manager: raw.manager ? {
+      id: raw.manager.id,
+      fullName: raw.manager.full_name,
+      email: raw.manager.email
     } : null,
     createdAt: raw.created_at
   }

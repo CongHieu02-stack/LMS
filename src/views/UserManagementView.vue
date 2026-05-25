@@ -555,7 +555,7 @@ onMounted(() => {
 
           <div class="modal-footer">
             <button type="button" class="btn-cancel" @click="showCreateModal = false">Hủy</button>
-            <button type="submit" class="btn-submit" :disabled="submitLoading || (formPassword && !isPasswordStrong) || (formConfirmPassword && !passwordsMatch)">
+            <button type="submit" class="btn-submit" :disabled="!!submitLoading || (!!formPassword && !isPasswordStrong) || (!!formConfirmPassword && !passwordsMatch)">
               <i v-if="submitLoading" class="pi pi-spin pi-spinner"></i>
               Tạo tài khoản
             </button>

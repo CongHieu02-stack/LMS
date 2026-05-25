@@ -23,7 +23,7 @@ async function loadData() {
 
     // Lấy tất cả lớp mở
     const classRes = await apiGet<{ success: boolean; data: any[] }>('/classes')
-    const classes = classRes.data || classRes as any[]
+    const classes = classRes.data || []
     availableClasses.value = (Array.isArray(classes) ? classes : []).map((c: any) => ({
       id: c.id,
       name: c.name || '',

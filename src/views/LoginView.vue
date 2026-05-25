@@ -29,7 +29,7 @@ async function handleLogin() {
       severity: 'error',
       summary: 'Thiếu thông tin',
       detail: 'Vui lòng nhập email và mật khẩu.',
-      life: 3000
+      life: 3000,
     })
     return
   }
@@ -43,7 +43,7 @@ async function handleLogin() {
       severity: 'success',
       summary: 'Đăng nhập thành công',
       detail: `Xin chào, ${authStore.profile?.fullName || 'User'}!`,
-      life: 3000
+      life: 3000,
     })
     router.push('/dashboard')
   } else {
@@ -51,7 +51,7 @@ async function handleLogin() {
       severity: 'error',
       summary: 'Đăng nhập thất bại',
       detail: authStore.error || 'Email hoặc mật khẩu không đúng.',
-      life: 4000
+      life: 4000,
     })
   }
 
@@ -113,9 +113,7 @@ async function handleLogin() {
       </form>
 
       <!-- Footer note -->
-      <p class="login-note">
-        Sử dụng tài khoản được cấp bởi quản trị viên hệ thống.
-      </p>
+      <p class="login-note">Sử dụng tài khoản được cấp bởi quản trị viên hệ thống.</p>
     </div>
   </div>
 </template>

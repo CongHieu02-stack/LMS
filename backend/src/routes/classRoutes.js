@@ -24,6 +24,12 @@ router.post('/', requireRank(70), classController.createClass)
 // PUT /api/classes/:id/instructor — Phân công GV (TBM, rank >= 60)
 router.put('/:id/instructor', requireRank(60), classController.assignInstructor)
 
+// PUT /api/classes/:id/approve — Duyệt mở lớp (PĐT, rank >= 70)
+router.put('/:id/approve', requireRank(70), classController.approveClass)
+
+// PUT /api/classes/:id/reject — Từ chối mở lớp (PĐT, rank >= 70)
+router.put('/:id/reject', requireRank(70), classController.rejectClass)
+
 // POST /api/classes/register — Đăng ký vào lớp (SV)
 router.post('/register', classController.registerToClass)
 

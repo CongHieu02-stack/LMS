@@ -84,9 +84,9 @@ async function loadClasses() {
     const res = await apiGet<any>('/classes')
     const all = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : [])
     // Lọc lớp mà GV này dạy hoặc TBM quản lý
-    classes.value = all.filter(c => 
+    classes.value = all.filter((c: any) => 
       (c.instructor?.id || c.instructor_id) === authStore.profile?.id || 
-      authStore.profile?.rank >= 70 // PĐT/HR/Admin thấy hết
+      (authStore.profile?.rank || 0) >= 70 // PĐT/HR/Admin thấy hết
     )
     if (classes.value.length > 0) {
       selectedClass.value = classes.value[0].id

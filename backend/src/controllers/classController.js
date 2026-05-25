@@ -122,3 +122,69 @@ export async function assignInstructor(req, res) {
     return res.status(500).json({ error: 'Lỗi khi phân công giảng viên.' })
   }
 }
+
+/**
+ * PUT /api/classes/:id/approve — Duyệt mở lớp và tự động xếp phòng ngẫu nhiên.
+ */
+export async function approveClass(req, res) {
+  try {
+    const { id } = req.params
+    const { maxStudents, schedule } = req.body
+
+    if (!maxStudents || parseInt(maxStudents) <= 0) {
+      return res.status(400).json({ error: 'Số lượng sinh viên tối đa phải lớn hơn 0.' })
+    }
+
+    // Nếu PĐT nhập lịch học, cập nhật vào DB trước khi gọi RPC tìm phòng
+    // (RPC đọc schedule từ DB để kiểm tra trùng lịch)
+    if (schedule && schedule.trim()) {
+      const { supabaseAdmin } = await import('../config/supabase.js')
+      const { error: schedErr } = await supabaseAdmin
+        .from('classes')
+        .update({ schedule: schedule.trim(), updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (schedErr) {
+        return res.status(500).json({ error: `Lỗi khi lưu lịch học: ${schedErr.message}` })
+      }
+    }
+
+    const result = await classModel.approveClassAndRandomRoom(id, parseInt(maxStudents))
+    
+    return res.json({
+      success: true,
+      message: `Duyệt lớp học và xếp phòng tự động thành công.`,
+      data: result
+    })
+  } catch (err) {
+    console.error('[ClassController.approveClass]', err.message)
+    return res.status(400).json({ error: err.message || 'Lỗi khi duyệt lớp học.' })
+  }
+}
+
+/**
+ * PUT /api/classes/:id/reject — Từ chối mở lớp.
+ */
+export async function rejectClass(req, res) {
+  try {
+    const { id } = req.params
+    const { data, error } = await classModel.supabaseAdmin
+      .from('classes')
+      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+
+    return res.json({
+      success: true,
+      message: 'Từ chối mở lớp học thành công.',
+      data
+    })
+  } catch (err) {
+    console.error('[ClassController.rejectClass]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi từ chối mở lớp.' })
+  }
+}
+
+

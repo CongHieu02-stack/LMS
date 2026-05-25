@@ -16,7 +16,8 @@ export async function findAll() {
     .select(`
       *,
       subject:subjects(id, code, name, credits),
-      instructor:profiles!instructor_id(id, full_name, email)
+      instructor:profiles!instructor_id(id, full_name, email),
+      manager:profiles!manager_id(id, full_name, email)
     `)
     .order('created_at', { ascending: false })
 
@@ -35,7 +36,8 @@ export async function findById(id) {
     .select(`
       *,
       subject:subjects(id, code, name, credits),
-      instructor:profiles!instructor_id(id, full_name, email)
+      instructor:profiles!instructor_id(id, full_name, email),
+      manager:profiles!manager_id(id, full_name, email)
     `)
     .eq('id', id)
     .single()
@@ -109,3 +111,20 @@ export async function assignInstructor(classId, instructorId) {
   if (error) throw error
   return data
 }
+
+/**
+ * Duyệt lớp học và tự động xếp phòng ngẫu nhiên
+ * @param {string} classId — UUID của class
+ * @param {number} maxStudents — Số lượng sinh viên tối đa
+ * @returns {object} — Kết quả từ RPC
+ */
+export async function approveClassAndRandomRoom(classId, maxStudents) {
+  const { data, error } = await supabaseAdmin
+    .rpc('approve_class_and_random_room', {
+      p_class_id: classId,
+      p_max_students: maxStudents
+    })
+  if (error) throw error
+  return data
+}
+

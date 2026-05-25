@@ -78,15 +78,30 @@ const menuGroups = ref<MainMenuGroup[]>([
     icon: 'pi pi-sitemap',
     isOpen: false,
     items: [
-      { 
-        label: 'Tạo lớp học (Khung)', 
-        to: '/admin/classes', 
-        requiredPermission: 'class_create' 
+      {
+        label: 'Đề xuất mở lớp',
+        to: '/classes/propose',
+        requiredPermission: 'class_quantity_propose',
       },
       {
         label: 'Phê duyệt lớp (Duyệt/Từ chối)',
         to: '/admin/classes/approve',
         requiredPermission: 'class_quantity_approve',
+      },
+      {
+        label: 'Phân công giảng viên',
+        to: '/admin/classes/assign',
+        requiredPermission: 'instructor_assign',
+      },
+      {
+        label: 'Bài học & Khảo thí',
+        to: '/lessons',
+        requiredPermission: 'lesson_exam_manage',
+      },
+      { 
+        label: 'Tạo lớp học (Khung)', 
+        to: '/admin/classes', 
+        requiredPermission: 'class_create' 
       },
       {
         label: 'Tra cứu lớp (Bộ lọc)',
@@ -115,8 +130,11 @@ const menuGroups = ref<MainMenuGroup[]>([
 ])
 
 // Thêm các menu độc lập cho Sinh viên / Giảng viên (Không thuộc 4 nhóm trên)
-const standaloneMenus = ref<SubMenuItem & { icon?: string }>([
+const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
   { label: 'Tổng quan', to: '/dashboard', icon: 'pi pi-th-large' },
+  { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register' },
+  { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take' },
+  { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view' },
 ])
 
 // ----------------------------------------------------------------------------
