@@ -167,13 +167,14 @@ export async function approveClass(req, res) {
 export async function rejectClass(req, res) {
   try {
     const { id } = req.params
-    const { data, error } = await classModel.supabaseAdmin
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data, error } = await supabaseAdmin
       .from('classes')
       .update({ status: 'rejected', updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()
-    
+
     if (error) throw error
 
     return res.json({

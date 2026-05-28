@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPut } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import html2pdf from 'html2pdf.js'
 
 const authStore = useAuthStore()
 
@@ -144,15 +145,45 @@ function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
     return {
+      type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
       youtubeId: parsed.youtubeId || '',
+      docContent: parsed.docContent || '',
       description: parsed.description || '',
     }
   } catch {
     return {
+      type: 'video',
       youtubeId: '',
+      docContent: '',
       description: contentStr || '',
     }
   }
+}
+
+const exportingPDF = ref<string | null>(null)
+
+function exportToPDF(lesson: any) {
+  const element = document.getElementById(`pdf-content-${lesson.id}`)
+  if (!element) return
+  
+  exportingPDF.value = lesson.id
+  
+  const opt = {
+    margin:       0.5,
+    filename:     `${lesson.title.replace(/\s+/g, '_')}.pdf`,
+    image:        { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, logging: false },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' as const }
+  }
+
+  // Chạy html2pdf và lưu file
+  html2pdf().from(element).set(opt).save().then(() => {
+    exportingPDF.value = null
+  }).catch((err: any) => {
+    console.error('PDF export error:', err)
+    exportingPDF.value = null
+    alert('Có lỗi xảy ra khi xuất file PDF.')
+  })
 }
 
 async function loadStudentData() {
@@ -537,9 +568,12 @@ onMounted(() => {
                 <div class="student-lesson-title">
                   <span class="lesson-index">Bài {{ idx + 1 }}</span>
                   <span class="lesson-name">{{ l.title }}</span>
-                  <span v-if="parseLessonContent(l.content).youtubeId" class="badge-video ml-2"
-                    ><i class="pi pi-video mr-1"></i>Video</span
-                  >
+                  <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
+                    <i class="pi pi-video mr-1"></i>Video
+                  </span>
+                  <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
+                    <i class="pi pi-file-pdf mr-1"></i>Tài liệu
+                  </span>
                 </div>
                 <i
                   class="pi"
@@ -554,7 +588,7 @@ onMounted(() => {
               <div v-if="expandedStudentLessons.includes(l.id)" class="student-lesson-body">
                 <!-- Video player -->
                 <div
-                  v-if="parseLessonContent(l.content).youtubeId"
+                  v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).youtubeId"
                   class="student-video-wrapper mb-3"
                 >
                   <iframe
@@ -574,12 +608,42 @@ onMounted(() => {
                   >
                   </iframe>
                 </div>
-                <!-- Description -->
-                <div v-if="parseLessonContent(l.content).description" class="student-lesson-desc">
+
+                <!-- Document viewer -->
+                <div v-if="parseLessonContent(l.content).type === 'doc'" class="student-doc-wrapper">
+                  <div class="doc-actions mb-3">
+                    <button @click="exportToPDF(l)" class="btn-pdf-download" :disabled="exportingPDF === l.id">
+                      <i v-if="exportingPDF === l.id" class="pi pi-spin pi-spinner mr-1"></i>
+                      <i v-else class="pi pi-file-pdf mr-1"></i>
+                      Xuất bài giảng PDF
+                    </button>
+                  </div>
+                  
+                  <!-- Đây là vùng nội dung sẽ được xuất PDF -->
+                  <div :id="'pdf-content-' + l.id" class="pdf-print-area">
+                    <div class="pdf-header-print">
+                      <div class="pdf-header-row">
+                        <span class="pdf-school">HỆ THỐNG QUẢN LÝ HỌC TẬP - LMS</span>
+                        <span class="pdf-class">Lớp: {{ activeClassForLessons.name }}</span>
+                      </div>
+                      <div class="pdf-subject">Môn học: {{ activeClassForLessons.subject?.name }} ({{ activeClassForLessons.subject?.code }})</div>
+                      <hr class="pdf-divider" />
+                    </div>
+                    <h2 class="pdf-title">{{ l.title }}</h2>
+                    <div class="pdf-body-content" v-html="parseLessonContent(l.content).docContent"></div>
+                    <div v-if="parseLessonContent(l.content).description" class="pdf-desc-content">
+                      <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
+                      <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(l.content).description }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Description for Video/legacy -->
+                <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).description" class="student-lesson-desc">
                   {{ parseLessonContent(l.content).description }}
                 </div>
-                <div v-else-if="!parseLessonContent(l.content).youtubeId" class="empty-desc">
-                  Không có ghi chú hay nội dung đính kèm.
+                <div v-else-if="parseLessonContent(l.content).type === 'video' && !parseLessonContent(l.content).youtubeId" class="empty-desc">
+                  Không có nội dung bài giảng video bổ sung.
                 </div>
               </div>
             </div>
@@ -1299,6 +1363,119 @@ onMounted(() => {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;
+}
+.badge-doc {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.student-doc-wrapper {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+}
+.btn-pdf-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-pdf-download:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);
+}
+.btn-pdf-download:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pdf-print-area {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.pdf-header-print {
+  margin-bottom: 1.5rem;
+  font-family: 'Inter', sans-serif;
+}
+.pdf-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+.pdf-subject {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-top: 0.25rem;
+}
+.pdf-divider {
+  border: 0;
+  border-top: 2px solid #374151;
+  margin: 0.75rem 0 1.25rem 0;
+}
+.pdf-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 1rem;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.3;
+}
+.pdf-body-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1f2937;
+  font-family: 'Inter', sans-serif;
+}
+.pdf-body-content :deep(p) {
+  margin-bottom: 1rem;
+}
+.pdf-body-content :deep(h3) {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.pdf-body-content :deep(ul), .pdf-body-content :deep(ol) {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.pdf-body-content :deep(li) {
+  margin-bottom: 0.25rem;
+}
+.pdf-body-content :deep(strong) {
+  font-weight: 700;
+  color: #000;
+}
+.pdf-body-content :deep(blockquote) {
+  border-left: 4px solid #7c3aed;
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+}
+.pdf-desc-content {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed #e5e7eb;
 }
 
 @keyframes fadeInModal {

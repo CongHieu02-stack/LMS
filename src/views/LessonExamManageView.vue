@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
+import html2pdf from 'html2pdf.js'
 
 const authStore = useAuthStore()
 
@@ -13,7 +14,7 @@ const loading = ref(true)
 const msg = ref<string | null>(null)
 
 // Forms
-const lessonForm = ref({ title: '', youtubeUrl: '', description: '', sortOrder: 1 })
+const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
 const examForm = ref({ title: '', durationMinutes: 60 })
 
 // Multiple Choice Question Builder State
@@ -67,15 +68,52 @@ function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
     return {
+      type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
       youtubeId: parsed.youtubeId || '',
+      docContent: parsed.docContent || '',
       description: parsed.description || ''
     }
   } catch {
     return {
+      type: 'video',
       youtubeId: '',
+      docContent: '',
       description: contentStr || ''
     }
   }
+}
+
+const currentClassObj = computed(() => {
+  return classes.value.find(c => c.id === selectedClass.value)
+})
+
+const exportingPDF = ref<string | null>(null)
+
+function exportToPDF(lesson: any) {
+  const element = document.getElementById(`pdf-content-${lesson.id}`)
+  if (!element) return
+  
+  exportingPDF.value = lesson.id
+  
+  const className = currentClassObj.value?.name || ''
+  const subjectName = currentClassObj.value?.subject?.name || ''
+  const subjectCode = currentClassObj.value?.subject?.code || ''
+  
+  const opt = {
+    margin:       0.5,
+    filename:     `${lesson.title.replace(/\s+/g, '_')}.pdf`,
+    image:        { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, logging: false },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' as const }
+  }
+
+  html2pdf().from(element).set(opt).save().then(() => {
+    exportingPDF.value = null
+  }).catch((err: any) => {
+    console.error('PDF export error:', err)
+    exportingPDF.value = null
+    alert('Có lỗi xảy ra khi xuất file PDF.')
+  })
 }
 
 async function loadClasses() {
@@ -118,11 +156,21 @@ onMounted(loadClasses)
 async function createLesson() {
   if (!selectedClass.value) return
   try {
-    const ytId = getYouTubeId(lessonForm.value.youtubeUrl)
-    const contentPayload = JSON.stringify({
-      youtubeId: ytId,
-      description: lessonForm.value.description
-    })
+    let contentPayload = ''
+    if (lessonForm.value.type === 'video') {
+      const ytId = getYouTubeId(lessonForm.value.youtubeUrl)
+      contentPayload = JSON.stringify({
+        type: 'video',
+        youtubeId: ytId,
+        description: lessonForm.value.description
+      })
+    } else {
+      contentPayload = JSON.stringify({
+        type: 'doc',
+        docContent: lessonForm.value.docContent,
+        description: lessonForm.value.description
+      })
+    }
 
     await apiPost('/lessons', {
       classId: selectedClass.value,
@@ -131,7 +179,14 @@ async function createLesson() {
       sortOrder: lessonForm.value.sortOrder
     })
     
-    lessonForm.value = { title: '', youtubeUrl: '', description: '', sortOrder: lessons.value.length + 2 }
+    lessonForm.value = { 
+      title: '', 
+      youtubeUrl: '', 
+      description: '', 
+      docContent: '', 
+      type: 'video', 
+      sortOrder: lessons.value.length + 2 
+    }
     loadClassContent()
     msg.value = 'Tạo bài học thành công'
   } catch (err: any) { msg.value = err.message }
@@ -211,9 +266,33 @@ async function deleteExam(id: string) {
               <!-- Form tạo bài giảng chuẩn Youtube Iframe -->
               <form @submit.prevent="createLesson" class="frm-col mb-6">
                 <input v-model="lessonForm.title" class="inp" placeholder="Tên bài giảng mới (Ví dụ: Bài 1 - Nhập môn)..." required />
-                <input v-model="lessonForm.youtubeUrl" class="inp" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
-                <textarea v-model="lessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả bài giảng / Ghi chú cho sinh viên..."></textarea>
-                <button type="submit" class="btn"><i class="pi pi-plus"></i> Thêm bài giảng</button>
+                
+                <div class="type-selector mb-2">
+                  <label class="selector-label">Loại bài học:</label>
+                  <div class="radio-options">
+                    <label class="radio-option">
+                      <input type="radio" v-model="lessonForm.type" value="video" />
+                      <span><i class="pi pi-video"></i> Video YouTube</span>
+                    </label>
+                    <label class="radio-option">
+                      <input type="radio" v-model="lessonForm.type" value="doc" />
+                      <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div v-if="lessonForm.type === 'video'">
+                  <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
+                </div>
+                
+                <div v-else-if="lessonForm.type === 'doc'">
+                  <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
+                  <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
+                </div>
+
+                <textarea v-model="lessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt bài giảng / Ghi chú cho sinh viên..."></textarea>
+                
+                <button type="submit" class="btn"><i class="pi pi-plus"></i> Tạo bài giảng</button>
               </form>
 
               <!-- Danh sách bài giảng Accordion Premium -->
@@ -223,7 +302,13 @@ async function deleteExam(id: string) {
                     <div class="lesson-card-title">
                       <i class="pi mr-2" :class="expandedLessons.includes(l.id) ? 'pi-chevron-down text-purple-600' : 'pi-chevron-right'"></i>
                       <span class="lesson-title-text">{{ l.title }}</span>
-                      <span v-if="parseLessonContent(l.content).youtubeId" class="badge-video ml-2"><i class="pi pi-video mr-1"></i>Video</span>
+                      
+                      <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
+                        <i class="pi pi-video mr-1"></i>Video
+                      </span>
+                      <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
+                        <i class="pi pi-file-pdf mr-1"></i>Tài liệu
+                      </span>
                     </div>
                     <button @click.stop="deleteLesson(l.id)" class="btn-del"><i class="pi pi-trash"></i></button>
                   </div>
@@ -231,7 +316,7 @@ async function deleteExam(id: string) {
                   <!-- Expanded Body -->
                   <div v-if="expandedLessons.includes(l.id)" class="lesson-card-body">
                     <!-- YouTube video iframe container -->
-                    <div v-if="parseLessonContent(l.content).youtubeId" class="video-wrapper mb-3">
+                    <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).youtubeId" class="video-wrapper mb-3">
                       <iframe 
                         :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" 
                         frameborder="0" 
@@ -239,12 +324,42 @@ async function deleteExam(id: string) {
                         allowfullscreen>
                       </iframe>
                     </div>
-                    <!-- Description -->
-                    <div v-if="parseLessonContent(l.content).description" class="lesson-description">
+
+                    <!-- Document content area -->
+                    <div v-if="parseLessonContent(l.content).type === 'doc'" class="instructor-doc-wrapper">
+                      <div class="doc-actions mb-3">
+                        <button @click="exportToPDF(l)" class="btn-pdf-download" :disabled="exportingPDF === l.id">
+                          <i v-if="exportingPDF === l.id" class="pi pi-spin pi-spinner mr-1"></i>
+                          <i v-else class="pi pi-file-pdf mr-1"></i>
+                          Tải tài liệu PDF
+                        </button>
+                      </div>
+                      
+                      <!-- Vùng in PDF -->
+                      <div :id="'pdf-content-' + l.id" class="pdf-print-area">
+                        <div class="pdf-header-print">
+                          <div class="pdf-header-row">
+                            <span class="pdf-school">HỆ THỐNG QUẢN LÝ HỌC TẬP - LMS</span>
+                            <span class="pdf-class">Lớp: {{ currentClassObj?.name }}</span>
+                          </div>
+                          <div class="pdf-subject">Môn học: {{ currentClassObj?.subject?.name }} ({{ currentClassObj?.subject?.code }})</div>
+                          <hr class="pdf-divider" />
+                        </div>
+                        <h2 class="pdf-title">{{ l.title }}</h2>
+                        <div class="pdf-body-content" v-html="parseLessonContent(l.content).docContent"></div>
+                        <div v-if="parseLessonContent(l.content).description" class="pdf-desc-content">
+                          <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
+                          <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(l.content).description }}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Description for video lessons -->
+                    <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).description" class="lesson-description">
                       {{ parseLessonContent(l.content).description }}
                     </div>
-                    <div v-else-if="!parseLessonContent(l.content).youtubeId" class="empty-desc">
-                      Không có nội dung bài giảng bổ sung.
+                    <div v-else-if="parseLessonContent(l.content).type === 'video' && !parseLessonContent(l.content).youtubeId" class="empty-desc">
+                      Không có nội dung bài giảng video bổ sung.
                     </div>
                   </div>
                 </div>
@@ -428,4 +543,164 @@ async function deleteExam(id: string) {
 .correct-opt { background: #dcfce7; color: #15803d; font-weight: 700; border: 1px solid #bbf7d0; }
 
 .btn-block { width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 600; }
+
+/* Custom lesson type styles and PDF style */
+.type-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+.selector-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+.radio-options {
+  display: flex;
+  gap: 1.5rem;
+}
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #374151;
+}
+.radio-option input {
+  accent-color: #7c3aed;
+  cursor: pointer;
+}
+.html-editor {
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: #f8fafc;
+}
+.editor-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: -0.25rem;
+  font-style: italic;
+}
+.w-full {
+  width: 100%;
+  box-sizing: border-box;
+}
+.badge-doc {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.instructor-doc-wrapper {
+  margin-top: 0.5rem;
+}
+.btn-pdf-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-pdf-download:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);
+}
+.btn-pdf-download:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pdf-print-area {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.pdf-header-print {
+  margin-bottom: 1.5rem;
+  font-family: 'Inter', sans-serif;
+}
+.pdf-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+.pdf-school {
+  text-transform: uppercase;
+}
+.pdf-subject {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-top: 0.25rem;
+}
+.pdf-divider {
+  border: 0;
+  border-top: 2px solid #374151;
+  margin: 0.75rem 0 1.25rem 0;
+}
+.pdf-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 1rem;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.3;
+}
+.pdf-body-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1f2937;
+  font-family: 'Inter', sans-serif;
+}
+.pdf-body-content :deep(p) {
+  margin-bottom: 1rem;
+}
+.pdf-body-content :deep(h3) {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.pdf-body-content :deep(ul), .pdf-body-content :deep(ol) {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.pdf-body-content :deep(li) {
+  margin-bottom: 0.25rem;
+}
+.pdf-body-content :deep(strong) {
+  font-weight: 700;
+  color: #000;
+}
+.pdf-body-content :deep(blockquote) {
+  border-left: 4px solid #7c3aed;
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+}
+.pdf-desc-content {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed #e5e7eb;
+}
 </style>

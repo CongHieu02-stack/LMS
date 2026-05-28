@@ -430,19 +430,6 @@ onMounted(() => {
                   <i class="pi pi-key"></i>
                 </button>
 
-                <!-- Xóa tài khoản -->
-                <button
-                  class="btn-icon btn-delete"
-                  :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  :title="
-                    user.rank >= effectiveRank
-                      ? 'Không có quyền xóa cấp bậc bằng/cao hơn'
-                      : 'Xóa tài khoản'
-                  "
-                  @click="handleDeleteUser(user)"
-                >
-                  <i class="pi pi-trash"></i>
-                </button>
               </td>
             </tr>
           </tbody>

@@ -26,6 +26,7 @@ interface SubMenuItem {
   label: string
   to: string
   requiredPermission?: string | string[]
+  studentOnly?: boolean
 }
 
 interface MainMenuGroup {
@@ -132,9 +133,9 @@ const menuGroups = ref<MainMenuGroup[]>([
 // Thêm các menu độc lập cho Sinh viên / Giảng viên (Không thuộc 4 nhóm trên)
 const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
   { label: 'Tổng quan', to: '/dashboard', icon: 'pi pi-th-large' },
-  { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register' },
-  { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take' },
-  { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view' },
+  { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register', studentOnly: true },
+  { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take', studentOnly: true },
+  { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view', studentOnly: true },
 ])
 
 // ----------------------------------------------------------------------------
@@ -144,6 +145,9 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
 // Lọc các chức năng độc lập
 const filteredStandalone = computed(() => {
   return standaloneMenus.value.filter((item) => {
+    if (item.studentOnly && authStore.profile?.role !== 'SINH_VIEN') {
+      return false
+    }
     if (!item.requiredPermission) return true
     if (Array.isArray(item.requiredPermission)) {
       return item.requiredPermission.some((p) => authStore.hasPermission(p))

@@ -61,6 +61,10 @@ async function handleLogin() {
 
 <template>
   <div class="login-page">
+    <!-- Ambient Blur Background Blobs -->
+    <div class="bg-blob bg-blob-indigo"></div>
+    <div class="bg-blob bg-blob-purple"></div>
+
     <div class="login-card">
       <!-- Header -->
       <div class="login-header">
@@ -120,22 +124,76 @@ async function handleLogin() {
 
 <style scoped>
 .login-page {
+  position: relative;
+  width: 100%;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--lms-gray-50);
+  background-color: #f8fafc;
   padding: var(--lms-space-lg);
+  overflow: hidden;
 }
 
+/* Ambient Background Blobs */
+.bg-blob {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  filter: blur(130px);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.bg-blob-indigo {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, rgba(99, 102, 241, 0) 70%);
+  top: -250px;
+  left: -250px;
+  animation: float-blob-1 25s infinite alternate ease-in-out;
+}
+
+.bg-blob-purple {
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0) 70%);
+  bottom: -250px;
+  right: -250px;
+  animation: float-blob-2 25s infinite alternate ease-in-out;
+}
+
+@keyframes float-blob-1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(100px, 60px) scale(1.15);
+  }
+}
+
+@keyframes float-blob-2 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(-100px, -60px) scale(1.15);
+  }
+}
+
+/* Glassmorphic Login Card */
 .login-card {
+  position: relative;
+  z-index: 10;
   width: 100%;
   max-width: 400px;
-  background: var(--lms-white);
-  border: var(--lms-border);
-  border-radius: var(--lms-radius-lg);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
   padding: var(--lms-space-2xl);
-  box-shadow: var(--lms-shadow-lg);
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.08),
+    0 0 50px -10px rgba(99, 102, 241, 0.05);
 }
 
 /* Header */
@@ -148,14 +206,15 @@ async function handleLogin() {
 }
 
 .login-icon-wrapper {
-  width: 56px;
-  height: 56px;
-  background-color: var(--lms-primary-light);
-  border-radius: var(--lms-radius-lg);
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--lms-primary-light), rgba(168, 85, 247, 0.15));
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: var(--lms-space-md);
+  box-shadow: 0 8px 16px -4px rgba(99, 102, 241, 0.2);
 }
 
 .login-icon {
@@ -164,10 +223,11 @@ async function handleLogin() {
 }
 
 .login-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--lms-gray-800);
   letter-spacing: -0.02em;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .login-subtitle {
@@ -205,15 +265,24 @@ async function handleLogin() {
 .login-btn {
   margin-top: var(--lms-space-sm);
   width: 100%;
-  padding: 10px !important;
+  padding: 12px !important;
   font-size: 0.95rem !important;
-  background: var(--lms-primary) !important;
-  border-color: var(--lms-primary) !important;
+  font-weight: 600 !important;
+  background: linear-gradient(135deg, var(--lms-primary), #6366f1) !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25) !important;
+  transition: all 0.2s ease !important;
+  color: var(--lms-white) !important;
 }
 
-.login-btn:hover {
-  background: var(--lms-primary-hover) !important;
-  border-color: var(--lms-primary-hover) !important;
+.login-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35) !important;
+  filter: brightness(1.05);
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 /* Footer */
