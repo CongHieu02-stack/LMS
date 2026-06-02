@@ -51,7 +51,7 @@ export async function findByClass(classId) {
 export async function upsert(gradeData) {
   const { data, error } = await supabaseAdmin
     .from('grades')
-    .upsert(gradeData, { onConflict: 'class_id,student_id,exam_id' })
+    .upsert(gradeData, { onConflict: 'exam_id,student_id' })
     .select()
     .single()
   if (error) throw error

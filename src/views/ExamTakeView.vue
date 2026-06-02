@@ -19,7 +19,13 @@ const timeLeft = ref(0)
 let timerInterval: any = null
 
 const questions = ref<any[]>([])
+// Trắc nghiệm: answers[questionId] = selectedOptionIndex
 const answers = ref<Record<number, number>>({})
+// Tự luận: essayAnswers[questionIndex] = text content
+const essayAnswers = ref<Record<number, string>>({})
+// File đính kèm tự luận: fileAnswers[questionIndex] = { url, name }
+const fileAnswers = ref<Record<number, { url: string; name: string }>>({})
+const fileUploading = ref<Record<number, boolean>>({})
 
 // ==========================================
 // LOAD DATA
@@ -132,45 +138,68 @@ async function startExam() {
   }, 1000)
 }
 
+async function handleFileUpload(questionIndex: number, event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+  const file = input.files[0]
+  fileUploading.value[questionIndex] = true
+  try {
+    // Đọc file dưới dạng base64
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    const res = await apiPost<{ success: boolean; fileUrl: string; fileName: string }>('/exam/upload', {
+      fileName: file.name,
+      fileData: base64
+    })
+    if (res.success && res.fileUrl) {
+      fileAnswers.value[questionIndex] = { url: res.fileUrl, name: file.name }
+    }
+  } catch (err) {
+    console.error('File upload error:', err)
+    alert('Lỗi khi tải file lên. Vui lòng thử lại.')
+  }
+  fileUploading.value[questionIndex] = false
+}
+
 async function submitExam(isForced = false) {
   clearInterval(timerInterval)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  
-  const answersList = Object.keys(answers.value).map(qid => ({
-    question_id: parseInt(qid),
-    selected_option: answers.value[parseInt(qid)]
-  }))
+
+  // Gộp tất cả câu trả lời (trắc nghiệm + tự luận + file)
+  const answersList = questions.value.map((q: any, idx: number) => {
+    if (q.type === 'essay') {
+      return {
+        question_id: idx,
+        type: 'essay',
+        essay_text: essayAnswers.value[idx] || '',
+        file_url: fileAnswers.value[idx]?.url || null,
+        file_name: fileAnswers.value[idx]?.name || null
+      }
+    } else {
+      return {
+        question_id: idx,
+        type: 'multiple_choice',
+        selected_option: answers.value[q.id] ?? answers.value[idx] ?? null
+      }
+    }
+  })
 
   try {
-    const res = await apiPost<{ success: boolean; data: any }>('/exam/submit', {
+    const res = await apiPost<{ success: boolean; data: any; score?: number }>('/exam/submit', {
+      examId: selectedExam.value.id,
       examTitle: selectedExam.value.title,
       answers: answersList,
       isForced,
       violations: cheatWarnings.value
     })
-    
-    // Lưu điểm qua API Grades
-    // Mock calculate score for grade table (in a real app, backend will grade)
-    let correct = 0
-    questions.value.forEach((q: any) => {
-      if (answers.value[q.id] === q.answer) correct++
-    })
-    const score = questions.value.length > 0 ? parseFloat(((correct / questions.value.length) * 10).toFixed(1)) : 0
-    finalScore.value = score
-    
-    try {
-      await apiPost('/grades', {
-        classId: selectedExam.value.class_id,
-        examId: selectedExam.value.id,
-        // using a specific backend route or student passing logic is normally required
-        // Since we only have /grades which requires rank >= 50, we mock this score locally,
-        // In real LMS, `submitExam` backend will trigger grading and update `grades` table automatically
-        score: score
-      })
-    } catch (e) {
-      console.warn('Grade API failed or restricted, score is local only', e)
-    }
+
+    // Hiển thị điểm từ backend (đã chấm tự động cho trắc nghiệm)
+    finalScore.value = res.score !== undefined && res.score !== null ? res.score : null
 
   } catch (err) {
     console.error('Submit error:', err)
@@ -269,14 +298,50 @@ onUnmounted(() => {
     <!-- Nội dung câu hỏi -->
     <div class="exam-content">
       <div v-if="questions.length === 0" class="text-center py-10 text-gray-500">Bài thi chưa có nội dung câu hỏi.</div>
-      <div class="mono-card mb-6" v-for="(q, index) in questions" :key="q.id">
+      <div class="mono-card mb-6" v-for="(q, index) in questions" :key="index">
         <div class="card-body">
-          <h3 class="question-text">Câu {{ index + 1 }}: {{ q.text }}</h3>
-          <div class="options-grid">
+          <h3 class="question-text">
+            Câu {{ index + 1 }}
+            <span v-if="q.type === 'essay'" class="badge-essay ml-2"><i class="pi pi-pencil mr-1"></i>Tự luận</span>
+            : {{ q.text }}
+          </h3>
+
+          <!-- Trắc nghiệm -->
+          <div v-if="!q.type || q.type === 'multiple_choice'" class="options-grid">
             <label v-for="(opt, optIndex) in q.options" :key="optIndex" class="option-label">
-              <input type="radio" :name="`q_${q.id}`" :value="optIndex" v-model="answers[q.id]" class="radio-input" />
+              <input type="radio" :name="`q_${index}`" :value="optIndex" v-model="answers[index]" class="radio-input" />
               <span class="option-box">{{ opt }}</span>
             </label>
+          </div>
+
+          <!-- Tự luận -->
+          <div v-else-if="q.type === 'essay'" class="essay-section">
+            <textarea
+              v-model="essayAnswers[index]"
+              class="essay-textarea"
+              :placeholder="`Nhập câu trả lời của bạn cho câu ${index + 1}...`"
+              rows="6"
+            ></textarea>
+
+            <!-- Upload file -->
+            <div class="file-upload-area">
+              <label class="file-upload-label">
+                <i v-if="fileUploading[index]" class="pi pi-spin pi-spinner"></i>
+                <i v-else class="pi pi-paperclip"></i>
+                {{ fileUploading[index] ? 'Đang tải lên...' : 'Đính kèm file (PDF, Word, ảnh, tối đa 10MB)' }}
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip"
+                  @change="handleFileUpload(index, $event)"
+                  class="hidden-file-input"
+                  :disabled="fileUploading[index]"
+                />
+              </label>
+              <div v-if="fileAnswers[index]" class="file-uploaded">
+                <i class="pi pi-check-circle text-green-600"></i>
+                <a :href="fileAnswers[index].url" target="_blank" class="file-link">{{ fileAnswers[index].name }}</a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -289,12 +354,16 @@ onUnmounted(() => {
       <i class="pi pi-check-circle text-green-500 result-icon"></i>
       <h2 class="text-2xl font-semibold mt-4 mb-2">Đã Nộp Bài Thành Công</h2>
       <p class="text-gray-500 mb-6">Bạn đã hoàn thành bài thi: {{ selectedExam.title }}.</p>
-      
-      <div class="score-display">
-        <span class="score-label">Điểm số ước tính</span>
-        <span class="score-value" :class="finalScore! >= 5 ? 'text-green-600' : 'text-red-600'">
+
+      <div v-if="finalScore !== null" class="score-display">
+        <span class="score-label">Điểm số</span>
+        <span class="score-value" :class="finalScore >= 5 ? 'text-green-600' : 'text-red-600'">
           {{ finalScore }} <small>/ 10</small>
         </span>
+      </div>
+      <div v-else class="pending-grade">
+        <i class="pi pi-clock"></i>
+        <p>Bài thi có câu tự luận — Điểm sẽ được cập nhật sau khi giảng viên chấm.</p>
       </div>
 
       <button class="btn-submit mx-auto mt-8" @click="closeExam">
@@ -394,6 +463,31 @@ onUnmounted(() => {
 }
 .option-label:hover .option-box { border-color: #d1d5db; background: #f9fafb; }
 .radio-input:checked + .option-box { border-color: #7c3aed; background: #faf5ff; font-weight: 500; color: #6d28d9; }
+
+/* Essay section */
+.essay-section { display: flex; flex-direction: column; gap: 1rem; }
+.essay-textarea {
+  width: 100%; padding: 0.875rem 1rem; border: 1px solid #e5e7eb; border-radius: 8px;
+  font-family: inherit; font-size: 0.95rem; line-height: 1.6; color: #1f2937;
+  resize: vertical; min-height: 140px; outline: none; transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.essay-textarea:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.file-upload-area { display: flex; flex-direction: column; gap: 0.5rem; }
+.file-upload-label {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 1rem; border: 1.5px dashed #d1d5db; border-radius: 8px;
+  background: #f9fafb; color: #6b7280; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+}
+.file-upload-label:hover { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+.hidden-file-input { display: none; }
+.file-uploaded { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #166534; }
+.file-link { color: #2563eb; text-decoration: underline; word-break: break-all; }
+.badge-essay { display: inline-flex; align-items: center; font-size: 0.7rem; background: #fef9c3; color: #854d0e; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; }
+.ml-2 { margin-left: 0.5rem; }
+.pending-grade { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 1.5rem; color: #92400e; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+.pending-grade i { font-size: 2rem; color: #f59e0b; }
+.pending-grade p { font-size: 0.9rem; line-height: 1.5; margin: 0; }
 
 /* Result */
 .result-icon { font-size: 4rem; }

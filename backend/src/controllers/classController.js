@@ -149,11 +149,18 @@ export async function approveClass(req, res) {
     }
 
     const result = await classModel.approveClassAndRandomRoom(id, parseInt(maxStudents))
+
+    // Tự động chuyển đổi trạng thái thành open_for_reg sau khi được phê duyệt để cho sinh viên đăng ký
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    await supabaseAdmin
+      .from('classes')
+      .update({ status: 'open_for_reg', updated_at: new Date().toISOString() })
+      .eq('id', id)
     
     return res.json({
       success: true,
       message: `Duyệt lớp học và xếp phòng tự động thành công.`,
-      data: result
+      data: { ...result, status: 'open_for_reg' }
     })
   } catch (err) {
     console.error('[ClassController.approveClass]', err.message)
@@ -185,6 +192,33 @@ export async function rejectClass(req, res) {
   } catch (err) {
     console.error('[ClassController.rejectClass]', err.message)
     return res.status(500).json({ error: 'Lỗi khi từ chối mở lớp.' })
+  }
+}
+
+/**
+ * PUT /api/classes/:id/complete — Hoàn thành lớp học (GV+)
+ */
+export async function completeClass(req, res) {
+  try {
+    const { id } = req.params
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data, error } = await supabaseAdmin
+      .from('classes')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return res.json({
+      success: true,
+      message: 'Lớp học đã được đánh dấu hoàn thành.',
+      data
+    })
+  } catch (err) {
+    console.error('[ClassController.completeClass]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi hoàn thành lớp học.' })
   }
 }
 

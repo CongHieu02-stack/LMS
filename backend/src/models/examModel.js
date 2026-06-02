@@ -8,18 +8,29 @@ import { supabaseAdmin } from '../config/supabase.js'
 
 /**
  * Lưu bài nộp thi
- * @param {object} submission — { student_id, exam_title, answers, is_forced, violations }
- * @returns {object} — Submission vừa tạo
+ * @param {object} submission
+ * {
+ *   student_id,
+ *   exam_id,
+ *   exam_title,
+ *   answers,
+ *   is_forced,
+ *   violations,
+ *   score
+ * }
+ * @returns {object}
  */
 export async function saveSubmission(submission) {
   const { data, error } = await supabaseAdmin
     .from('exam_submissions')
     .insert({
       student_id: submission.student_id,
+      exam_id: submission.exam_id || null,
       exam_title: submission.exam_title || 'Untitled Exam',
       answers: submission.answers || [],
       is_forced: submission.is_forced || false,
-      violations: submission.violations || 0
+      violations: submission.violations || 0,
+      score: submission.score !== undefined ? submission.score : null,
     })
     .select()
     .single()
@@ -30,7 +41,7 @@ export async function saveSubmission(submission) {
 
 /**
  * Lấy tất cả bài nộp của một sinh viên
- * @param {string} studentId — UUID sinh viên
+ * @param {string} studentId
  * @returns {Array}
  */
 export async function findByStudent(studentId) {
@@ -51,9 +62,34 @@ export async function findByStudent(studentId) {
 export async function findAll() {
   const { data, error } = await supabaseAdmin
     .from('exam_submissions')
-    .select('*, student:profiles!student_id(id, full_name, email)')
+    .select(
+      `
+      *,
+      student:profiles!student_id(
+        id,
+        full_name,
+        email
+      )
+    `,
+    )
     .order('submitted_at', { ascending: false })
 
   if (error) throw error
   return data || []
+}
+
+/**
+ * Lấy một bài nộp theo ID
+ * @param {string} submissionId
+ * @returns {object|null}
+ */
+export async function findById(submissionId) {
+  const { data, error } = await supabaseAdmin
+    .from('exam_submissions')
+    .select('*')
+    .eq('id', submissionId)
+    .single()
+
+  if (error) throw error
+  return data
 }

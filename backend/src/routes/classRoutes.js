@@ -30,6 +30,9 @@ router.put('/:id/approve', requireRank(70), classController.approveClass)
 // PUT /api/classes/:id/reject — Từ chối mở lớp (PĐT, rank >= 70)
 router.put('/:id/reject', requireRank(70), classController.rejectClass)
 
+// PUT /api/classes/:id/complete — Hoàn thành lớp học (GV, rank >= 50)
+router.put('/:id/complete', requireRank(50), classController.completeClass)
+
 // POST /api/classes/register — Đăng ký vào lớp (SV)
 router.post('/register', classController.registerToClass)
 

@@ -15,6 +15,12 @@ router.get('/class/:classId', requireRank(50), ctrl.getByClass)
 // GET /api/exam-manage/published/:classId — Bài KT đã publish (SV xem)
 router.get('/published/:classId', ctrl.getPublishedByClass)
 
+// GET /api/exam-manage/submissions/:classId — Lấy danh sách bài nộp để chấm (GV+)
+router.get('/submissions/:classId', requireRank(50), ctrl.getSubmissionsForClass)
+
+// POST /api/exam-manage/grade — Chấm điểm bài làm của sinh viên (GV+)
+router.post('/grade', requireRank(50), ctrl.gradeSubmission)
+
 // GET /api/exam-manage/:id — Chi tiết bài KT
 router.get('/:id', ctrl.getById)
 

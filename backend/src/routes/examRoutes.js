@@ -15,6 +15,9 @@ router.use(authMiddleware)
 // POST /api/exam/submit — Nộp bài thi
 router.post('/submit', examController.submitExam)
 
+// POST /api/exam/upload — Tải file bài làm tự luận
+router.post('/upload', examController.uploadSubmissionFile)
+
 // GET /api/exam/my-submissions — Bài nộp của SV hiện tại
 router.get('/my-submissions', examController.getMySubmissions)
 
