@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiGet, apiPost } from '@/lib/api'
 
@@ -20,6 +20,19 @@ let timerInterval: any = null
 
 const questions = ref<any[]>([])
 const answers = ref<Record<number, number>>({})
+
+// Modal & Submission Confirmation State
+const showConfirmModal = ref(false)
+const answeredCount = computed(() => Object.keys(answers.value).length)
+
+function triggerSubmitConfirmation() {
+  showConfirmModal.value = true
+}
+
+async function confirmSubmit() {
+  showConfirmModal.value = false
+  await submitExam(false)
+}
 
 // ==========================================
 // LOAD DATA
@@ -59,7 +72,11 @@ onMounted(loadExams)
 
 function selectExamToStart(exam: any) {
   selectedExam.value = exam
-  questions.value = exam.questions || []
+  // Gán ID duy nhất dựa trên index nếu câu hỏi không có id
+  questions.value = (exam.questions || []).map((q: any, idx: number) => ({
+    ...q,
+    id: q.id !== undefined ? q.id : idx
+  }))
   timeLeft.value = (exam.duration_minutes || 60) * 60
 }
 
@@ -225,7 +242,7 @@ onUnmounted(() => {
           <h3 class="font-bold">{{ e.title }}</h3>
           <p class="text-sm text-gray-500 mb-4">{{ e.subjectName }}</p>
           <div class="info-row"><i class="pi pi-clock"></i> {{ e.duration_minutes }} phút</div>
-          <button class="btn-submit w-full mt-4" @click="selectExamToStart(e)">Vào phòng Lobby</button>
+          <button class="btn-submit w-full mt-4" @click="selectExamToStart(e)">Bắt đầu kiểm tra</button>
         </div>
       </div>
     </div>
@@ -263,7 +280,7 @@ onUnmounted(() => {
       <div class="exam-timer" :class="{ 'text-red-600': timeLeft < 300 }">
         <i class="pi pi-clock"></i> {{ formatTime(timeLeft) }}
       </div>
-      <button class="btn-outline" @click="submitExam(false)">Nộp bài sớm</button>
+      <button class="btn-outline" @click="triggerSubmitConfirmation">Nộp bài</button>
     </div>
 
     <!-- Nội dung câu hỏi -->
@@ -302,6 +319,29 @@ onUnmounted(() => {
       </button>
     </div>
   </div>
+
+  <!-- POPUP XÁC NHẬN NỘP BÀI -->
+  <Transition name="fade">
+    <div v-if="showConfirmModal" class="modal-overlay" @click.self="showConfirmModal = false">
+      <div class="modal-card">
+        <div class="modal-header">
+          <i class="pi pi-question-circle modal-icon"></i>
+          <h3>Xác nhận nộp bài</h3>
+        </div>
+        <div class="modal-body">
+          <p>Bạn đã trả lời được <strong>{{ answeredCount }}</strong> trên tổng số <strong>{{ questions.length }}</strong> câu hỏi.</p>
+          <div class="warning-text mb-4" v-if="answeredCount < questions.length">
+            <i class="pi pi-exclamation-triangle"></i> Cảnh báo: Bạn chưa trả lời hết các câu hỏi!
+          </div>
+          <p>Bạn có chắc chắn muốn nộp bài thi ngay bây giờ không?</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-outline" @click="showConfirmModal = false">Làm tiếp</button>
+          <button class="btn-submit confirm-btn" @click="confirmSubmit">Nộp bài</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -402,4 +442,119 @@ onUnmounted(() => {
 .score-value { font-size: 3rem; font-weight: 600; line-height: 1; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Custom Confirmation Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(17, 24, 39, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal-overlay .modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+  width: 100%;
+  max-width: 28rem;
+  overflow: hidden;
+  animation: modalScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1.5rem 1.5rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.modal-icon {
+  font-size: 1.5rem;
+  color: #7c3aed;
+}
+
+.modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  color: #4b5563;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.modal-body p {
+  margin: 0 0 0.75rem 0;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.warning-text {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  color: #b45309;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
+  background: #f9fafb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.confirm-btn {
+  background: #7c3aed;
+  border-color: #7c3aed;
+}
+
+.confirm-btn:hover {
+  background: #6d28d9;
+}
+
+@keyframes modalScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Transition Animations */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>
