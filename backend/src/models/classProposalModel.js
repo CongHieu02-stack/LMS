@@ -55,7 +55,7 @@ export async function updateStatus(id, status, reviewerId) {
     .from('class_proposals')
     .update({ status, reviewed_by: reviewerId, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*, subject:subjects(id, code, name)')
+    .select('*, subject:subjects(id, code, name, department)')
     .single()
 
   if (error) {
@@ -68,7 +68,25 @@ export async function updateStatus(id, status, reviewerId) {
     const subjectId = data.subject_id
     const semester = data.semester
     const subjectCode = data.subject?.code || 'CLASS'
-    const managerId = data.proposed_by
+    const subjectDept = data.subject?.department
+    let managerId = data.proposed_by
+
+    // Tìm Trưởng bộ môn phụ trách Khoa/Bộ môn này
+    if (subjectDept) {
+      const { data: tbmUser, error: tbmErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('role', 'TRUONG_BO_MON')
+        .eq('department', subjectDept)
+        .limit(1)
+        .maybeSingle()
+
+      if (!tbmErr && tbmUser) {
+        managerId = tbmUser.id
+      } else {
+        console.warn(`[classProposalModel.updateStatus] Không tìm thấy Trưởng bộ môn cho khoa: ${subjectDept}. Fallback về proposer.`)
+      }
+    }
 
     // Find current number of classes for this subject and semester to compute index
     const { count, error: countError } = await supabaseAdmin
