@@ -144,7 +144,7 @@ export async function updateInfo(req, res) {
  */
 export async function createProfile(req, res) {
   try {
-    const { email, password, fullName, role } = req.body
+    const { email, password, fullName, role, department } = req.body
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
     if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
@@ -179,6 +179,10 @@ export async function createProfile(req, res) {
       })
     }
 
+    if (role === 'TRUONG_BO_MON' && !department) {
+      return res.status(400).json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách cho vai trò Trưởng bộ môn.` })
+    }
+
     // Validate mật khẩu mạnh: ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường, 1 chữ số, 1 ký tự đặc biệt
     if (!password || password.length < 8) {
       return res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự.' })
@@ -211,7 +215,14 @@ export async function createProfile(req, res) {
     const newUser = data.user
 
     // 2. Tạo profile row tương ứng
-    const profile = await profileModel.createProfile(newUser.id, email, fullName, role)
+    let profile
+    try {
+      profile = await profileModel.createProfile(newUser.id, email, fullName, role, role === 'TRUONG_BO_MON' ? department : null)
+    } catch (dbError) {
+      // Rollback: Xóa user vừa tạo ở auth.users để tránh rác/email bị kẹt
+      await supabaseAdmin.auth.admin.deleteUser(newUser.id)
+      throw dbError
+    }
 
     return res.status(201).json({
       success: true,
@@ -220,7 +231,7 @@ export async function createProfile(req, res) {
     })
   } catch (err) {
     console.error('[ProfileController.createProfile]', err.message)
-    return res.status(500).json({ error: 'Lỗi khi tạo tài khoản nhân sự.' })
+    return res.status(500).json({ error: err.message || 'Lỗi khi tạo tài khoản nhân sự.' })
   }
 }
 

@@ -7,6 +7,7 @@
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS lock_reason TEXT DEFAULT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS department TEXT DEFAULT NULL;
 
 -- 2. Bổ sung cột lý do từ chối cho bảng class_proposals (Duyệt đề xuất lớp học)
 ALTER TABLE public.class_proposals ADD COLUMN IF NOT EXISTS rejection_reason TEXT DEFAULT NULL;

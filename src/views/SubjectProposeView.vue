@@ -8,6 +8,7 @@ interface Subject {
   name: string;
   credits: number;
   description?: string | null;
+  department?: string | null;
   status: 'pending' | 'approved' | 'rejected';
 }
 
@@ -19,6 +20,16 @@ const formDescription = ref('')
 const isSubmitting = ref(false)
 const successMessage = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
+
+const formDepartment = ref('Khoa Công nghệ thông tin')
+const departments = [
+  'Khoa Công nghệ thông tin',
+  'Khoa Quản trị - Marketing',
+  'Khoa Tài chính - Thương mại',
+  'Khoa Khoa học Xã hội & Ngôn ngữ Quốc tế',
+  'Khoa Truyền thông số',
+  'Khoa Khoa học Sức khỏe'
+]
 
 // Danh sách môn đã đề xuất
 const myProposals = ref<Subject[]>([])
@@ -45,13 +56,15 @@ async function handleSubmit() {
       code: formCode.value,
       name: formName.value,
       credits: formCredits.value,
-      description: formDescription.value
+      description: formDescription.value,
+      department: formDepartment.value
     })
     successMessage.value = res.message
     formCode.value = ''
     formName.value = ''
     formCredits.value = 3
     formDescription.value = ''
+    formDepartment.value = 'Khoa Công nghệ thông tin'
     loadProposals()
   } catch (err) {
     errorMessage.value = (err as Error).message || 'Lỗi khi gửi đề xuất.'
@@ -99,9 +112,17 @@ function getStatusBadge(status: string) {
               <input v-model="formCredits" type="number" min="1" max="10" class="mono-input" required />
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Tên môn học</label>
-            <input v-model="formName" type="text" class="mono-input" placeholder="VD: Nhập môn Trí tuệ nhân tạo" required />
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Tên môn học</label>
+              <input v-model="formName" type="text" class="mono-input" placeholder="VD: Nhập môn Trí tuệ nhân tạo" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Khoa / Bộ môn phụ trách</label>
+              <select v-model="formDepartment" class="mono-input" required>
+                <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+              </select>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Mô tả tóm tắt (Đề cương)</label>
@@ -135,7 +156,7 @@ function getStatusBadge(status: string) {
           <div class="card-body proposal-list">
             <div v-for="s in myProposals" :key="s.id" class="proposal-item">
               <div>
-                <div class="proposal-code">{{ s.code }}</div>
+                <div class="proposal-code">{{ s.code }} <span class="dep-badge">{{ s.department || 'Bộ môn' }}</span></div>
                 <div class="proposal-name">{{ s.name }}</div>
               </div>
               <span class="status-badge" :class="getStatusBadge(s.status).cls">
@@ -185,7 +206,8 @@ function getStatusBadge(status: string) {
 .guideline-list strong { color: #111827; }
 .proposal-list { gap: 0.75rem; }
 .proposal-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
-.proposal-code { font-family: monospace; font-weight: 600; color: #111827; font-size: 0.9rem; }
+.proposal-code { font-family: monospace; font-weight: 600; color: #111827; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+.dep-badge { font-size: 0.7rem; font-weight: 500; color: #7c3aed; background-color: #f5f3ff; padding: 0.1rem 0.35rem; border-radius: 4px; font-family: sans-serif; }
 .proposal-name { font-size: 0.8rem; color: #6b7280; }
 .status-badge { font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 9999px; }
 .badge-pending { background: #fef3c7; color: #92400e; }
