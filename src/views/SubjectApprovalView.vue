@@ -1,12 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPut } from '@/lib/api'
 
-const authStore = useAuthStore()
+interface CreatorProfile {
+  id?: string;
+  fullName?: string;
+  full_name?: string;
+}
+
+interface Subject {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  description?: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string | null;
+  creator?: CreatorProfile | null;
+}
 
 // State
-const subjects = ref<any[]>([])
+const subjects = ref<Subject[]>([])
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
@@ -14,7 +28,7 @@ const successMessage = ref<string | null>(null)
 // Modal State
 const showRejectModal = ref(false)
 const rejectReason = ref('')
-const selectedSubject = ref<any>(null)
+const selectedSubject = ref<Subject | null>(null)
 const submittingReject = ref(false)
 
 // Fetch danh sách môn học
@@ -22,8 +36,8 @@ async function fetchSubjects() {
   loading.value = true
   errorMessage.value = null
   try {
-    const res = await apiGet<any>('/subjects')
-    if (res.success) {
+    const res = await apiGet<{ success: boolean; data: Subject[] }>('/subjects')
+    if (res.success && res.data) {
       // Chỉ lấy các môn học chưa duyệt nếu đây là trang Duyệt Môn Học
       // Nhưng theo backend thì trả về tất cả. Frontend có thể tự lọc hoặc hiển thị tất cả.
       // Dựa trên UI cũ, ta hiển thị tất cả.
@@ -37,7 +51,7 @@ async function fetchSubjects() {
 }
 
 // Xử lý phê duyệt
-async function handleApprove(subject: any) {
+async function handleApprove(subject: Subject) {
   const confirmAction = confirm(`Bạn có chắc chắn muốn PHÊ DUYỆT môn học "${subject.name}" (${subject.code}) không?`)
   if (!confirmAction) return
 
@@ -46,7 +60,7 @@ async function handleApprove(subject: any) {
   successMessage.value = null
 
   try {
-    const res = await apiPut<any>(`/subjects/${subject.id}/status`, {
+    const res = await apiPut<{ success: boolean }>(`/subjects/${subject.id}/status`, {
       status: 'approved'
     })
 
@@ -62,7 +76,7 @@ async function handleApprove(subject: any) {
 }
 
 // Xử lý mở Modal từ chối
-function openRejectModal(subject: any) {
+function openRejectModal(subject: Subject) {
   selectedSubject.value = subject
   rejectReason.value = ''
   showRejectModal.value = true
@@ -76,7 +90,7 @@ function closeRejectModal() {
 
 // Gửi yêu cầu từ chối
 async function submitReject() {
-  if (!rejectReason.value.trim()) {
+  if (!rejectReason.value.trim() || !selectedSubject.value) {
     alert('Vui lòng nhập lý do từ chối.')
     return
   }
@@ -86,7 +100,7 @@ async function submitReject() {
   successMessage.value = null
 
   try {
-    const res = await apiPut<any>(`/subjects/${selectedSubject.value.id}/status`, {
+    const res = await apiPut<{ success: boolean }>(`/subjects/${selectedSubject.value.id}/status`, {
       status: 'rejected',
       rejection_reason: rejectReason.value
     })

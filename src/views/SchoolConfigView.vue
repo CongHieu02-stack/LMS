@@ -2,6 +2,11 @@
 import { ref, onMounted, computed } from 'vue'
 import { apiGet, apiPut } from '@/lib/api'
 
+interface ConfigItem {
+  key: string;
+  value: string;
+}
+
 // State
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -18,9 +23,9 @@ async function fetchConfigs() {
   loading.value = true
   errorMessage.value = null
   try {
-    const res = await apiGet<any>('/configs')
+    const res = await apiGet<{ success: boolean; data?: ConfigItem[] }>('/configs')
     if (res.success && res.data) {
-      res.data.forEach((item: any) => {
+      res.data.forEach((item: ConfigItem) => {
         if (item.key === 'school_name') schoolName.value = item.value
         if (item.key === 'current_semester') currentSemester.value = item.value
         if (item.key === 'school_status') schoolStatus.value = item.value

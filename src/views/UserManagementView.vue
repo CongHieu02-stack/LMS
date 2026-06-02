@@ -38,7 +38,7 @@ const passwordRules = computed(() => [
   { label: 'Chứa chữ cái viết hoa (A-Z)', valid: /[A-Z]/.test(formPassword.value) },
   { label: 'Chứa chữ cái viết thường (a-z)', valid: /[a-z]/.test(formPassword.value) },
   { label: 'Chứa chữ số (0-9)', valid: /[0-9]/.test(formPassword.value) },
-  { label: 'Chứa ký tự đặc biệt (!@#$%...)', valid: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(formPassword.value) },
+  { label: 'Chứa ký tự đặc biệt (!@#$%...)', valid: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(formPassword.value) },
 ])
 
 const isPasswordStrong = computed(() => passwordRules.value.every(r => r.valid))

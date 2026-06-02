@@ -7,7 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function check() {
   console.log('Fetching user_role enum values from DB...');
-  const { data, error } = await supabase.rpc('get_roles_test_which_doesnt_exist');
+  const { data: _data, error } = await supabase.rpc('get_roles_test_which_doesnt_exist');
   console.log(error);
 }
 

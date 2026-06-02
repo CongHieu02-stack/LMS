@@ -2,8 +2,33 @@
 import { ref, onMounted } from 'vue'
 import { apiGet, apiPost } from '@/lib/api'
 
-const subjects = ref<any[]>([])
-const proposals = ref<any[]>([])
+// ── Type definitions based on the backend DB schema ──────────────────────────
+
+interface Subject {
+  id: string
+  code: string
+  name: string
+  description?: string
+  credits?: number
+  status: 'pending' | 'approved' | 'rejected'
+  is_locked?: boolean
+}
+
+interface ClassProposal {
+  id: string
+  subject_id: string
+  subject?: Pick<Subject, 'code' | 'name'>
+  quantity: number
+  semester: string
+  reason?: string
+  status: 'pending' | 'approved' | 'rejected'
+  created_at?: string
+}
+
+// ── Reactive state ────────────────────────────────────────────────────────────
+
+const subjects = ref<Subject[]>([])
+const proposals = ref<ClassProposal[]>([])
 const loading = ref(true)
 const submitting = ref(false)
 const successMsg = ref<string | null>(null)
@@ -18,12 +43,14 @@ async function loadData() {
   loading.value = true
   try {
     const [subRes, propRes] = await Promise.all([
-      apiGet<{ success: boolean; data: any[] }>('/subjects'),
-      apiGet<{ success: boolean; data: any[] }>('/class-proposals')
+      apiGet<{ success: boolean; data: Subject[] }>('/subjects'),
+      apiGet<{ success: boolean; data: ClassProposal[] }>('/class-proposals')
     ])
-    subjects.value = (subRes.data || []).filter((s: any) => s.status === 'approved')
+    subjects.value = (subRes.data || []).filter((s) => s.status === 'approved')
     proposals.value = propRes.data || []
-  } catch (err: any) { errorMsg.value = err.message }
+  } catch (err: unknown) {
+    errorMsg.value = err instanceof Error ? err.message : 'Đã xảy ra lỗi.'
+  }
   loading.value = false
 }
 
@@ -41,7 +68,9 @@ async function handleSubmit() {
     successMsg.value = res.message
     formSubjectId.value = ''; formQuantity.value = 1; formReason.value = ''
     loadData()
-  } catch (err: any) { errorMsg.value = err.message }
+  } catch (err: unknown) {
+    errorMsg.value = err instanceof Error ? err.message : 'Đã xảy ra lỗi.'
+  }
   submitting.value = false
 }
 

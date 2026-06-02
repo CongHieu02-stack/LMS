@@ -2,6 +2,15 @@
 import { ref } from 'vue'
 import { apiPost, apiGet } from '@/lib/api'
 
+interface Subject {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  description?: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 // State
 const formCode = ref('')
 const formName = ref('')
@@ -12,13 +21,13 @@ const successMessage = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 
 // Danh sách môn đã đề xuất
-const myProposals = ref<any[]>([])
+const myProposals = ref<Subject[]>([])
 const loadingList = ref(false)
 
 async function loadProposals() {
   loadingList.value = true
   try {
-    const res = await apiGet<{ success: boolean; data: any[] }>('/subjects')
+    const res = await apiGet<{ success: boolean; data: Subject[] }>('/subjects')
     myProposals.value = res.data || []
   } catch { /* ignore */ }
   loadingList.value = false
@@ -44,8 +53,8 @@ async function handleSubmit() {
     formCredits.value = 3
     formDescription.value = ''
     loadProposals()
-  } catch (err: any) {
-    errorMessage.value = err.message || 'Lỗi khi gửi đề xuất.'
+  } catch (err) {
+    errorMessage.value = (err as Error).message || 'Lỗi khi gửi đề xuất.'
   }
   isSubmitting.value = false
 }

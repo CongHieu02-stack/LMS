@@ -6,6 +6,19 @@ interface GradeItem {
   id: string; subjectCode: string; subjectName: string; credits: number; score: number; className: string;
 }
 
+interface RawGrade {
+  id: string;
+  score: string | number;
+  class?: {
+    name?: string;
+    subject?: {
+      code?: string;
+      name?: string;
+      credits?: number;
+    } | null;
+  } | null;
+}
+
 const grades = ref<GradeItem[]>([])
 const loading = ref(true)
 const passingScore = 5.0
@@ -13,13 +26,13 @@ const passingScore = 5.0
 async function loadGrades() {
   loading.value = true
   try {
-    const res = await apiGet<{ success: boolean; data: any[] }>('/grades/me')
-    grades.value = (res.data || []).map((g: any) => ({
+    const res = await apiGet<{ success: boolean; data: RawGrade[] }>('/grades/me')
+    grades.value = (res.data || []).map((g: RawGrade) => ({
       id: g.id,
       subjectCode: g.class?.subject?.code || 'N/A',
       subjectName: g.class?.subject?.name || 'N/A',
       credits: g.class?.subject?.credits || 0,
-      score: parseFloat(g.score) || 0,
+      score: parseFloat(String(g.score)) || 0,
       className: g.class?.name || ''
     }))
   } catch { /* grades table may be empty */ }

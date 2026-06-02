@@ -192,7 +192,7 @@ export async function createProfile(req, res) {
     if (!/[0-9]/.test(password)) {
       return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ số (0-9).' })
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
       return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
     }
 
@@ -319,7 +319,7 @@ export async function uploadAvatar(req, res) {
     }
 
     // 1. Giải mã base64
-    const matches = avatarData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+    const matches = avatarData.match(/^data:([A-Za-z-+/]+);base64,(.+)$/)
     if (!matches || matches.length !== 3) {
       return res.status(400).json({ error: 'Định dạng ảnh Base64 không hợp lệ.' })
     }
@@ -453,7 +453,7 @@ export async function resetPassword(req, res) {
     if (!/[0-9]/.test(newPassword)) {
       return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ số (0-9).' })
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassword)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(newPassword)) {
       return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
     }
 
