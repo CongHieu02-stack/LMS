@@ -151,7 +151,7 @@ const router = createRouter({
 })
 
 // ─── NAVIGATION GUARDS ───
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach(async (to, _from) => {
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -164,22 +164,21 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    next({ name: 'login' })
+    return { name: 'login' }
   } else if (to.meta.requiresGuest && isAuthenticated) {
-    next({ name: 'dashboard' })
+    return { name: 'dashboard' }
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    next({ name: 'dashboard' })
+    return { name: 'dashboard' }
   } else if (
     to.meta.requirePermission &&
     !authStore.hasPermission(to.meta.requirePermission as string) &&
     !authStore.hasPermission('user_manage_senior')
   ) {
-    next({ name: 'dashboard' })
+    return { name: 'dashboard' }
   } else if (to.meta.minRank && (authStore.profile?.rank || 0) < (to.meta.minRank as number)) {
-    next({ name: 'dashboard' })
-  } else {
-    next()
+    return { name: 'dashboard' }
   }
+  return true
 })
 
 export default router

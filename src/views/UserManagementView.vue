@@ -29,8 +29,18 @@ const formPassword = ref('')
 const formConfirmPassword = ref('')
 const formFullName = ref('')
 const formRole = ref('HR')
+const formDepartment = ref('Khoa Công nghệ thông tin')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+
+const departments = [
+  'Khoa Công nghệ thông tin',
+  'Khoa Quản trị - Marketing',
+  'Khoa Tài chính - Thương mại',
+  'Khoa Khoa học Xã hội & Ngôn ngữ Quốc tế',
+  'Khoa Truyền thông số',
+  'Khoa Khoa học Sức khỏe'
+]
 
 // Password strength validation rules
 const passwordRules = computed(() => [
@@ -164,6 +174,7 @@ async function handleCreateUser() {
       password: formPassword.value,
       fullName: formFullName.value,
       role: formRole.value,
+      department: formRole.value === 'TRUONG_BO_MON' ? formDepartment.value : undefined
     })
 
     if (res.success) {
@@ -528,14 +539,28 @@ onMounted(() => {
               </ul>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Vai trò chức vụ</label>
-              <div class="select-wrapper">
-                <select v-model="formRole" class="mono-input">
-                  <option v-for="role in availableRoles" :key="role.value" :value="role.value">
-                    {{ role.label }}
-                  </option>
-                </select>
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">Vai trò chức vụ</label>
+                <div class="select-wrapper">
+                  <select v-model="formRole" class="mono-input">
+                    <option v-for="role in availableRoles" :key="role.value" :value="role.value">
+                      {{ role.label }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Chỉ hiện ra khi chọn Trưởng bộ môn -->
+              <div v-if="formRole === 'TRUONG_BO_MON'" class="form-group">
+                <label class="form-label">Khoa / Bộ môn phụ trách</label>
+                <div class="select-wrapper">
+                  <select v-model="formDepartment" class="mono-input">
+                    <option v-for="dept in departments" :key="dept" :value="dept">
+                      {{ dept }}
+                    </option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>

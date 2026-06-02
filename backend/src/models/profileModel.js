@@ -97,15 +97,20 @@ export async function deleteById(id) {
  * @param {string} role — Vai trò (ADMIN, HIEU_TRUONG, HR, ...)
  * @returns {object} — Profile vừa tạo
  */
-export async function createProfile(id, email, fullName, role) {
+export async function createProfile(id, email, fullName, role, department = null) {
+  const insertData = {
+    id,
+    email,
+    full_name: fullName,
+    role
+  }
+  if (department) {
+    insertData.department = department
+  }
+
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .insert({
-      id,
-      email,
-      full_name: fullName,
-      role,
-    })
+    .insert(insertData)
     .select()
     .single()
 
