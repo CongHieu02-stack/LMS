@@ -58,7 +58,7 @@ const menuGroups = ref<MainMenuGroup[]>([
     isOpen: false,
     items: [
       { 
-        label: 'Tạo học phần mới', 
+        label: 'Đề xuất môn học mới', 
         to: '/subjects/propose', 
         requiredPermission: 'subject_propose' 
       },
