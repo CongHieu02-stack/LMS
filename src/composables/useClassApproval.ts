@@ -14,9 +14,9 @@ export function useClassApproval(onSuccess?: () => void) {
   const submitting = ref(false)
   const errorMessage = ref<string | null>(null)
 
-  function openApproveModal(classId: string, existingSchedule?: string) {
+  function openApproveModal(classId: string, existingSchedule?: string, defaultMaxStudents?: number) {
     selectedClassId.value = classId
-    maxStudentsInput.value = null
+    maxStudentsInput.value = defaultMaxStudents || 50
     scheduleInput.value = existingSchedule || ''
     errorMessage.value = null
     isApproveModalOpen.value = true

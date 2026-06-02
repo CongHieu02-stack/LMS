@@ -145,6 +145,7 @@ onMounted(loadData)
                 <tr>
                   <th>Môn học</th>
                   <th class="text-center">SL lớp</th>
+                  <th class="text-center">Sĩ số/Lớp</th>
                   <th>Học kỳ</th>
                   <th>Người đề xuất</th>
                   <th>Lý do</th>
@@ -158,6 +159,7 @@ onMounted(loadData)
                     <span class="subject-name"> — {{ p.subject?.name }}</span>
                   </td>
                   <td class="text-center font-bold">{{ p.quantity }}</td>
+                  <td class="text-center">{{ p.max_students || 50 }}</td>
                   <td class="semester-cell">{{ p.semester }}</td>
                   <td class="user-cell">
                     <i class="pi pi-user mr-1"></i>{{ p.proposer?.full_name || '—' }}
@@ -218,7 +220,7 @@ onMounted(loadData)
                   </td>
                   <td class="text-center">
                     <div class="action-buttons">
-                      <button class="btn-approve" @click="openApproveModal(c.id, c.schedule)" :disabled="processing === c.id">
+                      <button class="btn-approve" @click="openApproveModal(c.id, c.schedule, c.maxStudents)" :disabled="processing === c.id">
                         <i class="pi pi-check"></i> Duyệt mở
                       </button>
                       <button class="btn-reject" @click="handleReject(c.id)" :disabled="processing === c.id">

@@ -16,6 +16,7 @@ ALTER TABLE public.class_proposals ADD COLUMN IF NOT EXISTS lock_reason TEXT DEF
 
 -- 3. Bổ sung cột Khoa/Bộ môn cho bảng subjects (Quản lý Bộ môn)
 ALTER TABLE public.subjects ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Khoa Công nghệ thông tin';
+ALTER TABLE public.class_proposals ADD COLUMN IF NOT EXISTS max_students INTEGER DEFAULT 50 CHECK (max_students > 0);
 
 COMMENT ON COLUMN public.profiles.phone_number IS 'Số điện thoại liên lạc của người dùng';
 COMMENT ON COLUMN public.profiles.is_locked IS 'Trạng thái khóa tài khoản (true = bị khóa, cấm đăng nhập)';
