@@ -19,6 +19,7 @@ interface ClassProposal {
   subject_id: string
   subject?: Pick<Subject, 'code' | 'name'>
   quantity: number
+  max_students?: number
   semester: string
   reason?: string
   status: 'pending' | 'approved' | 'rejected'
@@ -36,6 +37,7 @@ const errorMsg = ref<string | null>(null)
 
 const formSubjectId = ref('')
 const formQuantity = ref(1)
+const formMaxStudents = ref(50)
 const formSemester = ref('HK1-2026')
 const formReason = ref('')
 
@@ -62,11 +64,12 @@ async function handleSubmit() {
     const res = await apiPost<{ success: boolean; message: string }>('/class-proposals', {
       subjectId: formSubjectId.value,
       quantity: formQuantity.value,
+      maxStudents: formMaxStudents.value,
       semester: formSemester.value,
       reason: formReason.value
     })
     successMsg.value = res.message
-    formSubjectId.value = ''; formQuantity.value = 1; formReason.value = ''
+    formSubjectId.value = ''; formQuantity.value = 1; formMaxStudents.value = 50; formReason.value = ''
     loadData()
   } catch (err: unknown) {
     errorMsg.value = err instanceof Error ? err.message : 'Đã xảy ra lỗi.'
@@ -107,8 +110,9 @@ function statusBadge(s: string) {
               <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
             </select>
           </div>
-          <div class="row-2">
+          <div class="row-3">
             <div class="fg"><label>Số lượng lớp</label><input v-model="formQuantity" type="number" min="1" max="20" class="mono-input" required /></div>
+            <div class="fg"><label>Sĩ số/Lớp</label><input v-model="formMaxStudents" type="number" min="1" max="150" class="mono-input" required /></div>
             <div class="fg"><label>Học kỳ</label><input v-model="formSemester" type="text" class="mono-input" required /></div>
           </div>
           <div class="fg"><label>Lý do</label><textarea v-model="formReason" class="mono-input ta" placeholder="Nhu cầu đăng ký cao..."></textarea></div>
@@ -122,7 +126,7 @@ function statusBadge(s: string) {
           <div class="card-body list">
             <div v-if="proposals.length === 0" class="empty">Chưa có đề xuất nào.</div>
             <div v-for="p in proposals" :key="p.id" class="list-item">
-              <div><div class="li-code">{{ p.subject?.code || 'N/A' }} — {{ p.subject?.name || '' }}</div><div class="li-meta">SL: {{ p.quantity }} | {{ p.semester }}</div></div>
+              <div><div class="li-code">{{ p.subject?.code || 'N/A' }} — {{ p.subject?.name || '' }}</div><div class="li-meta">SL: {{ p.quantity }} | Sĩ số: {{ p.max_students || 50 }} | {{ p.semester }}</div></div>
               <span class="badge" :class="statusBadge(p.status).c">{{ statusBadge(p.status).t }}</span>
             </div>
           </div>
@@ -154,6 +158,7 @@ function statusBadge(s: string) {
 .mono-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
 .ta { min-height: 80px; resize: vertical; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
 .af { display: flex; justify-content: flex-end; }
 .btn { padding: 0.6rem 1.5rem; background: #111827; color: #fff; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
 .btn:hover:not(:disabled) { background: #374151; }

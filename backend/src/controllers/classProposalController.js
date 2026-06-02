@@ -26,7 +26,7 @@ export async function getPending(req, res) {
 
 export async function create(req, res) {
   try {
-    const { subjectId, quantity, semester, reason } = req.body
+    const { subjectId, quantity, semester, reason, maxStudents } = req.body
     if (!subjectId || !quantity || !semester) {
       return res.status(400).json({ error: 'Thiếu thông tin: subjectId, quantity, semester.' })
     }
@@ -36,6 +36,7 @@ export async function create(req, res) {
       quantity: parseInt(quantity),
       semester,
       reason: reason || '',
+      max_students: maxStudents ? parseInt(maxStudents) : 50
     })
     return res
       .status(201)
