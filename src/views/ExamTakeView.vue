@@ -357,7 +357,7 @@ onUnmounted(() => {
   <!-- LOBBY (Chưa bắt đầu) -->
   <div v-else-if="!isExamStarted" class="mono-wrapper lobby-view">
     <div class="mono-card max-w-lg mx-auto mt-10">
-      <div class="card-header bg-gray-900 text-white">
+      <div class="card-header bg-primary-gradient text-white">
         <span>Bài thi: {{ selectedExam.title }}</span>
       </div>
       <div class="card-body">
@@ -487,11 +487,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.mono-wrapper { padding: 1.5rem 2rem; animation: fadeIn 0.3s ease-out; background: #f3f4f6; min-height: 100vh; }
+.mono-wrapper { animation: fadeIn 0.3s ease-out; }
 
 .page-header { margin-bottom: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; }
-.breadcrumb { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem; } .breadcrumb span { color: #111827; font-weight: 600; }
-.page-title { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem 0; color: #111827; }
+.breadcrumb { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem; } .breadcrumb span { color: var(--lms-gray-900, #111827); font-weight: 600; }
+.page-title { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem 0; color: var(--lms-gray-900, #111827); }
 .page-subtitle { font-size: 0.875rem; color: #6b7280; }
 
 .ld { display: flex; justify-content: center; padding: 4rem; font-size: 2rem; color: #6b7280; }
@@ -531,18 +531,20 @@ onUnmounted(() => {
 
 /* Card */
 .mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
-.bg-gray-900 { background: #111827 !important; }
+.bg-primary-gradient {
+  background: linear-gradient(135deg, var(--lms-primary, #4f46e5) 0%, var(--lms-primary-hover, #4338ca) 100%) !important;
+}
 .text-white { color: #fff !important; }
 .card-header { padding: 1rem 1.5rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; background: #f9fafb; color: #111827; }
 .card-body { padding: 1.5rem; }
 
 /* Buttons */
 .btn-submit {
-  padding: 0.75rem 1.5rem; border: 1px solid #111827; background: #111827; color: #fff;
+  padding: 0.75rem 1.5rem; border: 1px solid var(--lms-primary, #4f46e5); background: var(--lms-primary, #4f46e5); color: #fff;
   border-radius: 8px; font-weight: 500; font-size: 0.95rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;
 }
-.btn-submit:hover { background: #374151; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.btn-submit:hover { background: var(--lms-primary-hover, #4338ca); border-color: var(--lms-primary-hover, #4338ca); box-shadow: 0 4px 6px rgba(79, 70, 229, 0.15); }
 .btn-outline {
   padding: 0.5rem 1rem; border: 1px solid #e5e7eb; background: #fff; color: #111827;
   border-radius: 6px; font-weight: 500; cursor: pointer; transition: all 0.2s;
@@ -575,7 +577,7 @@ onUnmounted(() => {
   background: #fff; transition: all 0.2s; color: #374151;
 }
 .option-label:hover .option-box { border-color: #d1d5db; background: #f9fafb; }
-.radio-input:checked + .option-box { border-color: #7c3aed; background: #faf5ff; font-weight: 500; color: #6d28d9; }
+.radio-input:checked + .option-box { border-color: var(--lms-primary, #4f46e5); background: var(--lms-primary-light, #e0e7ff); font-weight: 500; color: var(--lms-primary-hover, #4338ca); }
 
 /* Result */
 .result-icon { font-size: 4rem; }
@@ -622,7 +624,7 @@ onUnmounted(() => {
 
 .modal-icon {
   font-size: 1.5rem;
-  color: #7c3aed;
+  color: var(--lms-primary, #4f46e5);
 }
 
 .modal-header h3 {
@@ -670,12 +672,13 @@ onUnmounted(() => {
 }
 
 .confirm-btn {
-  background: #7c3aed;
-  border-color: #7c3aed;
+  background: var(--lms-primary, #4f46e5);
+  border-color: var(--lms-primary, #4f46e5);
 }
 
 .confirm-btn:hover {
-  background: #6d28d9;
+  background: var(--lms-primary-hover, #4338ca);
+  border-color: var(--lms-primary-hover, #4338ca);
 }
 
 @keyframes modalScale {
