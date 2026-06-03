@@ -551,14 +551,8 @@ async function saveEditExam() {
                       <span class="badge-qcount ml-2">
                         <i class="pi pi-list mr-1"></i>{{ e.questions?.length || 0 }} câu hỏi
                       </span>
-                      <span class="bdg ml-2" :class="e.status === 'published' ? 'bg-green' : 'bg-gray'">
-                        {{ e.status === 'published' ? 'Đã phát hành' : 'Bản nháp' }}
-                      </span>
                     </div>
                     <div class="ex-acts">
-                      <button @click="toggleExamStatus(e)" class="btn-sm">
-                        {{ e.status === 'published' ? 'Ẩn' : 'Publish' }}
-                      </button>
                       <button @click="viewExamDetail(e)" class="btn-view-inline mx-2" title="Xem chi tiết">
                         <i class="pi pi-eye"></i>
                       </button>
@@ -781,12 +775,6 @@ async function saveEditExam() {
         <div style="margin-bottom: 1rem; display: flex; gap: 1.5rem;">
           <div><strong>Thời gian làm bài:</strong> {{ selectedExamDetail.duration_minutes || selectedExamDetail.durationMinutes }} phút</div>
           <div><strong>Số câu hỏi:</strong> {{ selectedExamDetail.questions?.length || 0 }} câu</div>
-          <div>
-            <strong>Trạng thái: </strong>
-            <span class="bdg" :class="selectedExamDetail.status === 'published' ? 'bg-green' : 'bg-gray'">
-              {{ selectedExamDetail.status === 'published' ? 'Đã phát hành' : 'Bản nháp' }}
-            </span>
-          </div>
         </div>
 
         <div v-if="!selectedExamDetail.questions || selectedExamDetail.questions.length === 0" class="empty-questions">
