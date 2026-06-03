@@ -25,9 +25,15 @@ export async function create(lessonData) {
 }
 
 export async function update(id, updates) {
+  const cleanUpdates = {}
+  for (const key in updates) {
+    if (updates[key] !== undefined) {
+      cleanUpdates[key] = updates[key]
+    }
+  }
   const { data, error } = await supabaseAdmin
     .from('lessons')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...cleanUpdates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()

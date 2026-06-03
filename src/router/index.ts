@@ -123,7 +123,13 @@ const router = createRouter({
     // ---- ĐÀO TẠO & KHẢO THÍ ----
     {
       path: '/lessons',
-      name: 'lesson-exam-manage',
+      name: 'lesson-manage',
+      component: () => import('@/views/LessonExamManageView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'lesson_exam_manage' },
+    },
+    {
+      path: '/exams',
+      name: 'exam-manage',
       component: () => import('@/views/LessonExamManageView.vue'),
       meta: { requiresAuth: true, requirePermission: 'lesson_exam_manage' },
     },

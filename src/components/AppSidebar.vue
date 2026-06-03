@@ -95,8 +95,13 @@ const menuGroups = ref<MainMenuGroup[]>([
         requiredPermission: 'instructor_assign',
       },
       {
-        label: 'Bài học & Khảo thí',
+        label: 'Bài học',
         to: '/lessons',
+        requiredPermission: 'lesson_exam_manage',
+      },
+      {
+        label: 'Bài kiểm tra',
+        to: '/exams',
         requiredPermission: 'lesson_exam_manage',
       },
       { 
