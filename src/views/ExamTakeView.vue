@@ -160,34 +160,17 @@ async function submitExam(isForced = false) {
   }))
 
   try {
-    const res = await apiPost<{ success: boolean; data: any }>('/exam/submit', {
+    const res = await apiPost<{ success: boolean; data: any; score?: number }>('/exam/submit', {
       examTitle: selectedExam.value.title,
+      examId: selectedExam.value.id,
+      classId: selectedExam.value.class_id,
       answers: answersList,
       isForced,
       violations: cheatWarnings.value
     })
     
-    // Lưu điểm qua API Grades
-    // Mock calculate score for grade table (in a real app, backend will grade)
-    let correct = 0
-    questions.value.forEach((q: any) => {
-      if (answers.value[q.id] === q.answer) correct++
-    })
-    const score = questions.value.length > 0 ? parseFloat(((correct / questions.value.length) * 10).toFixed(1)) : 0
-    finalScore.value = score
-    
-    try {
-      await apiPost('/grades', {
-        classId: selectedExam.value.class_id,
-        examId: selectedExam.value.id,
-        // using a specific backend route or student passing logic is normally required
-        // Since we only have /grades which requires rank >= 50, we mock this score locally,
-        // In real LMS, `submitExam` backend will trigger grading and update `grades` table automatically
-        score: score
-      })
-    } catch (e) {
-      console.warn('Grade API failed or restricted, score is local only', e)
-    }
+    // Backend tự động tính điểm và lưu vào grades table
+    finalScore.value = res.score || 0
 
   } catch (err) {
     console.error('Submit error:', err)
@@ -288,7 +271,7 @@ onUnmounted(() => {
       <div v-if="questions.length === 0" class="text-center py-10 text-gray-500">Bài thi chưa có nội dung câu hỏi.</div>
       <div class="mono-card mb-6" v-for="(q, index) in questions" :key="q.id">
         <div class="card-body">
-          <h3 class="question-text">Câu {{ index + 1 }}: {{ q.text }}</h3>
+          <h3 class="question-text">Câu {{ (index as number) + 1 }}: {{ q.text }}</h3>
           <div class="options-grid">
             <label v-for="(opt, optIndex) in q.options" :key="optIndex" class="option-label">
               <input type="radio" :name="`q_${q.id}`" :value="optIndex" v-model="answers[q.id]" class="radio-input" />

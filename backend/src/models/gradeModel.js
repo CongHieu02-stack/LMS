@@ -49,11 +49,36 @@ export async function findByClass(classId) {
 }
 
 export async function upsert(gradeData) {
-  const { data, error } = await supabaseAdmin
+  // Check if grade already exists
+  const { data: existing } = await supabaseAdmin
     .from('grades')
-    .upsert(gradeData, { onConflict: 'class_id,student_id,exam_id' })
-    .select()
+    .select('id')
+    .eq('exam_id', gradeData.exam_id)
+    .eq('student_id', gradeData.student_id)
     .single()
-  if (error) throw error
-  return data
+  
+  if (existing) {
+    // Update existing grade
+    const { data, error } = await supabaseAdmin
+      .from('grades')
+      .update({ 
+        score: gradeData.score,
+        graded_by: gradeData.graded_by,
+        graded_at: new Date().toISOString()
+      })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  } else {
+    // Insert new grade
+    const { data, error } = await supabaseAdmin
+      .from('grades')
+      .insert(gradeData)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
 }
