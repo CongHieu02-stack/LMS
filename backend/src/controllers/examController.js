@@ -1,7 +1,5 @@
 // ============================================================================
 // controllers/examController.js — Controller nộp bài thi
-// Trách nhiệm DUY NHẤT: Điều phối nghiệp vụ nộp bài (bình thường + bắt buộc).
-// Gọi Model (examModel) để lưu, gọi View (examView) để format.
 // ============================================================================
 
 import * as examModel from '../models/examModel.js'
@@ -9,10 +7,6 @@ import * as examView from '../views/examView.js'
 import * as examManageModel from '../models/examManageModel.js'
 import * as gradeModel from '../models/gradeModel.js'
 
-/**
- * POST /api/exam/submit — Nộp bài thi.
- * Body: { examTitle, examId, classId, answers: [...], isForced: boolean, violations: number }
- */
 export async function submitExam(req, res) {
   try {
     const {
@@ -26,14 +20,12 @@ export async function submitExam(req, res) {
 
     const studentId = req.user.id
 
-    // Validate input cơ bản
     if (!answers || !Array.isArray(answers)) {
       return res.status(400).json({
         error: 'Dữ liệu bài làm không hợp lệ.'
       })
     }
 
-    // Lưu bài nộp
     const submission = await examModel.saveSubmission({
       student_id: studentId,
       exam_title: examTitle,
@@ -42,7 +34,6 @@ export async function submitExam(req, res) {
       violations: violations || 0
     })
 
-    // Log nếu là nộp bắt buộc
     if (isForced) {
       console.warn(
         `[ANTI-CHEAT] Nộp bài bắt buộc: student=${studentId}, violations=${violations}, exam="${examTitle}"`
@@ -50,17 +41,15 @@ export async function submitExam(req, res) {
     }
 
     // ==========================
-    // AUTO GRADE
+    // AUTO GRADE (FIXED LOGIC)
     // ==========================
     let score = 0
 
-    console.log(
-      '[AUTO-GRADE] Starting auto-grade process',
-      {
-        examId,
-        isForced
-      }
-    )
+    console.log('[AUTO-GRADE] Starting auto-grade process', {
+      examId,
+      classId,
+      isForced
+    })
 
     if (examId && !isForced) {
       try {
@@ -76,29 +65,17 @@ export async function submitExam(req, res) {
         if (exam && Array.isArray(exam.questions)) {
           let correct = 0
 
-          exam.questions.forEach((q) => {
-            const studentAnswer = answers.find(
-              (a) => a.question_id === q.id
-            )
+          exam.questions.forEach((q, index) => {
+            const studentAnswer = answers?.[index]
 
-            console.log('====================')
-            console.log('QUESTION:', JSON.stringify(q, null, 2))
-            console.log('QUESTION ID:', q.id)
-            console.log('CORRECT ANSWER:', q.answer)
-            console.log('CORRECT ANSWER TYPE:', typeof q.answer)
-            console.log(
-              'STUDENT ANSWER:',
-              studentAnswer?.selected_option
-            )
-            console.log(
-              'STUDENT ANSWER TYPE:',
-              typeof studentAnswer?.selected_option
-            )
+            if (!studentAnswer) return
 
-            if (
-              studentAnswer &&
-              studentAnswer.selected_option === q.answer
-            ) {
+            const selected =
+              studentAnswer.selected_option ??
+              studentAnswer.answer ??
+              studentAnswer
+
+            if (Number(selected) === Number(q.answer)) {
               correct++
             }
           })
@@ -106,10 +83,7 @@ export async function submitExam(req, res) {
           score =
             exam.questions.length > 0
               ? parseFloat(
-                  (
-                    (correct / exam.questions.length) *
-                    10
-                  ).toFixed(1)
+                  ((correct / exam.questions.length) * 10).toFixed(1)
                 )
               : 0
 
@@ -122,8 +96,12 @@ export async function submitExam(req, res) {
             exam.questions.length
           )
 
+          // ==========================
+          // FIX: chuẩn hoá theo môn học (class)
+          // ==========================
           const gradeResult = await gradeModel.upsert({
             exam_id: examId,
+            class_id: classId, // 🔥 quan trọng để không tách môn
             student_id: studentId,
             score,
             graded_by: studentId
@@ -134,37 +112,21 @@ export async function submitExam(req, res) {
             gradeResult
           )
         } else {
-          console.log(
-            '[AUTO-GRADE] Exam not found or has no questions'
-          )
+          console.log('[AUTO-GRADE] Exam not found or invalid questions')
         }
       } catch (gradeErr) {
-        console.error(
-          '[ExamController.submitExam] Auto-grade error:',
-          gradeErr.message
-        )
-
-        console.error(
-          '[ExamController.submitExam] Auto-grade stack:',
-          gradeErr.stack
-        )
+        console.error('[AUTO-GRADE ERROR]', gradeErr.message)
       }
     } else {
-      console.log(
-        '[AUTO-GRADE] Skipped - examId missing or submission was forced'
-      )
+      console.log('[AUTO-GRADE] Skipped')
     }
 
-    // Response
     const response = examView.formatSubmissionResult(submission)
     response.score = score
 
     return res.json(response)
   } catch (err) {
-    console.error(
-      '[ExamController.submitExam]',
-      err.message
-    )
+    console.error('[submitExam]', err.message)
 
     return res.status(500).json({
       error: 'Lỗi khi nộp bài thi.'
@@ -172,23 +134,15 @@ export async function submitExam(req, res) {
   }
 }
 
-/**
- * GET /api/exam/my-submissions
- */
 export async function getMySubmissions(req, res) {
   try {
-    const submissions = await examModel.findByStudent(
-      req.user.id
-    )
+    const submissions = await examModel.findByStudent(req.user.id)
 
     return res.json(
       examView.formatSubmissionList(submissions)
     )
   } catch (err) {
-    console.error(
-      '[ExamController.getMySubmissions]',
-      err.message
-    )
+    console.error('[getMySubmissions]', err.message)
 
     return res.status(500).json({
       error: 'Lỗi khi lấy bài nộp.'
