@@ -43,7 +43,7 @@ export async function authMiddleware(req, res, next) {
     // Bước 3: Lấy profile kèm role + rank
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, full_name, role, rank, avatar_url')
+      .select('id, email, full_name, role, rank, avatar_url, department')
       .eq('id', user.id)
       .single()
 

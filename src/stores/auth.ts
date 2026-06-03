@@ -20,6 +20,7 @@ export interface UserProfile {
   rank: number
   displayRole: string
   avatarUrl: string | null
+  department?: string | null
   createdAt: string
   updatedAt: string
   permissions: string[]

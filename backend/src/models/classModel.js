@@ -15,7 +15,7 @@ export async function findAll() {
     .from('classes')
     .select(`
       *,
-      subject:subjects(id, code, name, credits),
+      subject:subjects(id, code, name, credits, department),
       instructor:profiles!instructor_id(id, full_name, email),
       manager:profiles!manager_id(id, full_name, email)
     `)
@@ -35,7 +35,7 @@ export async function findById(id) {
     .from('classes')
     .select(`
       *,
-      subject:subjects(id, code, name, credits),
+      subject:subjects(id, code, name, credits, department),
       instructor:profiles!instructor_id(id, full_name, email),
       manager:profiles!manager_id(id, full_name, email)
     `)
@@ -106,7 +106,7 @@ export async function assignInstructor(classId, instructorId) {
     .from('classes')
     .update({ instructor_id: instructorId })
     .eq('id', classId)
-    .select(`*, subject:subjects(id, code, name), instructor:profiles!instructor_id(id, full_name, email)`)
+    .select(`*, subject:subjects(id, code, name, department), instructor:profiles!instructor_id(id, full_name, email)`)
     .single()
   if (error) throw error
   return data
