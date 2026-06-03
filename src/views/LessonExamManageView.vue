@@ -26,6 +26,10 @@ const showDetailExamModal = ref(false)
 const selectedLessonDetail = ref<any>(null)
 const selectedExamDetail = ref<any>(null)
 
+// Modal body HTML element references for auto-scrolling
+const createExamModalBody = ref<HTMLElement | null>(null)
+const editExamModalBody = ref<HTMLElement | null>(null)
+
 function viewLessonDetail(lesson: any) {
   selectedLessonDetail.value = lesson
   showDetailLessonModal.value = true
@@ -101,7 +105,11 @@ function startEditQuestionInCreate(index: number) {
   const q = questions.value[index]
   newQuestionText.value = q.text
   newOptions.value = [...q.options]
-  newAnswer.value = q.answer
+  newAnswer.value = Number(q.answer)
+  
+  if (createExamModalBody.value) {
+    createExamModalBody.value.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
 function saveQuestionInCreate() {
@@ -138,7 +146,11 @@ function startEditQuestionInEdit(index: number) {
   const q = editExamQuestions.value[index]
   editNewQuestionText.value = q.text
   editNewOptions.value = [...q.options]
-  editNewAnswer.value = q.answer
+  editNewAnswer.value = Number(q.answer)
+
+  if (editExamModalBody.value) {
+    editExamModalBody.value.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
 function saveQuestionInEdit() {
@@ -699,7 +711,7 @@ async function saveEditExam() {
         <i class="pi pi-plus custom-modal-icon"></i>
         <h3>Tạo Bài Kiểm Tra Mới</h3>
       </div>
-      <div class="custom-modal-body modal-scrollable">
+      <div class="custom-modal-body modal-scrollable" ref="createExamModalBody">
         <form @submit.prevent="createExam" class="frm-col">
           <input v-model="examForm.title" class="inp" placeholder="Tên bài kiểm tra..." required />
           <div style="display:flex;gap:1rem;align-items:center">
@@ -709,7 +721,9 @@ async function saveEditExam() {
 
           <!-- BỘ TẠO CÂU HỎI TRẮC NGHIỆM TƯƠNG TÁC -->
           <div class="question-builder-box">
-            <div class="qb-header">Soạn câu hỏi trắc nghiệm</div>
+            <div class="qb-header">
+              {{ editingQuestionIndex === null ? 'Soạn câu hỏi trắc nghiệm mới' : 'Chỉnh sửa câu hỏi trắc nghiệm' }}
+            </div>
             
             <div class="frm-col-nested">
               <textarea v-model="newQuestionText" class="inp" style="min-height:60px" placeholder="Nhập câu hỏi..."></textarea>
@@ -949,7 +963,7 @@ async function saveEditExam() {
         <i class="pi pi-pencil custom-modal-icon"></i>
         <h3>Chỉnh Sửa Bài Kiểm Tra</h3>
       </div>
-      <div class="custom-modal-body modal-scrollable">
+      <div class="custom-modal-body modal-scrollable" ref="editExamModalBody">
         <form @submit.prevent="saveEditExam" class="frm-col">
           <input v-model="editExamForm.title" class="inp" placeholder="Tên bài kiểm tra..." required />
           <div style="display:flex;gap:1rem;align-items:center">
@@ -959,7 +973,9 @@ async function saveEditExam() {
 
           <!-- Bộ soạn câu hỏi trong Edit modal -->
           <div class="question-builder-box">
-            <div class="qb-header">Soạn câu hỏi trắc nghiệm mới</div>
+            <div class="qb-header">
+              {{ editingQuestionIndexInEdit === null ? 'Soạn câu hỏi trắc nghiệm mới' : 'Chỉnh sửa câu hỏi trắc nghiệm' }}
+            </div>
             <div class="frm-col-nested">
               <textarea v-model="editNewQuestionText" class="inp" style="min-height:60px" placeholder="Nhập câu hỏi..."></textarea>
               <div class="options-grid">
