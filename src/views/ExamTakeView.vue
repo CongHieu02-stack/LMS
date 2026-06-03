@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiGet, apiPost } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 // Lấy danh sách bài thi
 const availableExams = ref<any[]>([])
@@ -17,9 +19,15 @@ const cheatWarnings = ref(0)
 const finalScore = ref<number | null>(null)
 const timeLeft = ref(0)
 let timerInterval: any = null
+const showCheatOverlay = ref(false)
 
 const questions = ref<any[]>([])
 const answers = ref<Record<number, number>>({})
+
+// Watch answers to auto-save state
+watch(answers, () => {
+  saveExamStateToStorage()
+}, { deep: true })
 
 // Modal & Submission Confirmation State
 const showConfirmModal = ref(false)
@@ -68,7 +76,75 @@ async function loadExams() {
   loading.value = false
 }
 
-onMounted(loadExams)
+// Storage Key
+const storageKey = computed(() => {
+  const studentId = authStore.profile?.id || 'guest'
+  return `lms_active_exam_${studentId}`
+})
+
+// Save exam state to storage
+function saveExamStateToStorage() {
+  if (!selectedExam.value || isExamFinished.value) return
+  const state = {
+    selectedExam: selectedExam.value,
+    questions: questions.value,
+    answers: answers.value,
+    timeLeft: timeLeft.value,
+    cheatWarnings: cheatWarnings.value,
+    isExamStarted: isExamStarted.value,
+    showCheatOverlay: showCheatOverlay.value
+  }
+  localStorage.setItem(storageKey.value, JSON.stringify(state))
+}
+
+// Clear exam state from storage
+function clearExamStateFromStorage() {
+  localStorage.removeItem(storageKey.value)
+}
+
+// Load exam state from storage
+function loadExamStateFromStorage() {
+  const saved = localStorage.getItem(storageKey.value)
+  if (saved) {
+    try {
+      const state = JSON.parse(saved)
+      selectedExam.value = state.selectedExam
+      questions.value = state.questions || []
+      answers.value = state.answers || {}
+      timeLeft.value = state.timeLeft || 0
+      cheatWarnings.value = state.cheatWarnings || 0
+      isExamStarted.value = state.isExamStarted || false
+      showCheatOverlay.value = state.showCheatOverlay || false
+      
+      if (isExamStarted.value) {
+        // Gắn lại event listeners
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        document.addEventListener('fullscreenchange', handleFullscreenChange)
+        window.addEventListener('blur', handleWindowBlur)
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        
+        // Khởi chạy đồng hồ
+        if (timerInterval) clearInterval(timerInterval)
+        timerInterval = setInterval(() => {
+          if (timeLeft.value > 0) {
+            timeLeft.value--
+            saveExamStateToStorage()
+          } else {
+            alert('Hết thời gian làm bài! Hệ thống tự động thu bài.')
+            submitExam(false)
+          }
+        }, 1000)
+      }
+    } catch (e) {
+      console.error('Failed to parse saved exam state:', e)
+    }
+  }
+}
+
+onMounted(async () => {
+  await loadExams()
+  loadExamStateFromStorage()
+})
 
 function selectExamToStart(exam: any) {
   selectedExam.value = exam
@@ -83,29 +159,44 @@ function selectExamToStart(exam: any) {
 // ==========================================
 // ANTI-CHEAT LOGIC
 // ==========================================
-function handleVisibilityChange() {
-  if (isExamStarted.value && !isExamFinished.value && document.visibilityState === 'hidden') {
-    cheatWarnings.value++
-    if (cheatWarnings.value >= 2) {
-      alert('PHÁT HIỆN GIAN LẬN: Bạn đã thoát khỏi màn hình làm bài quá 2 lần. Bài thi sẽ tự động thu lại!')
-      submitExam(true)
-    } else {
-      alert(`CẢNH BÁO LẦN 1: Bạn vừa Alt+Tab hoặc rời khỏi màn hình làm bài. 
-Nghiêm cấm thoát màn hình khi đang thi. Nếu tái phạm, bài thi sẽ bị thu ngay lập tức!`)
-    }
+function triggerCheatViolation() {
+  if (isExamFinished.value || !isExamStarted.value) return
+  if (showCheatOverlay.value) return // Tránh cộng dồn cảnh báo khi đang hiện overlay
+
+  cheatWarnings.value++
+  saveExamStateToStorage()
+
+  if (cheatWarnings.value >= 2) {
+    showCheatOverlay.value = true
+    alert('PHÁT HIỆN GIAN LẬN: Bạn đã rời khỏi màn hình làm bài quá 2 lần. Hệ thống tự động thu bài thi!')
+    submitExam(true)
+  } else {
+    showCheatOverlay.value = true
   }
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    triggerCheatViolation()
+  }
+}
+
+function handleWindowBlur() {
+  triggerCheatViolation()
 }
 
 function handleFullscreenChange() {
   if (isExamStarted.value && !isExamFinished.value && !document.fullscreenElement) {
-    cheatWarnings.value++
-    if (cheatWarnings.value >= 2) {
-      alert('PHÁT HIỆN GIAN LẬN: Bạn đã thoát chế độ Toàn Màn Hình. Bài thi bị thu lại!')
-      submitExam(true)
-    } else {
-      alert('CẢNH BÁO: Bắt buộc phải làm bài ở chế độ Toàn Màn Hình. Vui lòng bật lại để tiếp tục!')
-      enterFullscreen()
+    if (!showCheatOverlay.value) {
+      triggerCheatViolation()
     }
+  }
+}
+
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+  if (isExamStarted.value && !isExamFinished.value) {
+    e.preventDefault()
+    e.returnValue = ''
   }
 }
 
@@ -126,6 +217,12 @@ async function exitFullscreen() {
   }
 }
 
+async function resumeExam() {
+  showCheatOverlay.value = false
+  saveExamStateToStorage()
+  await enterFullscreen()
+}
+
 // ==========================================
 // THAO TÁC THI
 // ==========================================
@@ -137,11 +234,17 @@ async function startExam() {
   // Gắn event listeners
   document.addEventListener('visibilitychange', handleVisibilityChange)
   document.addEventListener('fullscreenchange', handleFullscreenChange)
+  window.addEventListener('blur', handleWindowBlur)
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  saveExamStateToStorage()
 
   // Khởi chạy đồng hồ
+  if (timerInterval) clearInterval(timerInterval)
   timerInterval = setInterval(() => {
     if (timeLeft.value > 0) {
       timeLeft.value--
+      saveExamStateToStorage()
     } else {
       alert('Hết thời gian làm bài! Hệ thống tự động thu bài.')
       submitExam(false)
@@ -153,6 +256,11 @@ async function submitExam(isForced = false) {
   clearInterval(timerInterval)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  window.removeEventListener('blur', handleWindowBlur)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  
+  clearExamStateFromStorage()
+  showCheatOverlay.value = false
   
   const answersList = Object.keys(answers.value).map(qid => ({
     question_id: parseInt(qid),
@@ -180,9 +288,6 @@ async function submitExam(isForced = false) {
       await apiPost('/grades', {
         classId: selectedExam.value.class_id,
         examId: selectedExam.value.id,
-        // using a specific backend route or student passing logic is normally required
-        // Since we only have /grades which requires rank >= 50, we mock this score locally,
-        // In real LMS, `submitExam` backend will trigger grading and update `grades` table automatically
         score: score
       })
     } catch (e) {
@@ -338,6 +443,42 @@ onUnmounted(() => {
         <div class="modal-footer">
           <button class="btn-outline" @click="showConfirmModal = false">Làm tiếp</button>
           <button class="btn-submit confirm-btn" @click="confirmSubmit">Nộp bài</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- POPUP CẢNH BÁO GIAN LẬN (CHẶN MÀN HÌNH THI) -->
+  <Transition name="fade">
+    <div v-if="showCheatOverlay" class="modal-overlay">
+      <div class="modal-card" style="border-color: #ef4444;">
+        <div class="modal-header" style="border-bottom: 1px solid #fee2e2;">
+          <i class="pi pi-exclamation-triangle modal-icon" style="color: #ef4444;"></i>
+          <h3 style="color: #ef4444;">CẢNH BÁO GIAN LẬN</h3>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem 2rem;">
+          <p class="font-semibold text-gray-900" style="font-size: 1.05rem; margin-bottom: 1rem;">
+            Bạn vừa rời khỏi vùng làm bài (Alt+Tab, chuyển tab hoặc click ra ngoài cửa sổ).
+          </p>
+          <div class="warning-text mb-4" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;">
+            <i class="pi pi-ban"></i> Số lần vi phạm hiện tại: <strong>{{ cheatWarnings }} / 2</strong>
+          </div>
+          <p class="text-sm text-gray-500">
+            Chú ý: Quy chế phòng thi nghiêm cấm rời khỏi màn hình thi. Nếu vi phạm đủ 2 lần, bài làm sẽ bị hệ thống **tự động nộp** và kết thúc ngay lập tức.
+          </p>
+        </div>
+        <div class="modal-footer" style="background: #fef2f2; border-top: 1px solid #fecaca;">
+          <button 
+            v-if="cheatWarnings < 2"
+            class="btn-submit w-full" 
+            style="background: #dc2626; border-color: #dc2626; width: 100%;" 
+            @click="resumeExam"
+          >
+            <i class="pi pi-play"></i> Tôi đã hiểu & Tiếp tục làm bài
+          </button>
+          <div v-else class="text-center w-full font-bold" style="color: #dc2626; width: 100%; text-align: center;">
+            Hệ thống đang tự động thu bài...
+          </div>
         </div>
       </div>
     </div>
