@@ -28,7 +28,8 @@ export function formatClass(raw) {
       id: raw.subject.id,
       code: raw.subject.code,
       name: raw.subject.name,
-      credits: raw.subject.credits
+      credits: raw.subject.credits,
+      department: raw.subject.department
     } : null,
     instructor: raw.instructor ? {
       id: raw.instructor.id,

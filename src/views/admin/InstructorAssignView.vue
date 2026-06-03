@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { apiGet, apiPut } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
+const authStore = useAuthStore()
 const classes = ref<any[]>([])
 const instructors = ref<any[]>([])
 const loading = ref(true)
@@ -17,8 +19,17 @@ async function loadData() {
       apiGet<{ success: boolean; data: any[] }>('/profiles')
     ])
     const cd = cRes.data || cRes
-    classes.value = Array.isArray(cd) ? cd : []
-    instructors.value = (pRes.data || []).filter((p: any) => p.role === 'GIANG_VIEN')
+    const cdList = Array.isArray(cd) ? cd : []
+    const allInstructors = pRes.data || []
+
+    if (authStore.profile?.role === 'TRUONG_BO_MON' && authStore.profile?.department) {
+      const userDept = authStore.profile.department
+      classes.value = cdList.filter((c: any) => c.subject?.department === userDept)
+      instructors.value = allInstructors.filter((p: any) => p.role === 'GIANG_VIEN')
+    } else {
+      classes.value = cdList
+      instructors.value = allInstructors.filter((p: any) => p.role === 'GIANG_VIEN')
+    }
   } catch {}
   loading.value = false
 }
@@ -41,18 +52,55 @@ async function handleAssign(classId: string) {
   <div class="w">
     <div class="hdr"><div class="bc">Quản lý Lớp học / <span>Phân công GV</span></div>
       <h1 class="tt">Phân Công Giảng Viên</h1>
-      <div class="st">Trưởng bộ môn phân công giảng viên vào các lớp học.</div></div>
+      <div class="st">
+        <span v-if="authStore.profile?.role === 'TRUONG_BO_MON' && authStore.profile?.department">
+          Trưởng bộ môn quản lý và phân công giảng viên vào các lớp học thuộc <strong>{{ authStore.profile.department }}</strong>.
+        </span>
+        <span v-else>
+          Trưởng bộ môn phân công giảng viên vào các lớp học.
+        </span>
+      </div></div>
     <div v-if="msg" class="al"><i class="pi pi-info-circle"></i> {{ msg }}</div>
     <div v-if="loading" class="ld"><i class="pi pi-spin pi-spinner"></i></div>
     <div v-else-if="classes.length===0" class="emp"><i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af"></i><h3>Chưa có lớp nào</h3></div>
     <div v-else class="tc">
-      <table class="mt"><thead><tr><th>Lớp</th><th>Môn</th><th>GV hiện tại</th><th>Gán GV</th><th></th></tr></thead>
-        <tbody><tr v-for="c in classes" :key="c.id">
-          <td class="fw">{{ c.name }}</td><td>{{ c.subject?.name || '' }}</td>
-          <td>{{ c.instructor?.fullName || c.instructor?.full_name || '—' }}</td>
-          <td><select v-model="selectedInstructor[c.id]" class="si"><option value="">-- Chọn --</option><option v-for="i in instructors" :key="i.id" :value="i.id">{{ i.fullName }}</option></select></td>
-          <td><button class="btn" @click="handleAssign(c.id)" :disabled="!selectedInstructor[c.id] || saving===c.id"><i v-if="saving===c.id" class="pi pi-spin pi-spinner"></i><i v-else class="pi pi-user-plus"></i> Gán</button></td>
-        </tr></tbody></table></div>
+      <table class="mt">
+        <thead>
+          <tr>
+            <th>Lớp</th>
+            <th>Môn</th>
+            <th>Khoa</th>
+            <th>GV hiện tại</th>
+            <th>Gán GV</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in classes" :key="c.id">
+            <td class="fw">{{ c.name }}</td>
+            <td>{{ c.subject?.name || '' }}</td>
+            <td>
+              <span class="dep-badge">{{ c.subject?.department || '—' }}</span>
+            </td>
+            <td>{{ c.instructor?.fullName || c.instructor?.full_name || '—' }}</td>
+            <td>
+              <select v-model="selectedInstructor[c.id]" class="si">
+                <option value="">-- Chọn --</option>
+                <option v-for="i in instructors" :key="i.id" :value="i.id">
+                  {{ i.fullName || i.full_name }}
+                </option>
+              </select>
+            </td>
+            <td>
+              <button class="btn" @click="handleAssign(c.id)" :disabled="!selectedInstructor[c.id] || saving===c.id">
+                <i v-if="saving===c.id" class="pi pi-spin pi-spinner"></i>
+                <i v-else class="pi pi-user-plus"></i> Gán
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -74,5 +122,6 @@ async function handleAssign(classId: string) {
 .si{padding:.4rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;min-width:180px}
 .btn{padding:.4rem .75rem;background:#111827;color:#fff;border:none;border-radius:6px;font-size:.8rem;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:.3rem}
 .btn:hover:not(:disabled){background:#374151} .btn:disabled{opacity:.5;cursor:not-allowed}
+.dep-badge { font-size: 0.72rem; font-weight: 600; color: #7c3aed; background-color: #f5f3ff; padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-block; }
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>

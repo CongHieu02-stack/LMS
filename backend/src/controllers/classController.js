@@ -6,6 +6,7 @@
 
 import * as classModel from '../models/classModel.js'
 import * as classView from '../views/classView.js'
+import * as profileModel from '../models/profileModel.js'
 
 /**
  * GET /api/classes — Lấy danh sách tất cả lớp học đang hoạt động.
@@ -115,6 +116,35 @@ export async function assignInstructor(req, res) {
     if (!instructorId) {
       return res.status(400).json({ error: 'Thiếu instructorId.' })
     }
+
+    // 1. Lấy thông tin lớp học để kiểm tra khoa
+    const classData = await classModel.findById(req.params.id)
+    if (!classData) {
+      return res.status(404).json({ error: 'Không tìm thấy lớp học.' })
+    }
+
+    // 2. Lấy thông tin giảng viên để kiểm tra khoa
+    const instructorData = await profileModel.findById(instructorId)
+    if (!instructorData) {
+      return res.status(404).json({ error: 'Không tìm thấy giảng viên.' })
+    }
+
+    // 3. Ràng buộc khoa cho Trưởng bộ môn (rank === 60 hoặc role === 'TRUONG_BO_MON')
+    if (req.profile.role === 'TRUONG_BO_MON') {
+      const userDept = req.profile.department
+      const classDept = classData.subject?.department
+
+      if (!userDept) {
+        return res.status(403).json({ error: 'Tài khoản Trưởng bộ môn chưa được gán khoa phụ trách.' })
+      }
+
+      if (classDept !== userDept) {
+        return res.status(403).json({
+          error: `Bạn chỉ có quyền phân công giảng viên cho các lớp thuộc ${userDept}.`
+        })
+      }
+    }
+
     const updated = await classModel.assignInstructor(req.params.id, instructorId)
     return res.json({ success: true, message: 'Phân công giảng viên thành công.', data: updated })
   } catch (err) {
