@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
 import html2pdf from 'html2pdf.js'
@@ -17,6 +18,92 @@ const msg = ref<string | null>(null)
 const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
 const examForm = ref({ title: '', durationMinutes: 60 })
 
+// Modal state variables
+const showCreateLessonModal = ref(false)
+const showCreateExamModal = ref(false)
+const showDetailLessonModal = ref(false)
+const showDetailExamModal = ref(false)
+const selectedLessonDetail = ref<any>(null)
+const selectedExamDetail = ref<any>(null)
+
+function viewLessonDetail(lesson: any) {
+  selectedLessonDetail.value = lesson
+  showDetailLessonModal.value = true
+}
+
+function viewExamDetail(exam: any) {
+  selectedExamDetail.value = exam
+  showDetailExamModal.value = true
+}
+
+// Notification & Confirmation Modal States
+const showNotificationModal = ref(false)
+const notificationType = ref<'success' | 'error' | 'warning'>('success')
+const notificationTitle = ref('')
+const notificationMsg = ref('')
+let notificationTimeoutId: any = null
+
+function showToast(type: 'success' | 'error' | 'warning', title: string, message: string) {
+  notificationType.value = type
+  notificationTitle.value = title
+  notificationMsg.value = message
+  showNotificationModal.value = true
+
+  if (notificationTimeoutId) {
+    clearTimeout(notificationTimeoutId)
+  }
+
+  notificationTimeoutId = setTimeout(() => {
+    showNotificationModal.value = false
+  }, 3000)
+}
+
+// Delete Confirmation Modal States
+const showConfirmDeleteModal = ref(false)
+const deleteTargetType = ref<'lesson' | 'exam' | null>(null)
+const deleteTargetId = ref<string | null>(null)
+const confirmTitle = ref('')
+const confirmMsg = ref('')
+
+function triggerDeleteConfirm(type: 'lesson' | 'exam', id: string, title: string) {
+  deleteTargetType.value = type
+  deleteTargetId.value = id
+  confirmTitle.value = 'Xác nhận xóa'
+  confirmMsg.value = `Bạn có chắc chắn muốn xóa ${type === 'lesson' ? 'bài giảng' : 'bài kiểm tra'}: "${title}" không? Hành động này không thể hoàn tác.`
+  showConfirmDeleteModal.value = true
+}
+
+async function executeDelete() {
+  if (!deleteTargetType.value || !deleteTargetId.value) return
+  showConfirmDeleteModal.value = false
+  try {
+    if (deleteTargetType.value === 'lesson') {
+      await apiDelete(`/lessons/${deleteTargetId.value}`)
+      showToast('success', 'Thành công', 'Đã xóa bài giảng thành công!')
+    } else {
+      await apiDelete(`/exam-manage/${deleteTargetId.value}`)
+      showToast('success', 'Thành công', 'Đã xóa bài kiểm tra thành công!')
+    }
+    loadClassContent()
+  } catch (err: any) {
+    showToast('error', 'Lỗi', err.message || 'Có lỗi xảy ra khi xóa.')
+  } finally {
+    deleteTargetType.value = null
+    deleteTargetId.value = null
+  }
+}
+
+// Active tab state driven by route path
+const route = useRoute()
+const activeTab = ref<'lessons' | 'exams'>(route.path === '/exams' ? 'exams' : 'lessons')
+
+watch(
+  () => route.path,
+  (newPath) => {
+    activeTab.value = newPath === '/exams' ? 'exams' : 'lessons'
+  }
+)
+
 // Multiple Choice Question Builder State
 const questions = ref<any[]>([])
 const newQuestionText = ref('')
@@ -25,14 +112,15 @@ const newAnswer = ref(0) // 0 for A, 1 for B, 2 for C, 3 for D
 
 function addQuestion() {
   if (!newQuestionText.value.trim()) {
-    alert('Nội dung câu hỏi không được để trống!')
+    showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
     return
   }
   if (newOptions.value.some(o => !o.trim())) {
-    alert('Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
+    showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
     return
   }
   questions.value.push({
+    id: Date.now() + Math.floor(Math.random() * 1000),
     text: newQuestionText.value.trim(),
     options: [...newOptions.value],
     answer: newAnswer.value
@@ -54,6 +142,16 @@ function toggleLessonExpand(id: string) {
     expandedLessons.value = expandedLessons.value.filter(x => x !== id)
   } else {
     expandedLessons.value.push(id)
+  }
+}
+
+// Exam expanding
+const expandedExams = ref<string[]>([])
+function toggleExamExpand(id: string) {
+  if (expandedExams.value.includes(id)) {
+    expandedExams.value = expandedExams.value.filter(x => x !== id)
+  } else {
+    expandedExams.value.push(id)
   }
 }
 
@@ -112,7 +210,7 @@ function exportToPDF(lesson: any) {
   }).catch((err: any) => {
     console.error('PDF export error:', err)
     exportingPDF.value = null
-    alert('Có lỗi xảy ra khi xuất file PDF.')
+    showToast('error', 'Lỗi', 'Có lỗi xảy ra khi xuất file PDF.')
   })
 }
 
@@ -130,7 +228,7 @@ async function loadClasses() {
       selectedClass.value = classes.value[0].id
       await loadClassContent()
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error(err)
   }
   loading.value = false
@@ -138,7 +236,6 @@ async function loadClasses() {
 
 async function loadClassContent() {
   if (!selectedClass.value) return
-  msg.value = null
   try {
     const [lesRes, exRes] = await Promise.all([
       apiGet<{success: boolean; data: any[]}>(`/lessons/class/${selectedClass.value}`),
@@ -147,7 +244,7 @@ async function loadClassContent() {
     lessons.value = lesRes.data || []
     exams.value = exRes.data || []
   } catch (err: any) {
-    msg.value = err.message
+    showToast('error', 'Lỗi tải dữ liệu lớp học', err.message)
   }
 }
 
@@ -188,14 +285,15 @@ async function createLesson() {
       sortOrder: lessons.value.length + 2 
     }
     loadClassContent()
-    msg.value = 'Tạo bài học thành công'
-  } catch (err: any) { msg.value = err.message }
+    showCreateLessonModal.value = false
+    showToast('success', 'Thành công', 'Tạo bài học thành công!')
+  } catch (err: any) { showToast('error', 'Lỗi', err.message) }
 }
 
 async function createExam() {
   if (!selectedClass.value) return
   if (questions.value.length === 0) {
-    alert('Vui lòng thêm ít nhất 1 câu hỏi trắc nghiệm trước khi tạo bài kiểm tra!')
+    showToast('warning', 'Cảnh báo', 'Vui lòng thêm ít nhất 1 câu hỏi trắc nghiệm trước khi tạo bài kiểm tra!')
     return
   }
   try {
@@ -208,8 +306,9 @@ async function createExam() {
     examForm.value = { title: '', durationMinutes: 60 }
     questions.value = []
     loadClassContent()
-    msg.value = 'Tạo bài kiểm tra trắc nghiệm thành công'
-  } catch (err: any) { msg.value = err.message }
+    showCreateExamModal.value = false
+    showToast('success', 'Thành công', 'Tạo bài kiểm tra trắc nghiệm thành công!')
+  } catch (err: any) { showToast('error', 'Lỗi', err.message) }
 }
 
 async function toggleExamStatus(exam: any) {
@@ -217,35 +316,165 @@ async function toggleExamStatus(exam: any) {
     const newStatus = exam.status === 'published' ? 'draft' : 'published'
     await apiPut(`/exam-manage/${exam.id}`, { status: newStatus })
     loadClassContent()
-  } catch (err: any) { msg.value = err.message }
+    showToast('success', 'Thành công', newStatus === 'published' ? 'Đã phát hành bài kiểm tra!' : 'Đã ẩn bài kiểm tra!')
+  } catch (err: any) { showToast('error', 'Lỗi', err.message) }
 }
 
-async function deleteLesson(id: string) {
-  if(!confirm('Xóa bài học này?')) return
-  try {
-    await apiDelete(`/lessons/${id}`)
-    loadClassContent()
-  } catch (err: any) { msg.value = err.message }
+function deleteLesson(lesson: any) {
+  triggerDeleteConfirm('lesson', lesson.id, lesson.title)
 }
 
-async function deleteExam(id: string) {
-  if(!confirm('Xóa bài thi này?')) return
+function deleteExam(exam: any) {
+  triggerDeleteConfirm('exam', exam.id, exam.title)
+}
+
+// ─── CHỈNH SỬA BÀI GIẢNG ───
+const showEditLessonModal = ref(false)
+const editingLessonId = ref<string | null>(null)
+const editLessonForm = ref({
+  title: '',
+  type: 'video',
+  youtubeUrl: '',
+  docContent: '',
+  description: '',
+  sortOrder: 1
+})
+
+function startEditLesson(lesson: any) {
+  editingLessonId.value = lesson.id
+  const content = parseLessonContent(lesson.content)
+  editLessonForm.value = {
+    title: lesson.title,
+    type: content.type,
+    youtubeUrl: content.type === 'video' && content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
+    docContent: content.type === 'doc' ? content.docContent : '',
+    description: content.description || '',
+    sortOrder: lesson.sort_order || lesson.sortOrder || 1
+  }
+  showEditLessonModal.value = true
+}
+
+async function saveEditLesson() {
+  if (!editingLessonId.value) return
   try {
-    await apiDelete(`/exam-manage/${id}`)
+    let contentPayload = ''
+    if (editLessonForm.value.type === 'video') {
+      const ytId = getYouTubeId(editLessonForm.value.youtubeUrl)
+      contentPayload = JSON.stringify({
+        type: 'video',
+        youtubeId: ytId,
+        description: editLessonForm.value.description
+      })
+    } else {
+      contentPayload = JSON.stringify({
+        type: 'doc',
+        docContent: editLessonForm.value.docContent,
+        description: editLessonForm.value.description
+      })
+    }
+
+    await apiPut(`/lessons/${editingLessonId.value}`, {
+      title: editLessonForm.value.title,
+      content: contentPayload,
+      sort_order: editLessonForm.value.sortOrder
+    })
+
+    showEditLessonModal.value = false
+    editingLessonId.value = null
     loadClassContent()
-  } catch (err: any) { msg.value = err.message }
+    showToast('success', 'Thành công', 'Cập nhật bài giảng thành công!')
+  } catch (err: any) {
+    showToast('error', 'Lỗi', err.message)
+  }
+}
+
+// ─── CHỈNH SỬA BÀI KIỂM TRA ───
+const showEditExamModal = ref(false)
+const editingExamId = ref<string | null>(null)
+const editExamForm = ref({
+  title: '',
+  durationMinutes: 60
+})
+const editExamQuestions = ref<any[]>([])
+
+// Form thêm câu hỏi trong modal sửa
+const editNewQuestionText = ref('')
+const editNewOptions = ref(['', '', '', ''])
+const editNewAnswer = ref(0)
+
+function startEditExam(exam: any) {
+  editingExamId.value = exam.id
+  editExamForm.value = {
+    title: exam.title,
+    durationMinutes: exam.duration_minutes || exam.durationMinutes || 60
+  }
+  // Deep copy questions
+  editExamQuestions.value = (exam.questions || []).map((q: any) => ({
+    id: q.id || Date.now() + Math.floor(Math.random() * 1000),
+    text: q.text,
+    options: [...q.options],
+    answer: q.answer
+  }))
+  showEditExamModal.value = true
+}
+
+function addQuestionToEditExam() {
+  if (!editNewQuestionText.value.trim()) {
+    showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
+    return
+  }
+  if (editNewOptions.value.some(o => !o.trim())) {
+    showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
+    return
+  }
+  editExamQuestions.value.push({
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    text: editNewQuestionText.value.trim(),
+    options: [...editNewOptions.value],
+    answer: editNewAnswer.value
+  })
+  // reset form
+  editNewQuestionText.value = ''
+  editNewOptions.value = ['', '', '', '']
+  editNewAnswer.value = 0
+}
+
+function removeQuestionFromEditExam(index: number) {
+  editExamQuestions.value.splice(index, 1)
+}
+
+async function saveEditExam() {
+  if (!editingExamId.value) return
+  if (editExamQuestions.value.length === 0) {
+    showToast('warning', 'Cảnh báo', 'Vui lòng thêm ít nhất 1 câu hỏi trắc nghiệm!')
+    return
+  }
+  try {
+    await apiPut(`/exam-manage/${editingExamId.value}`, {
+      title: editExamForm.value.title,
+      duration_minutes: editExamForm.value.durationMinutes,
+      questions: editExamQuestions.value
+    })
+    showEditExamModal.value = false
+    editingExamId.value = null
+    loadClassContent()
+    showToast('success', 'Thành công', 'Cập nhật bài kiểm tra thành công!')
+  } catch (err: any) {
+    showToast('error', 'Lỗi', err.message)
+  }
 }
 </script>
 
 <template>
   <div class="w">
     <div class="hdr">
-      <div class="bc">Đào tạo & Khảo thí / <span>Soạn Bài & Thi</span></div>
-      <h1 class="tt">Quản Lý Bài Học & Khảo Thí</h1>
-      <div class="st">Giảng viên tạo nội dung bài giảng và cấu hình bài kiểm tra cho lớp.</div>
+      <div class="bc">Đào tạo & Khảo thí / <span>{{ activeTab === 'lessons' ? 'Bài học' : 'Bài kiểm tra' }}</span></div>
+      <h1 class="tt">{{ activeTab === 'lessons' ? 'Quản Lý Bài Học' : 'Quản Lý Khảo Thí' }}</h1>
+      <div class="st">
+        {{ activeTab === 'lessons' ? 'Giảng viên tạo nội dung bài giảng cho lớp.' : 'Giảng viên cấu hình bài kiểm tra cho lớp.' }}
+      </div>
     </div>
 
-    <div v-if="msg" class="al"><i class="pi pi-info-circle"></i> {{ msg }}</div>
     <div v-if="loading" class="ld"><i class="pi pi-spin pi-spinner"></i></div>
     <div v-else-if="classes.length === 0" class="emp"><h3>Bạn chưa được phân công giảng dạy lớp nào.</h3></div>
     
@@ -257,50 +486,25 @@ async function deleteExam(id: string) {
         </select>
       </div>
 
-      <div class="split">
-        <!-- Bài học -->
-        <div class="flex-1">
+      <div class="tabs-container">
+        <!-- Tab 1: Bài học / Bài giảng -->
+        <div v-if="activeTab === 'lessons'" class="tab-pane">
           <div class="crd">
-            <div class="ch"><span>Bài giảng ({{ lessons.length }})</span></div>
+            <div class="ch">
+              <span>Bài giảng ({{ lessons.length }})</span>
+              <button @click="showCreateLessonModal = true" class="btn-create-header">
+                <i class="pi pi-plus"></i> Tạo bài giảng
+              </button>
+            </div>
             <div class="cb">
-              <!-- Form tạo bài giảng chuẩn Youtube Iframe -->
-              <form @submit.prevent="createLesson" class="frm-col mb-6">
-                <input v-model="lessonForm.title" class="inp" placeholder="Tên bài giảng mới (Ví dụ: Bài 1 - Nhập môn)..." required />
-                
-                <div class="type-selector mb-2">
-                  <label class="selector-label">Loại bài học:</label>
-                  <div class="radio-options">
-                    <label class="radio-option">
-                      <input type="radio" v-model="lessonForm.type" value="video" />
-                      <span><i class="pi pi-video"></i> Video YouTube</span>
-                    </label>
-                    <label class="radio-option">
-                      <input type="radio" v-model="lessonForm.type" value="doc" />
-                      <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div v-if="lessonForm.type === 'video'">
-                  <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
-                </div>
-                
-                <div v-else-if="lessonForm.type === 'doc'">
-                  <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
-                  <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
-                </div>
-
-                <textarea v-model="lessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt bài giảng / Ghi chú cho sinh viên..."></textarea>
-                
-                <button type="submit" class="btn"><i class="pi pi-plus"></i> Tạo bài giảng</button>
-              </form>
-
-              <!-- Danh sách bài giảng Accordion Premium -->
-              <div class="lst">
-                <div v-for="l in lessons" :key="l.id" class="lesson-card">
-                  <div class="lesson-card-header" @click="toggleLessonExpand(l.id)">
+              <!-- Danh sách bài giảng tĩnh -->
+              <div v-if="lessons.length === 0" class="empty-desc" style="text-align:center; padding: 2rem 0;">
+                Chưa có bài giảng nào trong lớp này. Hãy bấm "+ Tạo bài giảng" để bắt đầu.
+              </div>
+              <div v-else class="lst">
+                <div v-for="l in lessons" :key="l.id" class="lesson-card-static">
+                  <div class="lesson-card-header-static">
                     <div class="lesson-card-title">
-                      <i class="pi mr-2" :class="expandedLessons.includes(l.id) ? 'pi-chevron-down text-purple-600' : 'pi-chevron-right'"></i>
                       <span class="lesson-title-text">{{ l.title }}</span>
                       
                       <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
@@ -310,56 +514,10 @@ async function deleteExam(id: string) {
                         <i class="pi pi-file-pdf mr-1"></i>Tài liệu
                       </span>
                     </div>
-                    <button @click.stop="deleteLesson(l.id)" class="btn-del"><i class="pi pi-trash"></i></button>
-                  </div>
-
-                  <!-- Expanded Body -->
-                  <div v-if="expandedLessons.includes(l.id)" class="lesson-card-body">
-                    <!-- YouTube video iframe container -->
-                    <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).youtubeId" class="video-wrapper mb-3">
-                      <iframe 
-                        :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" 
-                        frameborder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowfullscreen>
-                      </iframe>
-                    </div>
-
-                    <!-- Document content area -->
-                    <div v-if="parseLessonContent(l.content).type === 'doc'" class="instructor-doc-wrapper">
-                      <div class="doc-actions mb-3">
-                        <button @click="exportToPDF(l)" class="btn-pdf-download" :disabled="exportingPDF === l.id">
-                          <i v-if="exportingPDF === l.id" class="pi pi-spin pi-spinner mr-1"></i>
-                          <i v-else class="pi pi-file-pdf mr-1"></i>
-                          Tải tài liệu PDF
-                        </button>
-                      </div>
-                      
-                      <!-- Vùng in PDF -->
-                      <div :id="'pdf-content-' + l.id" class="pdf-print-area">
-                        <div class="pdf-header-print">
-                          <div class="pdf-header-row">
-                            <span class="pdf-school">HỆ THỐNG QUẢN LÝ HỌC TẬP - LMS</span>
-                            <span class="pdf-class">Lớp: {{ currentClassObj?.name }}</span>
-                          </div>
-                          <div class="pdf-subject">Môn học: {{ currentClassObj?.subject?.name }} ({{ currentClassObj?.subject?.code }})</div>
-                          <hr class="pdf-divider" />
-                        </div>
-                        <h2 class="pdf-title">{{ l.title }}</h2>
-                        <div class="pdf-body-content" v-html="parseLessonContent(l.content).docContent"></div>
-                        <div v-if="parseLessonContent(l.content).description" class="pdf-desc-content">
-                          <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
-                          <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(l.content).description }}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Description for video lessons -->
-                    <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).description" class="lesson-description">
-                      {{ parseLessonContent(l.content).description }}
-                    </div>
-                    <div v-else-if="parseLessonContent(l.content).type === 'video' && !parseLessonContent(l.content).youtubeId" class="empty-desc">
-                      Không có nội dung bài giảng video bổ sung.
+                    <div class="lesson-actions">
+                      <button @click="viewLessonDetail(l)" class="btn-view-inline mr-2" title="Xem chi tiết"><i class="pi pi-eye"></i></button>
+                      <button @click="startEditLesson(l)" class="btn-edit-inline mr-2" title="Chỉnh sửa bài giảng"><i class="pi pi-pencil"></i></button>
+                      <button @click="deleteLesson(l)" class="btn-del" title="Xóa bài giảng"><i class="pi pi-trash"></i></button>
                     </div>
                   </div>
                 </div>
@@ -368,94 +526,47 @@ async function deleteExam(id: string) {
           </div>
         </div>
 
-        <!-- Bài kiểm tra -->
-        <div class="flex-1">
+        <!-- Tab 2: Bài kiểm tra -->
+        <div v-if="activeTab === 'exams'" class="tab-pane">
           <div class="crd">
-            <div class="ch"><span>Bài kiểm tra ({{ exams.length }})</span></div>
+            <div class="ch">
+              <span>Bài kiểm tra ({{ exams.length }})</span>
+              <button @click="showCreateExamModal = true" class="btn-create-header">
+                <i class="pi pi-plus"></i> Tạo bài kiểm tra
+              </button>
+            </div>
             <div class="cb">
-              <form @submit.prevent="createExam" class="frm-col">
-                <input v-model="examForm.title" class="inp" placeholder="Tên bài kiểm tra..." required />
-                <div style="display:flex;gap:1rem;align-items:center">
-                  <label>Thời gian (phút):</label>
-                  <input v-model="examForm.durationMinutes" type="number" class="inp" style="width:80px" required />
-                </div>
-
-                <!-- BỘ TẠO CÂU HỎI TRẮC NGHIỆM TƯƠNG TÁC -->
-                <div class="question-builder-box">
-                  <div class="qb-header">Soạn câu hỏi trắc nghiệm</div>
-                  
-                  <div class="frm-col-nested">
-                    <textarea v-model="newQuestionText" class="inp" style="min-height:60px" placeholder="Nhập câu hỏi..."></textarea>
-                    
-                    <div class="options-grid">
-                      <div class="opt-row">
-                        <span class="opt-lbl">A:</span>
-                        <input v-model="newOptions[0]" class="inp" placeholder="Lựa chọn A..." />
-                      </div>
-                      <div class="opt-row">
-                        <span class="opt-lbl">B:</span>
-                        <input v-model="newOptions[1]" class="inp" placeholder="Lựa chọn B..." />
-                      </div>
-                      <div class="opt-row">
-                        <span class="opt-lbl">C:</span>
-                        <input v-model="newOptions[2]" class="inp" placeholder="Lựa chọn C..." />
-                      </div>
-                      <div class="opt-row">
-                        <span class="opt-lbl">D:</span>
-                        <input v-model="newOptions[3]" class="inp" placeholder="Lựa chọn D..." />
-                      </div>
+              <!-- DANH SÁCH BÀI THI TĨNH -->
+              <div v-if="exams.length === 0" class="empty-desc" style="text-align:center; padding: 2rem 0;">
+                Chưa có bài kiểm tra nào trong lớp này. Hãy bấm "+ Tạo bài kiểm tra" để bắt đầu.
+              </div>
+              <div v-else class="lst">
+                <div v-for="e in exams" :key="e.id" class="exam-card-item-static">
+                  <div class="exam-card-header-static">
+                    <div class="exam-card-title">
+                      <span class="exam-title-text">{{ e.title }}</span>
+                      <span class="badge-duration ml-2">
+                        <i class="pi pi-clock mr-1"></i>{{ e.duration_minutes }} phút
+                      </span>
+                      <span class="badge-qcount ml-2">
+                        <i class="pi pi-list mr-1"></i>{{ e.questions?.length || 0 }} câu hỏi
+                      </span>
+                      <span class="bdg ml-2" :class="e.status === 'published' ? 'bg-green' : 'bg-gray'">
+                        {{ e.status === 'published' ? 'Đã phát hành' : 'Bản nháp' }}
+                      </span>
                     </div>
-
-                    <div class="ans-row">
-                      <div class="flex-align">
-                        <label class="mr-2">Đáp án đúng:</label>
-                        <select v-model="newAnswer" class="si-sm">
-                          <option :value="0">Đáp án A</option>
-                          <option :value="1">Đáp án B</option>
-                          <option :value="2">Đáp án C</option>
-                          <option :value="3">Đáp án D</option>
-                        </select>
-                      </div>
-                      <button type="button" @click="addQuestion" class="btn-add-q">
-                        <i class="pi pi-plus"></i> Thêm câu hỏi
+                    <div class="ex-acts">
+                      <button @click="toggleExamStatus(e)" class="btn-sm">
+                        {{ e.status === 'published' ? 'Ẩn' : 'Publish' }}
                       </button>
+                      <button @click="viewExamDetail(e)" class="btn-view-inline mx-2" title="Xem chi tiết">
+                        <i class="pi pi-eye"></i>
+                      </button>
+                      <button @click="startEditExam(e)" class="btn-edit-inline mr-2" title="Chỉnh sửa bài thi">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                      <button @click="deleteExam(e)" class="btn-del" title="Xóa bài thi"><i class="pi pi-trash"></i></button>
                     </div>
-                  </div>
-                </div>
-
-                <!-- DANH SÁCH CÂU HỎI ĐÃ SOẠN -->
-                <div v-if="questions.length > 0" class="added-questions-box">
-                  <div class="qb-header">Danh sách câu hỏi đã thêm ({{ questions.length }})</div>
-                  <div class="added-q-list">
-                    <div v-for="(q, idx) in questions" :key="idx" class="added-q-item">
-                      <div class="added-q-header">
-                        <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
-                        <button type="button" @click="removeQuestion(idx)" class="btn-del-q"><i class="pi pi-trash"></i></button>
-                      </div>
-                      <div class="added-q-opts">
-                        <div class="opt-text" :class="{ 'correct-opt': q.answer === 0 }">A. {{ q.options[0] }}</div>
-                        <div class="opt-text" :class="{ 'correct-opt': q.answer === 1 }">B. {{ q.options[1] }}</div>
-                        <div class="opt-text" :class="{ 'correct-opt': q.answer === 2 }">C. {{ q.options[2] }}</div>
-                        <div class="opt-text" :class="{ 'correct-opt': q.answer === 3 }">D. {{ q.options[3] }}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Nút Tạo bài kiểm tra tổng -->
-                <button type="submit" class="btn btn-block">
-                  <i class="pi pi-check"></i> Hoàn tất & Tạo bài kiểm tra
-                </button>
-              </form>
-              <div class="lst mt">
-                <div v-for="e in exams" :key="e.id" class="li-exam">
-                  <div class="ex-info">
-                    <strong>{{ e.title }}</strong> ({{ e.duration_minutes }}p)
-                    <span class="bdg" :class="e.status === 'published' ? 'bg-green' : 'bg-gray'">{{ e.status }}</span>
-                  </div>
-                  <div class="ex-acts">
-                    <button @click="toggleExamStatus(e)" class="btn-sm">{{ e.status === 'published' ? 'Ẩn' : 'Publish' }}</button>
-                    <button @click="deleteExam(e.id)" class="btn-del"><i class="pi pi-trash"></i></button>
                   </div>
                 </div>
               </div>
@@ -464,6 +575,398 @@ async function deleteExam(id: string) {
         </div>
       </div>
     </template>
+  </div>
+
+  <!-- Modal Tạo Bài Giảng -->
+  <div v-if="showCreateLessonModal" class="custom-modal-overlay">
+    <div class="custom-modal-card max-w-lg">
+      <div class="custom-modal-header">
+        <i class="pi pi-plus custom-modal-icon"></i>
+        <h3>Tạo Bài Giảng Mới</h3>
+      </div>
+      <div class="custom-modal-body">
+        <form @submit.prevent="createLesson" class="frm-col">
+          <input v-model="lessonForm.title" class="inp" placeholder="Tên bài giảng mới (Ví dụ: Bài 1 - Nhập môn)..." required />
+          
+          <div class="type-selector mb-2">
+            <label class="selector-label">Loại bài học:</label>
+            <div class="radio-options">
+              <label class="radio-option">
+                <input type="radio" v-model="lessonForm.type" value="video" />
+                <span><i class="pi pi-video"></i> Video YouTube</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" v-model="lessonForm.type" value="doc" />
+                <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
+              </label>
+            </div>
+          </div>
+
+          <div v-if="lessonForm.type === 'video'">
+            <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
+          </div>
+          
+          <div v-else-if="lessonForm.type === 'doc'">
+            <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
+            <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
+          </div>
+
+          <textarea v-model="lessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt bài giảng / Ghi chú cho sinh viên..."></textarea>
+          
+          <div class="custom-modal-footer mt-4">
+            <button type="button" class="btn-cancel" @click="showCreateLessonModal = false">Hủy bỏ</button>
+            <button type="submit" class="btn"><i class="pi pi-plus"></i> Tạo bài giảng</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Tạo Bài Kiểm Tra -->
+  <div v-if="showCreateExamModal" class="custom-modal-overlay">
+    <div class="custom-modal-card max-w-xl">
+      <div class="custom-modal-header">
+        <i class="pi pi-plus custom-modal-icon"></i>
+        <h3>Tạo Bài Kiểm Tra Mới</h3>
+      </div>
+      <div class="custom-modal-body modal-scrollable">
+        <form @submit.prevent="createExam" class="frm-col">
+          <input v-model="examForm.title" class="inp" placeholder="Tên bài kiểm tra..." required />
+          <div style="display:flex;gap:1rem;align-items:center">
+            <label>Thời gian (phút):</label>
+            <input v-model="examForm.durationMinutes" type="number" class="inp" style="width:80px" required />
+          </div>
+
+          <!-- BỘ TẠO CÂU HỎI TRẮC NGHIỆM TƯƠNG TÁC -->
+          <div class="question-builder-box">
+            <div class="qb-header">Soạn câu hỏi trắc nghiệm</div>
+            
+            <div class="frm-col-nested">
+              <textarea v-model="newQuestionText" class="inp" style="min-height:60px" placeholder="Nhập câu hỏi..."></textarea>
+              
+              <div class="options-grid">
+                <div class="opt-row">
+                  <span class="opt-lbl">A:</span>
+                  <input v-model="newOptions[0]" class="inp" placeholder="Lựa chọn A..." />
+                </div>
+                <div class="opt-row">
+                  <span class="opt-lbl">B:</span>
+                  <input v-model="newOptions[1]" class="inp" placeholder="Lựa chọn B..." />
+                </div>
+                <div class="opt-row">
+                  <span class="opt-lbl">C:</span>
+                  <input v-model="newOptions[2]" class="inp" placeholder="Lựa chọn C..." />
+                </div>
+                <div class="opt-row">
+                  <span class="opt-lbl">D:</span>
+                  <input v-model="newOptions[3]" class="inp" placeholder="Lựa chọn D..." />
+                </div>
+              </div>
+
+              <div class="ans-row">
+                <div class="flex-align">
+                  <label class="mr-2">Đáp án đúng:</label>
+                  <select v-model="newAnswer" class="si-sm">
+                    <option :value="0">Đáp án A</option>
+                    <option :value="1">Đáp án B</option>
+                    <option :value="2">Đáp án C</option>
+                    <option :value="3">Đáp án D</option>
+                  </select>
+                </div>
+                <button type="button" @click="addQuestion" class="btn-add-q">
+                  <i class="pi pi-plus"></i> Thêm câu hỏi
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- DANH SÁCH CÂU HỎI ĐÃ SOẠN -->
+          <div v-if="questions.length > 0" class="added-questions-box">
+            <div class="qb-header">Danh sách câu hỏi đã thêm ({{ questions.length }})</div>
+            <div class="added-q-list">
+              <div v-for="(q, idx) in questions" :key="idx" class="added-q-item">
+                <div class="added-q-header">
+                  <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
+                  <button type="button" @click="removeQuestion(idx)" class="btn-del-q"><i class="pi pi-trash"></i></button>
+                </div>
+                <div class="added-q-opts">
+                  <div class="opt-text" :class="{ 'correct-opt': q.answer === 0 }">A. {{ q.options[0] }}</div>
+                  <div class="opt-text" :class="{ 'correct-opt': q.answer === 1 }">B. {{ q.options[1] }}</div>
+                  <div class="opt-text" :class="{ 'correct-opt': q.answer === 2 }">C. {{ q.options[2] }}</div>
+                  <div class="opt-text" :class="{ 'correct-opt': q.answer === 3 }">D. {{ q.options[3] }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="custom-modal-footer mt-4">
+            <button type="button" class="btn-cancel" @click="showCreateExamModal = false">Hủy bỏ</button>
+            <button type="submit" class="btn"><i class="pi pi-check"></i> Hoàn tất & Tạo</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Chi Tiết Bài Giảng -->
+  <div v-if="showDetailLessonModal && selectedLessonDetail" class="custom-modal-overlay">
+    <div class="custom-modal-card max-w-xl">
+      <div class="custom-modal-header">
+        <i class="pi pi-info-circle custom-modal-icon"></i>
+        <h3>Chi Tiết Bài Giảng: {{ selectedLessonDetail.title }}</h3>
+      </div>
+      <div class="custom-modal-body modal-scrollable">
+        <!-- YouTube video iframe container -->
+        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && parseLessonContent(selectedLessonDetail.content).youtubeId" class="video-wrapper mb-3">
+          <iframe 
+            :src="'https://www.youtube.com/embed/' + parseLessonContent(selectedLessonDetail.content).youtubeId" 
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowfullscreen>
+          </iframe>
+        </div>
+
+        <!-- Document content area -->
+        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'doc'" class="instructor-doc-wrapper">
+          <div class="doc-actions mb-3">
+            <button @click="exportToPDF(selectedLessonDetail)" class="btn-pdf-download" :disabled="exportingPDF === selectedLessonDetail.id">
+              <i v-if="exportingPDF === selectedLessonDetail.id" class="pi pi-spin pi-spinner mr-1"></i>
+              <i v-else class="pi pi-file-pdf mr-1"></i>
+              Tải tài liệu PDF
+            </button>
+          </div>
+          
+          <!-- Vùng in PDF -->
+          <div :id="'pdf-content-' + selectedLessonDetail.id" class="pdf-print-area">
+            <div class="pdf-header-print">
+              <div class="pdf-header-row">
+                <span class="pdf-school">HỆ THỐNG QUẢN LÝ HỌC TẬP - LMS</span>
+                <span class="pdf-class">Lớp: {{ currentClassObj?.name }}</span>
+              </div>
+              <div class="pdf-subject">Môn học: {{ currentClassObj?.subject?.name }} ({{ currentClassObj?.subject?.code }})</div>
+              <hr class="pdf-divider" />
+            </div>
+            <h2 class="pdf-title">{{ selectedLessonDetail.title }}</h2>
+            <div class="pdf-body-content" v-html="parseLessonContent(selectedLessonDetail.content).docContent"></div>
+            <div v-if="parseLessonContent(selectedLessonDetail.content).description" class="pdf-desc-content">
+              <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
+              <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(selectedLessonDetail.content).description }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description for video lessons -->
+        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3">
+          <strong style="color: #374151; font-size: 0.9rem;">Mô tả:</strong>
+          <p style="margin-top: 0.25rem; white-space: pre-wrap;">{{ parseLessonContent(selectedLessonDetail.content).description }}</p>
+        </div>
+        <div v-else-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && !parseLessonContent(selectedLessonDetail.content).youtubeId" class="empty-desc">
+          Không có nội dung bài giảng video bổ sung.
+        </div>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn-cancel" @click="showDetailLessonModal = false">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Chi Tiết Bài Kiểm Tra -->
+  <div v-if="showDetailExamModal && selectedExamDetail" class="custom-modal-overlay">
+    <div class="custom-modal-card max-w-xl">
+      <div class="custom-modal-header">
+        <i class="pi pi-info-circle custom-modal-icon"></i>
+        <h3>Chi Tiết Bài Kiểm Tra: {{ selectedExamDetail.title }}</h3>
+      </div>
+      <div class="custom-modal-body modal-scrollable">
+        <div style="margin-bottom: 1rem; display: flex; gap: 1.5rem;">
+          <div><strong>Thời gian làm bài:</strong> {{ selectedExamDetail.duration_minutes || selectedExamDetail.durationMinutes }} phút</div>
+          <div><strong>Số câu hỏi:</strong> {{ selectedExamDetail.questions?.length || 0 }} câu</div>
+          <div>
+            <strong>Trạng thái: </strong>
+            <span class="bdg" :class="selectedExamDetail.status === 'published' ? 'bg-green' : 'bg-gray'">
+              {{ selectedExamDetail.status === 'published' ? 'Đã phát hành' : 'Bản nháp' }}
+            </span>
+          </div>
+        </div>
+
+        <div v-if="!selectedExamDetail.questions || selectedExamDetail.questions.length === 0" class="empty-questions">
+          Bài thi chưa có câu hỏi nào.
+        </div>
+        <div v-else class="preview-q-list">
+          <div v-for="(q, idx) in selectedExamDetail.questions" :key="idx" class="preview-q-item">
+            <div class="preview-q-text">
+              <strong>Câu {{ Number(idx) + 1 }}:</strong> {{ q.text }}
+            </div>
+            <div class="preview-q-opts">
+              <div 
+                v-for="(opt, oIdx) in q.options" 
+                :key="oIdx" 
+                class="preview-opt-text"
+                :class="{ 'correct-opt': Number(q.answer) === Number(oIdx) }"
+              >
+                {{ String.fromCharCode(65 + Number(oIdx)) }}. {{ opt }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn-cancel" @click="showDetailExamModal = false">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Sửa Bài Giảng -->
+  <div v-if="showEditLessonModal" class="custom-modal-overlay">
+    <div class="custom-modal-card max-w-lg">
+      <div class="custom-modal-header">
+        <i class="pi pi-pencil custom-modal-icon"></i>
+        <h3>Chỉnh Sửa Bài Giảng</h3>
+      </div>
+      <div class="custom-modal-body">
+        <form @submit.prevent="saveEditLesson" class="frm-col">
+          <input v-model="editLessonForm.title" class="inp" placeholder="Tên bài giảng..." required />
+          
+          <div class="type-selector mb-2">
+            <label class="selector-label">Loại bài học:</label>
+            <div class="radio-options">
+              <label class="radio-option">
+                <input type="radio" v-model="editLessonForm.type" value="video" />
+                <span><i class="pi pi-video"></i> Video YouTube</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" v-model="editLessonForm.type" value="doc" />
+                <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
+              </label>
+            </div>
+          </div>
+
+          <div v-if="editLessonForm.type === 'video'">
+            <input v-model="editLessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube..." />
+          </div>
+          
+          <div v-else-if="editLessonForm.type === 'doc'">
+            <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
+          </div>
+
+          <textarea v-model="editLessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt..."></textarea>
+          
+          <div style="display:flex; gap:1rem; align-items:center">
+            <label>Thứ tự sắp xếp:</label>
+            <input v-model="editLessonForm.sortOrder" type="number" class="inp" style="width:80px" required />
+          </div>
+
+          <div class="custom-modal-footer mt-4">
+            <button type="button" class="btn-cancel" @click="showEditLessonModal = false">Hủy bỏ</button>
+            <button type="submit" class="btn">Lưu thay đổi</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Sửa Bài Kiểm Tra -->
+  <div v-if="showEditExamModal" class="custom-modal-overlay">
+    <div class="custom-modal-card max-w-xl">
+      <div class="custom-modal-header">
+        <i class="pi pi-pencil custom-modal-icon"></i>
+        <h3>Chỉnh Sửa Bài Kiểm Tra</h3>
+      </div>
+      <div class="custom-modal-body modal-scrollable">
+        <form @submit.prevent="saveEditExam" class="frm-col">
+          <input v-model="editExamForm.title" class="inp" placeholder="Tên bài kiểm tra..." required />
+          <div style="display:flex;gap:1rem;align-items:center">
+            <label>Thời gian (phút):</label>
+            <input v-model="editExamForm.durationMinutes" type="number" class="inp" style="width:80px" required />
+          </div>
+
+          <!-- Bộ soạn câu hỏi trong Edit modal -->
+          <div class="question-builder-box">
+            <div class="qb-header">Soạn câu hỏi trắc nghiệm mới</div>
+            <div class="frm-col-nested">
+              <textarea v-model="editNewQuestionText" class="inp" style="min-height:60px" placeholder="Nhập câu hỏi..."></textarea>
+              <div class="options-grid">
+                <div class="opt-row"><span class="opt-lbl">A:</span><input v-model="editNewOptions[0]" class="inp" placeholder="Lựa chọn A..." /></div>
+                <div class="opt-row"><span class="opt-lbl">B:</span><input v-model="editNewOptions[1]" class="inp" placeholder="Lựa chọn B..." /></div>
+                <div class="opt-row"><span class="opt-lbl">C:</span><input v-model="editNewOptions[2]" class="inp" placeholder="Lựa chọn C..." /></div>
+                <div class="opt-row"><span class="opt-lbl">D:</span><input v-model="editNewOptions[3]" class="inp" placeholder="Lựa chọn D..." /></div>
+              </div>
+              <div class="ans-row">
+                <div class="flex-align">
+                  <label class="mr-2">Đáp án đúng:</label>
+                  <select v-model="editNewAnswer" class="si-sm">
+                    <option :value="0">Đáp án A</option>
+                    <option :value="1">Đáp án B</option>
+                    <option :value="2">Đáp án C</option>
+                    <option :value="3">Đáp án D</option>
+                  </select>
+                </div>
+                <button type="button" @click="addQuestionToEditExam" class="btn-add-q">
+                  <i class="pi pi-plus"></i> Thêm câu hỏi
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danh sách câu hỏi trong Edit modal -->
+          <div v-if="editExamQuestions.length > 0" class="added-questions-box">
+            <div class="qb-header">Danh sách câu hỏi của bài kiểm tra ({{ editExamQuestions.length }})</div>
+            <div class="added-q-list">
+              <div v-for="(q, idx) in editExamQuestions" :key="q.id || idx" class="added-q-item">
+                <div class="added-q-header">
+                  <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
+                  <button type="button" @click="removeQuestionFromEditExam(idx)" class="btn-del-q"><i class="pi pi-trash"></i></button>
+                </div>
+                <div class="added-q-opts">
+                  <div class="opt-text" :class="{ 'correct-opt': Number(q.answer) === 0 }">A. {{ q.options[0] }}</div>
+                  <div class="opt-text" :class="{ 'correct-opt': Number(q.answer) === 1 }">B. {{ q.options[1] }}</div>
+                  <div class="opt-text" :class="{ 'correct-opt': Number(q.answer) === 2 }">C. {{ q.options[2] }}</div>
+                  <div class="opt-text" :class="{ 'correct-opt': Number(q.answer) === 3 }">D. {{ q.options[3] }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="custom-modal-footer mt-4">
+            <button type="button" class="btn-cancel" @click="showEditExamModal = false">Hủy bỏ</button>
+            <button type="submit" class="btn">Lưu thay đổi</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Thông Báo Custom (Góc trên cùng bên phải, tự đóng sau 3 giây) -->
+  <div v-if="showNotificationModal" class="custom-toast-container" @click="showNotificationModal = false">
+    <div class="custom-toast-card" :class="notificationType">
+      <div class="custom-toast-content">
+        <i v-if="notificationType === 'success'" class="pi pi-check-circle toast-icon success"></i>
+        <i v-else-if="notificationType === 'error'" class="pi pi-times-circle toast-icon error"></i>
+        <i v-else class="pi pi-exclamation-triangle toast-icon warning"></i>
+        <div class="toast-text">
+          <strong class="toast-title">{{ notificationTitle }}</strong>
+          <span class="toast-message">{{ notificationMsg }}</span>
+        </div>
+      </div>
+      <button class="toast-close-btn">&times;</button>
+    </div>
+  </div>
+
+  <!-- Modal Xác Nhận Xóa Custom -->
+  <div v-if="showConfirmDeleteModal" class="custom-modal-overlay" @click.self="showConfirmDeleteModal = false">
+    <div class="custom-modal-card max-w-sm">
+      <div class="custom-modal-header">
+        <i class="pi pi-exclamation-circle text-red-500 custom-modal-icon"></i>
+        <h3>{{ confirmTitle }}</h3>
+      </div>
+      <div class="custom-modal-body" style="padding: 0.5rem 0 1rem 0;">
+        <p style="color: #4b5563; font-size: 0.95rem; line-height: 1.5; margin: 0;">{{ confirmMsg }}</p>
+      </div>
+      <div class="custom-modal-footer" style="padding-top: 0.75rem;">
+        <button class="btn-cancel" @click="showConfirmDeleteModal = false">Hủy</button>
+        <button class="btn" @click="executeDelete" style="background-color: #ef4444; border-color: #ef4444;">Xác nhận xóa</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -482,7 +985,7 @@ async function deleteExam(id: string) {
 .split { display: flex; gap: 2rem; }
 .flex-1 { flex: 1; }
 .crd { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; }
-.ch { background: #f9fafb; padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827; }
+.ch { background: #f9fafb; padding: 0.75rem 1.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827; display: flex; justify-content: space-between; align-items: center; }
 .cb { padding: 1.5rem; }
 .frm { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
 .frm-col { display: flex; flex-direction: column; gap: 1rem; padding-bottom: 1.5rem; border-bottom: 1px dashed #e5e7eb; }
@@ -702,5 +1205,412 @@ async function deleteExam(id: string) {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px dashed #e5e7eb;
+}
+
+/* Tab switcher & Tab pane */
+.tabs-nav {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+  padding-bottom: 2px;
+}
+.tab-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+}
+.tab-nav-btn:hover {
+  color: #111827;
+  border-bottom-color: #cbd5e1;
+}
+.tab-nav-btn.active {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+}
+.tab-pane {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Accordion bài kiểm tra & Chi tiết câu hỏi */
+.exam-card-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+}
+.exam-card-item:hover {
+  border-color: #d1d5db;
+}
+.exam-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+}
+.exam-card-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+.exam-title-text {
+  font-size: 0.95rem;
+}
+.badge-duration {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.badge-qcount {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.exam-card-body {
+  padding: 1.25rem;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+}
+.preview-q-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.preview-q-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+.preview-q-text {
+  font-size: 0.9rem;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+.preview-q-opts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+.preview-opt-text {
+  font-size: 0.8rem;
+  color: #64748b;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.empty-questions {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem;
+}
+.ml-2 {
+  margin-left: 0.5rem;
+}
+
+/* Modal Popup Styles */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+.custom-modal-card {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 90%;
+  padding: 1.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.max-w-sm {
+  max-width: 24rem;
+}
+.max-w-lg {
+  max-width: 32rem;
+}
+.max-w-xl {
+  max-width: 42rem;
+}
+.modal-scrollable {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+.modal-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-scrollable::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+.custom-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.75rem;
+}
+.custom-modal-icon {
+  font-size: 1.5rem;
+  color: #7c3aed;
+}
+.custom-modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+.custom-modal-body {
+  text-align: left;
+}
+.custom-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+.btn-cancel {
+  padding: 0.6rem 1.25rem;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #cbd5e1;
+}
+.btn-edit-inline {
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: .2rem;
+  transition: color 0.2s;
+}
+.btn-edit-inline:hover {
+  color: #1d4ed8;
+}
+.mx-2 {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}
+.mr-2 {
+  margin-right: 0.5rem;
+}
+.lesson-actions {
+  display: flex;
+  align-items: center;
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.btn-create-header {
+  padding: 0.5rem 1rem;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+.btn-create-header:hover {
+  background: #6d28d9;
+  box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.2);
+}
+.lesson-card-static {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+}
+.lesson-card-static:hover {
+  border-color: #d1d5db;
+}
+.lesson-card-header-static {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background: #f9fafb;
+  user-select: none;
+}
+.exam-card-item-static {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+}
+.exam-card-item-static:hover {
+  border-color: #d1d5db;
+}
+.exam-card-header-static {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background: #f9fafb;
+  user-select: none;
+}
+.btn-view-inline {
+  color: #10b981;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: .2rem;
+  transition: color 0.2s;
+}
+.btn-view-inline:hover {
+  color: #059669;
+}
+
+/* Custom Toast Notification CSS */
+.custom-toast-container {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 10000;
+  animation: slideInRight 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.custom-toast-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 0.85rem 1.25rem;
+  border-radius: 10px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid #7c3aed;
+  min-width: 280px;
+  max-width: 380px;
+  gap: 1rem;
+}
+.custom-toast-card.success {
+  border-left-color: #10b981;
+}
+.custom-toast-card.error {
+  border-left-color: #ef4444;
+}
+.custom-toast-card.warning {
+  border-left-color: #f59e0b;
+}
+.custom-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.toast-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+.toast-icon.success {
+  color: #10b981;
+}
+.toast-icon.error {
+  color: #ef4444;
+}
+.toast-icon.warning {
+  color: #f59e0b;
+}
+.toast-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.toast-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+.toast-message {
+  font-size: 0.825rem;
+  color: #4b5563;
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+.toast-close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.toast-close-btn:hover {
+  color: #4b5563;
+}
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>
