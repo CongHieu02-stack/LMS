@@ -93,6 +93,80 @@ async function executeDelete() {
   }
 }
 
+// Editing question in create modal state
+const editingQuestionIndex = ref<number | null>(null)
+
+function startEditQuestionInCreate(index: number) {
+  editingQuestionIndex.value = index
+  const q = questions.value[index]
+  newQuestionText.value = q.text
+  newOptions.value = [...q.options]
+  newAnswer.value = q.answer
+}
+
+function saveQuestionInCreate() {
+  if (editingQuestionIndex.value === null) return
+  if (!newQuestionText.value.trim()) {
+    showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
+    return
+  }
+  if (newOptions.value.some(o => !o.trim())) {
+    showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
+    return
+  }
+  questions.value[editingQuestionIndex.value] = {
+    ...questions.value[editingQuestionIndex.value],
+    text: newQuestionText.value.trim(),
+    options: [...newOptions.value],
+    answer: newAnswer.value
+  }
+  cancelEditQuestionInCreate()
+}
+
+function cancelEditQuestionInCreate() {
+  editingQuestionIndex.value = null
+  newQuestionText.value = ''
+  newOptions.value = ['', '', '', '']
+  newAnswer.value = 0
+}
+
+// Editing question in edit modal state
+const editingQuestionIndexInEdit = ref<number | null>(null)
+
+function startEditQuestionInEdit(index: number) {
+  editingQuestionIndexInEdit.value = index
+  const q = editExamQuestions.value[index]
+  editNewQuestionText.value = q.text
+  editNewOptions.value = [...q.options]
+  editNewAnswer.value = q.answer
+}
+
+function saveQuestionInEdit() {
+  if (editingQuestionIndexInEdit.value === null) return
+  if (!editNewQuestionText.value.trim()) {
+    showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
+    return
+  }
+  if (editNewOptions.value.some(o => !o.trim())) {
+    showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
+    return
+  }
+  editExamQuestions.value[editingQuestionIndexInEdit.value] = {
+    ...editExamQuestions.value[editingQuestionIndexInEdit.value],
+    text: editNewQuestionText.value.trim(),
+    options: [...editNewOptions.value],
+    answer: editNewAnswer.value
+  }
+  cancelEditQuestionInEdit()
+}
+
+function cancelEditQuestionInEdit() {
+  editingQuestionIndexInEdit.value = null
+  editNewQuestionText.value = ''
+  editNewOptions.value = ['', '', '', '']
+  editNewAnswer.value = 0
+}
+
 // Active tab state driven by route path
 const route = useRoute()
 const activeTab = ref<'lessons' | 'exams'>(route.path === '/exams' ? 'exams' : 'lessons')
@@ -305,6 +379,7 @@ async function createExam() {
     })
     examForm.value = { title: '', durationMinutes: 60 }
     questions.value = []
+    editingQuestionIndex.value = null
     loadClassContent()
     showCreateExamModal.value = false
     showToast('success', 'Thành công', 'Tạo bài kiểm tra trắc nghiệm thành công!')
@@ -457,6 +532,7 @@ async function saveEditExam() {
     })
     showEditExamModal.value = false
     editingExamId.value = null
+    editingQuestionIndexInEdit.value = null
     loadClassContent()
     showToast('success', 'Thành công', 'Cập nhật bài kiểm tra thành công!')
   } catch (err: any) {
@@ -667,9 +743,19 @@ async function saveEditExam() {
                     <option :value="3">Đáp án D</option>
                   </select>
                 </div>
-                <button type="button" @click="addQuestion" class="btn-add-q">
-                  <i class="pi pi-plus"></i> Thêm câu hỏi
-                </button>
+                <div v-if="editingQuestionIndex === null">
+                  <button type="button" @click="addQuestion" class="btn-add-q">
+                    <i class="pi pi-plus"></i> Thêm câu hỏi
+                  </button>
+                </div>
+                <div v-else style="display: flex; gap: 0.5rem;">
+                  <button type="button" @click="cancelEditQuestionInCreate" class="btn-cancel-q-edit">
+                    Hủy
+                  </button>
+                  <button type="button" @click="saveQuestionInCreate" class="btn-save-q-edit">
+                    Cập nhật câu hỏi
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -678,10 +764,13 @@ async function saveEditExam() {
           <div v-if="questions.length > 0" class="added-questions-box">
             <div class="qb-header">Danh sách câu hỏi đã thêm ({{ questions.length }})</div>
             <div class="added-q-list">
-              <div v-for="(q, idx) in questions" :key="idx" class="added-q-item">
+              <div v-for="(q, idx) in questions" :key="idx" class="added-q-item" :style="editingQuestionIndex === idx ? 'border-color: #7c3aed; background: #faf5ff;' : ''">
                 <div class="added-q-header">
                   <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
-                  <button type="button" @click="removeQuestion(idx)" class="btn-del-q"><i class="pi pi-trash"></i></button>
+                  <div>
+                    <button type="button" @click="startEditQuestionInCreate(idx)" class="btn-edit-q-inline" title="Sửa câu hỏi"><i class="pi pi-pencil"></i></button>
+                    <button type="button" @click="removeQuestion(idx)" class="btn-del-q" title="Xóa câu hỏi"><i class="pi pi-trash"></i></button>
+                  </div>
                 </div>
                 <div class="added-q-opts">
                   <div class="opt-text" :class="{ 'correct-opt': q.answer === 0 }">A. {{ q.options[0] }}</div>
@@ -694,7 +783,7 @@ async function saveEditExam() {
           </div>
 
           <div class="custom-modal-footer mt-4">
-            <button type="button" class="btn-cancel" @click="showCreateExamModal = false">Hủy bỏ</button>
+            <button type="button" class="btn-cancel" @click="showCreateExamModal = false; cancelEditQuestionInCreate();">Hủy bỏ</button>
             <button type="submit" class="btn"><i class="pi pi-check"></i> Hoàn tất & Tạo</button>
           </div>
         </form>
@@ -889,9 +978,19 @@ async function saveEditExam() {
                     <option :value="3">Đáp án D</option>
                   </select>
                 </div>
-                <button type="button" @click="addQuestionToEditExam" class="btn-add-q">
-                  <i class="pi pi-plus"></i> Thêm câu hỏi
-                </button>
+                <div v-if="editingQuestionIndexInEdit === null">
+                  <button type="button" @click="addQuestionToEditExam" class="btn-add-q">
+                    <i class="pi pi-plus"></i> Thêm câu hỏi
+                  </button>
+                </div>
+                <div v-else style="display: flex; gap: 0.5rem;">
+                  <button type="button" @click="cancelEditQuestionInEdit" class="btn-cancel-q-edit">
+                    Hủy
+                  </button>
+                  <button type="button" @click="saveQuestionInEdit" class="btn-save-q-edit">
+                    Cập nhật câu hỏi
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -900,10 +999,13 @@ async function saveEditExam() {
           <div v-if="editExamQuestions.length > 0" class="added-questions-box">
             <div class="qb-header">Danh sách câu hỏi của bài kiểm tra ({{ editExamQuestions.length }})</div>
             <div class="added-q-list">
-              <div v-for="(q, idx) in editExamQuestions" :key="q.id || idx" class="added-q-item">
+              <div v-for="(q, idx) in editExamQuestions" :key="q.id || idx" class="added-q-item" :style="editingQuestionIndexInEdit === idx ? 'border-color: #7c3aed; background: #faf5ff;' : ''">
                 <div class="added-q-header">
                   <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
-                  <button type="button" @click="removeQuestionFromEditExam(idx)" class="btn-del-q"><i class="pi pi-trash"></i></button>
+                  <div>
+                    <button type="button" @click="startEditQuestionInEdit(idx)" class="btn-edit-q-inline" title="Sửa câu hỏi"><i class="pi pi-pencil"></i></button>
+                    <button type="button" @click="removeQuestionFromEditExam(idx)" class="btn-del-q" title="Xóa câu hỏi"><i class="pi pi-trash"></i></button>
+                  </div>
                 </div>
                 <div class="added-q-opts">
                   <div class="opt-text" :class="{ 'correct-opt': Number(q.answer) === 0 }">A. {{ q.options[0] }}</div>
@@ -916,7 +1018,7 @@ async function saveEditExam() {
           </div>
 
           <div class="custom-modal-footer mt-4">
-            <button type="button" class="btn-cancel" @click="showEditExamModal = false">Hủy bỏ</button>
+            <button type="button" class="btn-cancel" @click="showEditExamModal = false; cancelEditQuestionInEdit();">Hủy bỏ</button>
             <button type="submit" class="btn">Lưu thay đổi</button>
           </div>
         </form>
@@ -1600,5 +1702,52 @@ async function saveEditExam() {
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+.btn-edit-q-inline {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.2rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-right: 0.5rem;
+}
+.btn-edit-q-inline:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.btn-save-q-edit {
+  background: #ea580c;
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+.btn-save-q-edit:hover {
+  background: #c2410c;
+}
+.btn-cancel-q-edit {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+.btn-cancel-q-edit:hover {
+  background: #f9fafb;
 }
 </style>

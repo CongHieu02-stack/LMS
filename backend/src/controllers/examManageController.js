@@ -45,7 +45,8 @@ export async function create(req, res) {
       class_id: classId,
       title,
       duration_minutes: durationMinutes || 60,
-      questions: questions || []
+      questions: questions || [],
+      status: 'published'
     })
     return res.status(201).json({ success: true, message: 'Tạo bài kiểm tra thành công.', data: exam })
   } catch (err) {
