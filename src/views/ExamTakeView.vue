@@ -29,6 +29,11 @@ watch(answers, () => {
   saveExamStateToStorage()
 }, { deep: true })
 
+// Watch selectedExam to dynamically hide sidebar when inside lobby/exam
+watch(selectedExam, (newExam) => {
+  authStore.isTakingExam = !!newExam
+}, { immediate: true })
+
 // Modal & Submission Confirmation State
 const showConfirmModal = ref(false)
 const answeredCount = computed(() => Object.keys(answers.value).length)
@@ -303,6 +308,13 @@ async function submitExam(isForced = false) {
 }
 
 function closeExam() {
+  selectedExam.value = null
+  isExamStarted.value = false
+  isExamFinished.value = false
+  answers.value = {}
+  questions.value = []
+  cheatWarnings.value = 0
+  authStore.isTakingExam = false
   router.push('/dashboard')
 }
 
@@ -317,6 +329,9 @@ onUnmounted(() => {
   clearInterval(timerInterval)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  window.removeEventListener('blur', handleWindowBlur)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  authStore.isTakingExam = false
 })
 </script>
 

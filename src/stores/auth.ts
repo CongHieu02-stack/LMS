@@ -40,6 +40,9 @@ export const useAuthStore = defineStore('auth', () => {
   /** Lỗi gần nhất */
   const error = ref<string | null>(null)
 
+  /** Trạng thái sinh viên đang trong phòng thi (dùng để ẩn sidebar) */
+  const isTakingExam = ref(false)
+
   // ─── GETTERS (Computed) ───
 
   /** Đã đăng nhập chưa */
@@ -221,6 +224,7 @@ export const useAuthStore = defineStore('auth', () => {
     profile,
     loading,
     error,
+    isTakingExam,
 
     // Getters
     isAuthenticated,

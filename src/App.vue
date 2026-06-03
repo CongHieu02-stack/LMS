@@ -34,9 +34,9 @@ const isGuestPage = computed(() => route.meta.requiresGuest === true)
 
   <!-- Layout cho User đã đăng nhập (Sidebar + Main Content) -->
   <div v-else class="app-layout">
-    <AppSidebar />
+    <AppSidebar v-if="!authStore.isTakingExam" />
     <div class="lms-main-wrapper">
-      <main class="lms-page">
+      <main :class="authStore.isTakingExam ? 'lms-page-full' : 'lms-page'">
         <RouterView />
       </main>
     </div>
@@ -49,6 +49,12 @@ const isGuestPage = computed(() => route.meta.requiresGuest === true)
   display: flex;
   min-height: 100vh;
   background-color: var(--lms-gray-50);
+}
+
+.lms-page-full {
+  flex: 1;
+  width: 100%;
+  min-height: 100vh;
 }
 
 /* Guest layout: login/register full screen */
