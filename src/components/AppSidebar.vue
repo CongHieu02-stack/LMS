@@ -50,6 +50,11 @@ const menuGroups = ref<MainMenuGroup[]>([
         to: '/admin/users',
         requiredPermission: ['user_manage_senior', 'user_manage_staff'],
       },
+      {
+        label: 'Phân quyền nhân sự',
+        to: '/admin/permissions',
+        requiredPermission: 'user_manage_senior',
+      },
     ],
   },
   {
