@@ -9,6 +9,21 @@ const authStore = useAuthStore()
 
 const isStudent = computed(() => authStore.profile?.role === 'SINH_VIEN')
 
+const subjectLink = computed(() => {
+  if (authStore.hasPermission('subject_approve')) return '/admin/subjects'
+  if (authStore.hasPermission('subject_propose')) return '/subjects/propose'
+  return '/dashboard'
+})
+
+const classLink = computed(() => {
+  if (authStore.hasPermission('class_create')) return '/admin/classes'
+  if (authStore.hasPermission('class_quantity_approve')) return '/admin/classes/approve'
+  if (authStore.hasPermission('instructor_assign')) return '/admin/classes/assign'
+  if (authStore.hasPermission('lesson_exam_manage')) return '/lessons'
+  if (authStore.hasPermission('class_quantity_propose')) return '/classes/propose'
+  return '/dashboard'
+})
+
 /** Thông tin thẻ thống kê cho Admin */
 const statsCards = computed(() => [
   {
@@ -483,23 +498,23 @@ onMounted(() => {
         </div>
 
         <!-- Quick actions -->
-        <div class="actions-section mt-xl">
+        <div v-if="subjectLink !== '/dashboard' || classLink !== '/dashboard'" class="actions-section mt-xl">
           <h3 class="section-title">Khám phá tính năng</h3>
           <div class="actions-grid">
-            <RouterLink to="/admin/subjects" class="lms-card action-card">
+            <RouterLink v-if="subjectLink !== '/dashboard'" :to="subjectLink" class="lms-card action-card">
               <div class="action-icon-wrapper blue"><i class="pi pi-book"></i></div>
               <div class="action-content">
-                <span class="action-label">Duyệt môn học</span>
-                <span class="action-desc">Quản lý chương trình đào tạo</span>
+                <span class="action-label">Quản lý học phần</span>
+                <span class="action-desc">Xem và phê duyệt học phần</span>
               </div>
               <i class="pi pi-chevron-right action-arrow"></i>
             </RouterLink>
 
-            <RouterLink to="/admin/users" class="lms-card action-card">
-              <div class="action-icon-wrapper purple"><i class="pi pi-users"></i></div>
+            <RouterLink v-if="classLink !== '/dashboard'" :to="classLink" class="lms-card action-card">
+              <div class="action-icon-wrapper purple"><i class="pi pi-sitemap"></i></div>
               <div class="action-content">
-                <span class="action-label">Quản lý Nhân sự</span>
-                <span class="action-desc">Thêm/Xóa Giảng viên, NV</span>
+                <span class="action-label">Quản lý lớp học</span>
+                <span class="action-desc">Quản lý và phân công lớp học</span>
               </div>
               <i class="pi pi-chevron-right action-arrow"></i>
             </RouterLink>

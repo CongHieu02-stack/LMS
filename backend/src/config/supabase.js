@@ -1,4 +1,4 @@
-// ============================================================================
+// =============================================================================
 // config/supabase.js — Supabase Admin Client
 // Trách nhiệm DUY NHẤT: Khởi tạo và export Supabase client dùng service_role.
 // Client này bypass RLS — chỉ dùng trong backend, KHÔNG BAO GIỜ lộ ra FE.
