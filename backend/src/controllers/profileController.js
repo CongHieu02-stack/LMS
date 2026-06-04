@@ -96,6 +96,23 @@ export async function updateRole(req, res) {
       })
     }
 
+    if (role === 'TRUONG_BO_MON') {
+      const dept = targetProfile.department
+      if (!dept) {
+        return res.status(400).json({
+          error: 'Tài khoản này chưa được gán Khoa/Bộ môn. Vui lòng gán Khoa/Bộ môn trước khi chuyển sang vai trò Trưởng bộ môn.'
+        })
+      }
+      if (!targetProfile.is_locked) {
+        const activeHead = await profileModel.findActiveDepartmentHead(dept)
+        if (activeHead && activeHead.id !== targetId) {
+          return res.status(400).json({
+            error: `Khoa/Bộ môn "${dept}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Không thể chuyển đổi vai trò.`
+          })
+        }
+      }
+    }
+
     const updated = await profileModel.updateRole(targetId, role)
     return res.json({
       success: true,
@@ -179,8 +196,16 @@ export async function createProfile(req, res) {
       })
     }
 
-    if (role === 'TRUONG_BO_MON' && !department) {
-      return res.status(400).json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách cho vai trò Trưởng bộ môn.` })
+    if (role === 'TRUONG_BO_MON') {
+      if (!department) {
+        return res.status(400).json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách cho vai trò Trưởng bộ môn.` })
+      }
+      const activeHead = await profileModel.findActiveDepartmentHead(department)
+      if (activeHead) {
+        return res.status(400).json({
+          error: `Khoa/Bộ môn "${department}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Vui lòng khóa tài khoản cũ trước khi thêm Trưởng bộ môn mới.`
+        })
+      }
     }
 
     // Validate mật khẩu mạnh: ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường, 1 chữ số, 1 ký tự đặc biệt
@@ -412,6 +437,15 @@ export async function lockProfile(req, res) {
 
     if (isLocked && (!reason || reason.trim() === '')) {
       return res.status(400).json({ error: 'Khóa tài khoản bắt buộc phải nhập lý do.' })
+    }
+
+    if (!isLocked && targetProfile.role === 'TRUONG_BO_MON' && targetProfile.department) {
+      const activeHead = await profileModel.findActiveDepartmentHead(targetProfile.department)
+      if (activeHead && activeHead.id !== targetId) {
+        return res.status(400).json({
+          error: `Không thể mở khóa. Khoa/Bộ môn "${targetProfile.department}" đã có Trưởng bộ môn khác đang hoạt động (${activeHead.full_name}).`
+        })
+      }
     }
 
     const updated = await profileModel.updateLockStatus(targetId, !!isLocked, isLocked ? reason.trim() : null)
