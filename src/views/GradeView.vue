@@ -95,13 +95,54 @@ const groupedGrades = computed<GroupedGrade[]>(() => {
 })
 
 /* =========================
+   CONVERSION HELPERS
+========================= */
+function toScale4(score: number): number {
+  if (score >= 8.5) return 4.0
+  if (score >= 8.0) return 3.5
+  if (score >= 7.0) return 3.0
+  if (score >= 6.5) return 2.5
+  if (score >= 5.5) return 2.0
+  if (score >= 5.0) return 1.5
+  if (score >= 4.0) return 1.0
+  return 0.0
+}
+
+function toLetter(score: number): string {
+  if (score >= 8.5) return 'A'
+  if (score >= 8.0) return 'B+'
+  if (score >= 7.0) return 'B'
+  if (score >= 6.5) return 'C+'
+  if (score >= 5.5) return 'C'
+  if (score >= 5.0) return 'D+'
+  if (score >= 4.0) return 'D'
+  return 'F'
+}
+
+/* =========================
    GPA
 ========================= */
-const gpa = computed(() => {
+const gpa10 = computed(() => {
   if (groupedGrades.value.length === 0) return '0.00'
 
   const total = groupedGrades.value.reduce(
     (acc: number, g: GroupedGrade) => acc + g.score * g.credits,
+    0
+  )
+
+  const credits = groupedGrades.value.reduce(
+    (acc: number, g: GroupedGrade) => acc + g.credits,
+    0
+  )
+
+  return (total / credits).toFixed(2)
+})
+
+const gpa4 = computed(() => {
+  if (groupedGrades.value.length === 0) return '0.00'
+
+  const total = groupedGrades.value.reduce(
+    (acc: number, g: GroupedGrade) => acc + toScale4(g.score) * g.credits,
     0
   )
 
@@ -183,8 +224,18 @@ onMounted(loadGrades)
             <i class="pi pi-chart-line"></i>
           </div>
           <div>
-            <div class="stat-label">Điểm Trung Bình (GPA)</div>
-            <div class="stat-value">{{ gpa }}</div>
+            <div class="stat-label">Điểm Trung Bình (Hệ 10)</div>
+            <div class="stat-value">{{ gpa10 }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon bg-purple">
+            <i class="pi pi-chart-line"></i>
+          </div>
+          <div>
+            <div class="stat-label">Điểm Trung Bình (Hệ 4)</div>
+            <div class="stat-value">{{ gpa4 }}</div>
           </div>
         </div>
 
@@ -216,7 +267,9 @@ onMounted(loadGrades)
                 <th>Mã Môn</th>
                 <th>Tên Môn Học</th>
                 <th class="tc">Số TC</th>
-                <th class="tc">Điểm</th>
+                <th class="tc">Hệ 10</th>
+                <th class="tc">Hệ 4</th>
+                <th class="tc">Điểm Chữ</th>
                 <th class="tc">Trạng Thái</th>
               </tr>
             </thead>
@@ -229,6 +282,13 @@ onMounted(loadGrades)
                 <td class="tc fw-700"
                     :class="g.score >= passingScore ? 'text-green' : 'text-red'">
                   {{ g.score.toFixed(1) }}
+                </td>
+                <td class="tc fw-700">
+                  {{ toScale4(g.score).toFixed(2) }}
+                </td>
+                <td class="tc font-mono fw-700"
+                    :class="toLetter(g.score) !== 'F' ? 'text-green' : 'text-red'">
+                  {{ toLetter(g.score) }}
                 </td>
                 <td class="tc">
                   <span class="status-badge"
