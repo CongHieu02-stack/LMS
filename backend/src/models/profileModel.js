@@ -149,6 +149,23 @@ export async function findPermissionsByUserId(userId, role) {
 }
 
 /**
+ * Tìm Trưởng bộ môn đang hoạt động (chưa bị khóa) của một khoa/bộ môn
+ * @param {string} department - Tên khoa/bộ môn
+ * @returns {object|null} - Profile hoặc null
+ */
+export async function findActiveDepartmentHead(department) {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('*')
+    .eq('role', 'TRUONG_BO_MON')
+    .eq('department', department)
+    .eq('is_locked', false)
+
+  if (error) throw error
+  return data && data.length > 0 ? data[0] : null
+}
+
+/**
  * Cập nhật trạng thái khóa của một profile
  * @param {string} id - UUID của user
  * @param {boolean} isLocked - Trạng thái khóa
