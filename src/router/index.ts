@@ -28,6 +28,12 @@ const router = createRouter({
       meta: { requiresGuest: true },
     },
     {
+      path: '/update-password',
+      name: 'update-password',
+      component: () => import('@/views/UpdatePasswordView.vue'),
+      meta: { isGuestLayout: true },
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: DashboardView,

@@ -20,7 +20,7 @@ onMounted(() => {
 })
 
 /** Xác định xem trang hiện tại có phải trang "khách" (login) hay không */
-const isGuestPage = computed(() => route.meta.requiresGuest === true)
+const isGuestPage = computed(() => route.meta.requiresGuest === true || route.meta.isGuestLayout === true)
 </script>
 
 <template>

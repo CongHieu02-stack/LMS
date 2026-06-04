@@ -39,7 +39,7 @@ const departments = [
   'Khoa Tài chính - Thương mại',
   'Khoa Khoa học Xã hội & Ngôn ngữ Quốc tế',
   'Khoa Truyền thông số',
-  'Khoa Khoa học Sức khỏe'
+  'Khoa Khoa học Sức khỏe',
 ]
 
 // Password strength validation rules
@@ -48,11 +48,19 @@ const passwordRules = computed(() => [
   { label: 'Chứa chữ cái viết hoa (A-Z)', valid: /[A-Z]/.test(formPassword.value) },
   { label: 'Chứa chữ cái viết thường (a-z)', valid: /[a-z]/.test(formPassword.value) },
   { label: 'Chứa chữ số (0-9)', valid: /[0-9]/.test(formPassword.value) },
-  { label: 'Chứa ký tự đặc biệt (!@#$%...)', valid: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(formPassword.value) },
+  {
+    label: 'Chứa ký tự đặc biệt (!@#$%...)',
+    valid: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(formPassword.value),
+  },
 ])
 
-const isPasswordStrong = computed(() => passwordRules.value.every(r => r.valid))
-const passwordsMatch = computed(() => formPassword.value && formConfirmPassword.value && formPassword.value === formConfirmPassword.value)
+const isPasswordStrong = computed(() => passwordRules.value.every((r) => r.valid))
+const passwordsMatch = computed(
+  () =>
+    formPassword.value &&
+    formConfirmPassword.value &&
+    formPassword.value === formConfirmPassword.value,
+)
 
 const rolesList = [
   { label: 'Hiệu trưởng', value: 'HIEU_TRUONG' },
@@ -83,7 +91,7 @@ const effectiveRank = computed(() => {
 const availableRoles = computed(() => {
   return rolesList.filter((role) => RANK_MAP[role.value] <= effectiveRank.value)
 })
-
+const testResetLink = ref<string | null>(null)
 // useAdminActions Composable for password resets and locking
 const {
   showModal: showAdminModal,
@@ -94,7 +102,7 @@ const {
   submitting: adminSubmitting,
   errorMsg: adminErrorMsg,
   openReasonModal,
-  submitAction
+  submitAction,
 } = useAdminActions(async () => {
   successMessage.value = 'Thao tác cập nhật trạng thái người dùng thành công.'
   await fetchProfiles()
@@ -107,25 +115,17 @@ const filteredProfiles = computed(() => {
       u.fullName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
 
-    const matchesRole =
-      !roleFilter.value ||
-      u.role === roleFilter.value
+    const matchesRole = !roleFilter.value || u.role === roleFilter.value
 
     return matchesSearch && matchesRole
   })
 })
 
 const adminModalInputValue = computed({
-  get: () => {
-    return adminActionType.value === 'RESET_PASSWORD' ? adminPassword.value : adminReason.value
-  },
+  get: () => adminReason.value,
   set: (val) => {
-    if (adminActionType.value === 'RESET_PASSWORD') {
-      adminPassword.value = val
-    } else {
-      adminReason.value = val
-    }
-  }
+    adminReason.value = val
+  },
 })
 
 // Hàm fetch danh sách profiles
@@ -174,7 +174,7 @@ async function handleCreateUser() {
       password: formPassword.value,
       fullName: formFullName.value,
       role: formRole.value,
-      department: formRole.value === 'TRUONG_BO_MON' ? formDepartment.value : undefined
+      department: formRole.value === 'TRUONG_BO_MON' ? formDepartment.value : undefined,
     })
 
     if (res.success) {
@@ -227,7 +227,7 @@ async function handleDeleteUser(user: any) {
       } finally {
         loading.value = false
       }
-    }
+    },
   })
 }
 
@@ -245,7 +245,7 @@ async function handleUnlockUser(user: any) {
 
       try {
         const res = await apiPut<any>(`/profiles/${user.id}/lock`, {
-          isLocked: false
+          isLocked: false,
         })
         if (res.success) {
           successMessage.value = `Đã mở khóa tài khoản "${user.fullName}" thành công.`
@@ -256,7 +256,38 @@ async function handleUnlockUser(user: any) {
       } finally {
         loading.value = false
       }
-    }
+    },
+  })
+}
+
+// Gửi email đặt lại mật khẩu cho nhân viên
+async function handleSendResetPasswordEmail(user: any) {
+  confirmPrime.require({
+    message: `Bạn có chắc chắn muốn gửi email hướng dẫn đặt lại mật khẩu tới "${user.fullName}" (${user.email}) không?`,
+    header: 'Xác nhận đặt lại mật khẩu',
+    icon: 'pi pi-envelope',
+    acceptClass: 'p-button-primary',
+    accept: async () => {
+      loading.value = true
+      errorMessage.value = null
+      successMessage.value = null
+      testResetLink.value = null
+
+      try {
+        const res = await apiPost<any>(`/profiles/${user.id}/reset-password`, {})
+        if (res.success) {
+          successMessage.value =
+            res.message || 'Đã gửi email hướng dẫn đặt lại mật khẩu thành công.'
+          if (res.actionLink) {
+            testResetLink.value = res.actionLink
+          }
+        }
+      } catch (err) {
+        errorMessage.value = (err as Error).message || 'Lỗi khi yêu cầu đặt lại mật khẩu.'
+      } finally {
+        loading.value = false
+      }
+    },
   })
 }
 
@@ -285,7 +316,7 @@ watch(
       showCreateModal.value = false
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 // When create modal is closed manually, clear the action query param
@@ -321,7 +352,44 @@ onMounted(() => {
     </div>
     <div v-if="successMessage && !showCreateModal" class="mono-alert alert-success">
       <i class="pi pi-check"></i>
-      <div><strong>THÀNH CÔNG:</strong> {{ successMessage }}</div>
+      <div style="width: 100%">
+        <div><strong>THÀNH CÔNG:</strong> {{ successMessage }}</div>
+        <div
+          v-if="testResetLink"
+          class="test-link-box"
+          style="
+            background: rgba(255, 255, 255, 0.4);
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px dashed #15803d;
+            margin-top: 10px;
+            width: 100%;
+          "
+        >
+          <span
+            style="
+              font-size: 0.8rem;
+              font-weight: 700;
+              color: #15803d;
+              display: block;
+              margin-bottom: 4px;
+            "
+            >LIÊN KẾT ĐẶT LẠI MẬT KHẨU (THỬ NGHIỆM):</span
+          >
+          <a
+            :href="testResetLink"
+            target="_blank"
+            style="
+              word-break: break-all;
+              font-weight: bold;
+              color: #166534;
+              text-decoration: underline;
+            "
+          >
+            {{ testResetLink }}
+          </a>
+        </div>
+      </div>
     </div>
 
     <!-- Bảng danh sách tài khoản -->
@@ -332,21 +400,49 @@ onMounted(() => {
       </div>
 
       <!-- Tìm kiếm & Bộ lọc (Thoả mãn Use Case tìm kiếm & lọc vai trò) -->
-      <div class="filter-bar flex gap-md p-md" style="background-color: #fafafa; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; gap: 16px; padding: 16px;">
-        <div class="form-group" style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px;">
+      <div
+        class="filter-bar flex gap-md p-md"
+        style="
+          background-color: #fafafa;
+          border-bottom: 1px solid #e5e7eb;
+          flex-wrap: wrap;
+          gap: 16px;
+          padding: 16px;
+        "
+      >
+        <div
+          class="form-group"
+          style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px"
+        >
           <input
             v-model="searchQuery"
             type="text"
             class="mono-input"
             placeholder="🔍 Tìm kiếm theo họ tên hoặc email..."
-            style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem;"
+            style="
+              width: 100%;
+              padding: 10px 12px;
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+              font-size: 0.9rem;
+            "
           />
         </div>
-        <div class="form-group" style="min-width: 180px; display: flex; flex-direction: column; gap: 8px;">
-          <select 
-            v-model="roleFilter" 
-            class="mono-input" 
-            style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; background: #fff;"
+        <div
+          class="form-group"
+          style="min-width: 180px; display: flex; flex-direction: column; gap: 8px"
+        >
+          <select
+            v-model="roleFilter"
+            class="mono-input"
+            style="
+              width: 100%;
+              padding: 10px 12px;
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+              font-size: 0.9rem;
+              background: #fff;
+            "
           >
             <option value="">Tất cả vai trò</option>
             <option v-for="role in rolesList" :key="role.value" :value="role.value">
@@ -381,7 +477,10 @@ onMounted(() => {
               :class="{ 'row-self': user.id === authStore.profile?.id }"
             >
               <td>
-                <div class="user-name" :style="user.isLocked ? 'text-decoration: line-through; color: #9ca3af;' : ''">
+                <div
+                  class="user-name"
+                  :style="user.isLocked ? 'text-decoration: line-through; color: #9ca3af;' : ''"
+                >
                   {{ user.fullName }}
                 </div>
                 <div v-if="user.id === authStore.profile?.id" class="self-tag">(Bạn hiện tại)</div>
@@ -393,24 +492,27 @@ onMounted(() => {
                 </span>
               </td>
               <td class="text-center">
-                <span 
-                  v-if="user.isLocked" 
-                  class="mono-badge" 
-                  style="background: #fee2e2; color: #ef4444; border-color: #fca5a5;"
+                <span
+                  v-if="user.isLocked"
+                  class="mono-badge"
+                  style="background: #fee2e2; color: #ef4444; border-color: #fca5a5"
                   :title="`Lý do khóa: ${user.lockReason || 'Không có'}`"
                 >
                   🔒 Bị khóa
                 </span>
-                <span 
-                  v-else 
-                  class="mono-badge" 
-                  style="background: #d1fae5; color: #10b981; border-color: #a7f3d0;"
+                <span
+                  v-else
+                  class="mono-badge"
+                  style="background: #d1fae5; color: #10b981; border-color: #a7f3d0"
                 >
                   ✅ Hoạt động
                 </span>
               </td>
               <td class="text-center font-black rank-cell">{{ user.rank }}</td>
-              <td class="text-right" style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+              <td
+                class="text-right"
+                style="display: flex; gap: 8px; justify-content: flex-end; align-items: center"
+              >
                 <!-- Khóa/Mở khóa (Use Case Khóa người dùng kèm lý do) -->
                 <button
                   v-if="!user.isLocked"
@@ -431,16 +533,15 @@ onMounted(() => {
                   <i class="pi pi-lock-open"></i>
                 </button>
 
-                <!-- Reset mật khẩu (Use Case Reset mật khẩu) -->
+                <!-- Reset mật khẩu (Gửi email đặt lại) -->
                 <button
                   class="btn-icon btn-reset"
                   :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  title="Đặt lại mật khẩu mới"
-                  @click="openReasonModal(user.id, 'user', 'RESET_PASSWORD')"
+                  title="Gửi email đặt lại mật khẩu"
+                  @click="handleSendResetPasswordEmail(user)"
                 >
                   <i class="pi pi-key"></i>
                 </button>
-
               </td>
             </tr>
           </tbody>
@@ -499,7 +600,12 @@ onMounted(() => {
                     required
                     autocomplete="new-password"
                   />
-                  <button type="button" class="btn-toggle-pw" @click="showPassword = !showPassword" tabindex="-1">
+                  <button
+                    type="button"
+                    class="btn-toggle-pw"
+                    @click="showPassword = !showPassword"
+                    tabindex="-1"
+                  >
                     <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
                   </button>
                 </div>
@@ -515,7 +621,12 @@ onMounted(() => {
                     required
                     autocomplete="new-password"
                   />
-                  <button type="button" class="btn-toggle-pw" @click="showConfirmPassword = !showConfirmPassword" tabindex="-1">
+                  <button
+                    type="button"
+                    class="btn-toggle-pw"
+                    @click="showConfirmPassword = !showConfirmPassword"
+                    tabindex="-1"
+                  >
                     <i :class="showConfirmPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
                   </button>
                 </div>
@@ -532,7 +643,11 @@ onMounted(() => {
             <div v-if="formPassword" class="pw-strength-box">
               <div class="pw-strength-title">Yêu cầu mật khẩu:</div>
               <ul class="pw-rules-list">
-                <li v-for="(rule, idx) in passwordRules" :key="idx" :class="{ 'rule-pass': rule.valid, 'rule-fail': !rule.valid }">
+                <li
+                  v-for="(rule, idx) in passwordRules"
+                  :key="idx"
+                  :class="{ 'rule-pass': rule.valid, 'rule-fail': !rule.valid }"
+                >
                   <i :class="rule.valid ? 'pi pi-check-circle' : 'pi pi-circle'"></i>
                   {{ rule.label }}
                 </li>
@@ -567,7 +682,15 @@ onMounted(() => {
 
           <div class="modal-footer">
             <button type="button" class="btn-cancel" @click="showCreateModal = false">Hủy</button>
-            <button type="submit" class="btn-submit" :disabled="!!submitLoading || (!!formPassword && !isPasswordStrong) || (!!formConfirmPassword && !passwordsMatch)">
+            <button
+              type="submit"
+              class="btn-submit"
+              :disabled="
+                !!submitLoading ||
+                (!!formPassword && !isPasswordStrong) ||
+                (!!formConfirmPassword && !passwordsMatch)
+              "
+            >
               <i v-if="submitLoading" class="pi pi-spin pi-spinner"></i>
               Tạo tài khoản
             </button>
@@ -576,10 +699,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Modal nhập lý do & Reset mật khẩu của Admin (quan hệ <<include>>) -->
+    <!-- Modal nhập lý do của Admin (quan hệ <<include>>) -->
     <ReasonDialog
       :visible="showAdminModal"
-      :title="adminActionType === 'RESET_PASSWORD' ? 'Đặt lại mật khẩu nhân viên' : 'Khóa tài khoản nhân sự'"
+      title="Khóa tài khoản nhân sự"
       :action-type="adminActionType"
       v-model="adminModalInputValue"
       :submitting="adminSubmitting"

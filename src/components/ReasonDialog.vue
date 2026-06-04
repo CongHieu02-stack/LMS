@@ -5,7 +5,7 @@ import Dialog from 'primevue/dialog'
 const props = defineProps<{
   visible: boolean
   title: string
-  actionType?: 'DUYET' | 'TU_CHOI' | 'KHOA' | 'RESET_PASSWORD' | null
+  actionType?: 'DUYET' | 'TU_CHOI' | 'KHOA' | null
   modelValue: string // reason or password
   submitting?: boolean
   error?: string | null
@@ -45,32 +45,16 @@ function handleSubmit() {
       </div>
 
       <p class="dialog-desc mb-md">
-        {{ 
-          actionType === 'RESET_PASSWORD' 
-            ? 'Vui lòng thiết lập mật khẩu mới cho tài khoản người dùng.'
-            : 'Hành động này bắt buộc phải nhập lý do chi tiết để hệ thống lưu lịch sử kiểm duyệt.' 
-        }}
+        Hành động này bắt buộc phải nhập lý do chi tiết để hệ thống lưu lịch sử kiểm duyệt.
       </p>
 
       <div class="form-group flex flex-col gap-sm">
         <label class="form-label font-semibold text-sm">
-          {{ actionType === 'RESET_PASSWORD' ? 'MẬT KHẨU MỚI' : 'NỘI DUNG LÝ DO' }}
+          NỘI DUNG LÝ DO
           <span class="text-danger">*</span>
         </label>
         
-        <input
-          v-if="actionType === 'RESET_PASSWORD'"
-          v-model="textVal"
-          type="text"
-          class="lms-input w-full"
-          placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)..."
-          required
-          :disabled="submitting"
-          autofocus
-        />
-        
         <textarea
-          v-else
           v-model="textVal"
           class="lms-textarea w-full"
           placeholder="Nhập lý do chi tiết tại đây..."

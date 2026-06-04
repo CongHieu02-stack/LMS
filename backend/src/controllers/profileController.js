@@ -8,6 +8,8 @@
 import * as profileModel from '../models/profileModel.js'
 import * as profileView from '../views/profileView.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import nodemailer from 'nodemailer'
+
 
 /**
  * GET /api/profiles — Lấy danh sách tất cả profiles.
@@ -100,14 +102,15 @@ export async function updateRole(req, res) {
       const dept = targetProfile.department
       if (!dept) {
         return res.status(400).json({
-          error: 'Tài khoản này chưa được gán Khoa/Bộ môn. Vui lòng gán Khoa/Bộ môn trước khi chuyển sang vai trò Trưởng bộ môn.'
+          error:
+            'Tài khoản này chưa được gán Khoa/Bộ môn. Vui lòng gán Khoa/Bộ môn trước khi chuyển sang vai trò Trưởng bộ môn.',
         })
       }
       if (!targetProfile.is_locked) {
         const activeHead = await profileModel.findActiveDepartmentHead(dept)
         if (activeHead && activeHead.id !== targetId) {
           return res.status(400).json({
-            error: `Khoa/Bộ môn "${dept}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Không thể chuyển đổi vai trò.`
+            error: `Khoa/Bộ môn "${dept}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Không thể chuyển đổi vai trò.`,
           })
         }
       }
@@ -198,12 +201,14 @@ export async function createProfile(req, res) {
 
     if (role === 'TRUONG_BO_MON') {
       if (!department) {
-        return res.status(400).json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách cho vai trò Trưởng bộ môn.` })
+        return res
+          .status(400)
+          .json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách cho vai trò Trưởng bộ môn.` })
       }
       const activeHead = await profileModel.findActiveDepartmentHead(department)
       if (activeHead) {
         return res.status(400).json({
-          error: `Khoa/Bộ môn "${department}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Vui lòng khóa tài khoản cũ trước khi thêm Trưởng bộ môn mới.`
+          error: `Khoa/Bộ môn "${department}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Vui lòng khóa tài khoản cũ trước khi thêm Trưởng bộ môn mới.`,
         })
       }
     }
@@ -216,13 +221,17 @@ export async function createProfile(req, res) {
       return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa (A-Z).' })
     }
     if (!/[a-z]/.test(password)) {
-      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết thường (a-z).' })
+      return res
+        .status(400)
+        .json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết thường (a-z).' })
     }
     if (!/[0-9]/.test(password)) {
       return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ số (0-9).' })
     }
     if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
-      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
+      return res
+        .status(400)
+        .json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
     }
 
     // 1. Tạo tài khoản trong auth.users bằng Admin API (tự xác thực email)
@@ -242,7 +251,13 @@ export async function createProfile(req, res) {
     // 2. Tạo profile row tương ứng
     let profile
     try {
-      profile = await profileModel.createProfile(newUser.id, email, fullName, role, role === 'TRUONG_BO_MON' ? department : null)
+      profile = await profileModel.createProfile(
+        newUser.id,
+        email,
+        fullName,
+        role,
+        role === 'TRUONG_BO_MON' ? department : null,
+      )
     } catch (dbError) {
       // Rollback: Xóa user vừa tạo ở auth.users để tránh rác/email bị kẹt
       await supabaseAdmin.auth.admin.deleteUser(newUser.id)
@@ -431,7 +446,7 @@ export async function lockProfile(req, res) {
 
     if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền của bạn không đủ để khóa/mở khóa tài khoản này.`
+        error: `Quyền của bạn không đủ để khóa/mở khóa tài khoản này.`,
       })
     }
 
@@ -443,17 +458,21 @@ export async function lockProfile(req, res) {
       const activeHead = await profileModel.findActiveDepartmentHead(targetProfile.department)
       if (activeHead && activeHead.id !== targetId) {
         return res.status(400).json({
-          error: `Không thể mở khóa. Khoa/Bộ môn "${targetProfile.department}" đã có Trưởng bộ môn khác đang hoạt động (${activeHead.full_name}).`
+          error: `Không thể mở khóa. Khoa/Bộ môn "${targetProfile.department}" đã có Trưởng bộ môn khác đang hoạt động (${activeHead.full_name}).`,
         })
       }
     }
 
-    const updated = await profileModel.updateLockStatus(targetId, !!isLocked, isLocked ? reason.trim() : null)
+    const updated = await profileModel.updateLockStatus(
+      targetId,
+      !!isLocked,
+      isLocked ? reason.trim() : null,
+    )
 
     return res.json({
       success: true,
       message: isLocked ? 'Đã khóa tài khoản thành công.' : 'Đã mở khóa tài khoản thành công.',
-      profile: profileView.formatProfile(updated)
+      profile: profileView.formatProfile(updated),
     })
   } catch (err) {
     console.error('[ProfileController.lockProfile]', err.message)
@@ -467,7 +486,6 @@ export async function lockProfile(req, res) {
 export async function resetPassword(req, res) {
   try {
     const targetId = req.params.id
-    const { newPassword } = req.body
 
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
@@ -481,43 +499,84 @@ export async function resetPassword(req, res) {
 
     if (effectiveRank <= targetProfile.rank) {
       return res.status(403).json({
-        error: `Quyền của bạn không đủ để đặt lại mật khẩu cho tài khoản này.`
+        error: `Quyền của bạn không đủ để đặt lại mật khẩu cho tài khoản này.`,
       })
     }
 
-    // Validate mật khẩu mạnh: ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường, 1 chữ số, 1 ký tự đặc biệt
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự.' })
-    }
-    if (!/[A-Z]/.test(newPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa (A-Z).' })
-    }
-    if (!/[a-z]/.test(newPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ cái viết thường (a-z).' })
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 chữ số (0-9).' })
-    }
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(newPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
-    }
+    // Tạo liên kết đặt lại mật khẩu thông qua Admin API của Supabase
+    // Cách này sẽ KHÔNG bị giới hạn rate limit gửi email của SMTP mặc định
+    const clientOrigin = req.headers.origin || req.headers.referer || 'http://localhost:5173'
+    const redirectTo = `${clientOrigin.replace(/\/$/, '')}/update-password`
 
-    // Cập nhật mật khẩu trực tiếp qua Admin API
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
-      password: newPassword
+    const { data, error: authError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email: targetProfile.email,
+      options: {
+        redirectTo,
+      },
     })
 
     if (authError) {
       return res.status(400).json({ error: authError.message })
     }
 
+    const actionLink = data?.properties?.action_link
+
+    let emailSent = false
+    let mailError = null
+
+    // Kiểm tra cấu hình SMTP trong env để gửi email tự động
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'smtp.gmail.com',
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_PORT === '465',
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        })
+
+        const mailOptions = {
+          from: `"Hệ thống LMS" <${process.env.SMTP_USER}>`,
+          to: targetProfile.email,
+          subject: '[LMS] Hướng dẫn đặt lại mật khẩu tài khoản',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2 style="color: #4f46e5; text-align: center;">Đặt lại mật khẩu tài khoản LMS</h2>
+              <p>Xin chào <strong>${targetProfile.fullName || 'Người dùng'}</strong>,</p>
+              <p>Hệ thống đã tạo yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
+              <p>Vui lòng nhấn vào liên kết bên dưới để thực hiện đặt lại mật khẩu mới:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${actionLink}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Đặt lại mật khẩu</a>
+              </div>
+              <p style="color: #64748b; font-size: 0.85rem;">Nếu nút trên không hoạt động, bạn có thể copy và dán đường dẫn này vào trình duyệt:</p>
+              <p style="word-break: break-all; font-size: 0.85rem;"><a href="${actionLink}">${actionLink}</a></p>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="color: #94a3b8; font-size: 0.8rem; text-align: center;">Đây là email tự động từ hệ thống LMS, vui lòng không trả lời thư này.</p>
+            </div>
+          `,
+        }
+
+        await transporter.sendMail(mailOptions)
+        emailSent = true
+      } catch (err) {
+        console.error('[Nodemailer Error]', err.message)
+        mailError = err.message
+      }
+    }
+
     return res.json({
       success: true,
-      message: `Đã đặt lại mật khẩu cho tài khoản "${targetProfile.full_name || targetProfile.email}" thành công.`
+      message: emailSent
+        ? `Đã gửi email khôi phục mật khẩu tự động tới "${targetProfile.email}".`
+        : `Đã tạo liên kết đặt lại mật khẩu thành công.`,
+      actionLink: emailSent ? null : actionLink,
+      emailSent
     })
   } catch (err) {
     console.error('[ProfileController.resetPassword]', err.message)
-    return res.status(500).json({ error: 'Lỗi khi đặt lại mật khẩu.' })
+    return res.status(500).json({ error: 'Lỗi khi tạo liên kết đặt lại mật khẩu.' })
   }
 }
-

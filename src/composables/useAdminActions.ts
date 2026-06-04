@@ -9,7 +9,7 @@ export function useAdminActions(onSuccess?: () => void) {
   const showModal = ref(false)
   const targetId = ref<string | null>(null)
   const entity = ref<'subject' | 'class' | 'department' | 'user' | null>(null)
-  const actionType = ref<'DUYET' | 'TU_CHOI' | 'KHOA' | 'RESET_PASSWORD' | null>(null)
+  const actionType = ref<'DUYET' | 'TU_CHOI' | 'KHOA' | null>(null)
   const reason = ref('')
   const password = ref('')
   const submitting = ref(false)
@@ -19,7 +19,7 @@ export function useAdminActions(onSuccess?: () => void) {
   function openReasonModal(
     id: string,
     ent: 'subject' | 'class' | 'department' | 'user',
-    action: 'DUYET' | 'TU_CHOI' | 'KHOA' | 'RESET_PASSWORD'
+    action: 'DUYET' | 'TU_CHOI' | 'KHOA'
   ) {
     targetId.value = id
     entity.value = ent
@@ -44,12 +44,7 @@ export function useAdminActions(onSuccess?: () => void) {
   async function submitAction() {
     if (!targetId.value || !entity.value || !actionType.value) return
 
-    if (actionType.value === 'RESET_PASSWORD') {
-      if (!password.value || password.value.length < 6) {
-        errorMsg.value = 'Mật khẩu mới phải từ 6 ký tự.'
-        return
-      }
-    } else if (['TU_CHOI', 'KHOA'].includes(actionType.value) && !reason.value.trim()) {
+    if (['TU_CHOI', 'KHOA'].includes(actionType.value) && !reason.value.trim()) {
       errorMsg.value = 'Lý do bắt buộc phải nhập.'
       return
     }
@@ -65,10 +60,6 @@ export function useAdminActions(onSuccess?: () => void) {
           res = await apiPut<any>(`/profiles/${targetId.value}/lock`, {
             isLocked: true,
             reason: reason.value.trim()
-          })
-        } else if (actionType.value === 'RESET_PASSWORD') {
-          res = await apiPost<any>(`/profiles/${targetId.value}/reset-password`, {
-            newPassword: password.value
           })
         }
       } else {
