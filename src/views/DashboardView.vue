@@ -222,16 +222,35 @@ async function loadStudentData() {
     myRegisteredClasses.value = regs.map((r) => r.class).filter(Boolean)
     const myClassIds = regs.map((r) => r.class?.id || r.class_id)
 
+    // Helper to convert to scale 4
+    function toScale4(score: number): number {
+      if (score >= 8.5) return 4.0
+      if (score >= 8.0) return 3.5
+      if (score >= 7.0) return 3.0
+      if (score >= 6.5) return 2.5
+      if (score >= 5.5) return 2.0
+      if (score >= 5.0) return 1.5
+      if (score >= 4.0) return 1.0
+      return 0.0
+    }
+
     // 2. Điểm GPA
     const grades = gradeRes.data || []
     let totalCredits = 0
-    let totalScore = 0
+    let totalScore10 = 0
+    let totalScore4 = 0
     grades.forEach((g) => {
       const tc = g.class?.subject?.credits || 0
       totalCredits += tc
-      totalScore += (parseFloat(g.score) || 0) * tc
+      const rawScore = parseFloat(g.score) || 0
+      totalScore10 += rawScore * tc
+      totalScore4 += toScale4(rawScore) * tc
     })
-    if (totalCredits > 0) gpaDisplay.value = (totalScore / totalCredits).toFixed(1)
+    if (totalCredits > 0) {
+      const g10 = (totalScore10 / totalCredits).toFixed(2)
+      const g4 = (totalScore4 / totalCredits).toFixed(2)
+      gpaDisplay.value = `${g10} / ${g4}`
+    }
 
     // 3. Lớp đang mở (Gợi ý 2 lớp chưa đăng ký)
     const allClasses = classRes.data || classRes
@@ -320,7 +339,7 @@ onMounted(() => {
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ gpaDisplay }}</div>
-              <div class="stat-label">Điểm GPA hiện tại</div>
+              <div class="stat-label">Điểm GPA (Hệ 10 / Hệ 4)</div>
             </div>
           </div>
         </div>

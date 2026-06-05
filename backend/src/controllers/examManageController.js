@@ -37,7 +37,7 @@ export async function getPublishedByClass(req, res) {
 
 export async function create(req, res) {
   try {
-    const { classId, title, durationMinutes, questions } = req.body
+    const { classId, title, durationMinutes, examType, questions } = req.body
     if (!classId || !title) {
       return res.status(400).json({ error: 'Thiếu classId hoặc title.' })
     }
@@ -45,6 +45,7 @@ export async function create(req, res) {
       class_id: classId,
       title,
       duration_minutes: durationMinutes || 60,
+      exam_type: examType || 'midterm',
       questions: questions || [],
       status: 'published'
     })
@@ -57,8 +58,8 @@ export async function create(req, res) {
 
 export async function update(req, res) {
   try {
-    const { title, duration_minutes, questions, status } = req.body
-    const updated = await examManageModel.update(req.params.id, { title, duration_minutes, questions, status })
+    const { title, duration_minutes, examType, questions, status } = req.body
+    const updated = await examManageModel.update(req.params.id, { title, duration_minutes, exam_type: examType, questions, status })
     return res.json({ success: true, data: updated })
   } catch (err) {
     console.error('[ExamManageController.update]', err.message)
