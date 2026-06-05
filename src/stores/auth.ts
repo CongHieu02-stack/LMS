@@ -210,7 +210,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Lắng nghe thay đổi auth state (token refresh, logout từ tab khác, ...)
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        window.location.href = '/update-password'
+        if (window.location.pathname !== '/update-password') {
+          window.location.href = '/update-password'
+        }
         return
       }
       if (session?.user) {
