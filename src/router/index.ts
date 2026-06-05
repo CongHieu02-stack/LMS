@@ -54,6 +54,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requirePermission: 'user_manage_senior' },
     },
     {
+      path: '/admin/activity-logs',
+      name: 'activity-logs',
+      component: () => import('@/views/admin/ActivityLogsView.vue'),
+      meta: { requiresAuth: true, minRank: 100 },
+    },
+    {
       path: '/admin/configs',
       name: 'school-config',
       component: SchoolConfigView,
