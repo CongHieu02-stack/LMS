@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import html2pdf from 'html2pdf.js'
 
 const authStore = useAuthStore()
@@ -13,9 +14,28 @@ const lessons = ref<any[]>([])
 const exams = ref<any[]>([])
 const loading = ref(true)
 const msg = ref<string | null>(null)
+const uploadingFile = ref(false)
 
 // Forms
-const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
+const lessonForm = ref<{
+  title: string
+  youtubeUrl: string
+  description: string
+  docContent: string
+  type: 'video' | 'doc' | 'file'
+  sortOrder: number
+  pdfFile: File | null
+  pdfUrl: string
+}>({
+  title: '',
+  youtubeUrl: '',
+  description: '',
+  docContent: '',
+  type: 'video',
+  sortOrder: 1,
+  pdfFile: null,
+  pdfUrl: ''
+})
 const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm' })
 
 // Modal state variables
@@ -255,13 +275,64 @@ function isYouTubeUrl(url: string) {
   return !!(match && match[2].length === 11)
 }
 
+function handleFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    const fileExt = (file.name.split('.').pop() || '').toLowerCase()
+    if (fileExt !== 'pdf' && fileExt !== 'docx') {
+      showToast('warning', 'Cảnh báo', 'Vui lòng chọn file có định dạng PDF (.pdf) hoặc Word (.docx)!')
+      target.value = ''
+      lessonForm.value.pdfFile = null
+      return
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      showToast('warning', 'Cảnh báo', 'Dung lượng file tối đa là 100MB!')
+      target.value = ''
+      lessonForm.value.pdfFile = null
+      return
+    }
+    lessonForm.value.pdfFile = file
+  }
+}
+
+function handleEditFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    const fileExt = (file.name.split('.').pop() || '').toLowerCase()
+    if (fileExt !== 'pdf' && fileExt !== 'docx') {
+      showToast('warning', 'Cảnh báo', 'Vui lòng chọn file có định dạng PDF (.pdf) hoặc Word (.docx)!')
+      target.value = ''
+      editLessonForm.value.pdfFile = null
+      return
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      showToast('warning', 'Cảnh báo', 'Dung lượng file tối đa là 100MB!')
+      target.value = ''
+      editLessonForm.value.pdfFile = null
+      return
+    }
+    editLessonForm.value.pdfFile = file
+  }
+}
+
 function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
+    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.pdfUrl || parsed.fileUrl ? 'file' : 'doc'))
+    const fileUrl = parsed.fileUrl || parsed.pdfUrl || ''
+    const fileExt = parsed.fileExt || (fileUrl.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf')
+    const fileName = parsed.fileName || (fileUrl ? fileUrl.split('/').pop()?.split('?')[0] || 'Tài liệu' : '')
+    
     return {
-      type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
+      type: type === 'pdf' ? 'file' : type,
       youtubeId: parsed.youtubeId || '',
       docContent: parsed.docContent || '',
+      fileUrl,
+      pdfUrl: fileUrl,
+      fileName,
+      fileExt,
       description: parsed.description || ''
     }
   } catch {
@@ -269,6 +340,10 @@ function parseLessonContent(contentStr: string) {
       type: 'video',
       youtubeId: '',
       docContent: '',
+      fileUrl: '',
+      pdfUrl: '',
+      fileName: '',
+      fileExt: '',
       description: contentStr || ''
     }
   }
@@ -354,6 +429,7 @@ onMounted(loadClasses)
 
 async function createLesson() {
   if (!selectedClass.value) return
+  uploadingFile.value = true
   try {
     let contentPayload = ''
     if (lessonForm.value.type === 'video') {
@@ -372,7 +448,7 @@ async function createLesson() {
         youtubeId: ytId,
         description: lessonForm.value.description
       })
-    } else {
+    } else if (lessonForm.value.type === 'doc') {
       const docHtml = (lessonForm.value.docContent || '').trim()
       if (!docHtml) {
         showToast('warning', 'Cảnh báo', 'Vui lòng điền nội dung tài liệu bài giảng!')
@@ -381,6 +457,33 @@ async function createLesson() {
       contentPayload = JSON.stringify({
         type: 'doc',
         docContent: docHtml,
+        description: lessonForm.value.description
+      })
+    } else if (lessonForm.value.type === 'file') {
+      if (!lessonForm.value.pdfFile) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng chọn file cần tải lên!')
+        return
+      }
+      const file = lessonForm.value.pdfFile
+      const fileExt = (file.name.split('.').pop() || '').toLowerCase()
+      const fileName = `lesson-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('lessons')
+        .upload(fileName, file)
+      
+      if (uploadError) {
+        console.error('Upload failed. Suggest creating public bucket "lessons" in Supabase.', uploadError)
+        showToast('error', 'Lỗi tải lên', 'Không thể tải file lên Supabase. Vui lòng kiểm tra xem bạn đã tạo bucket "lessons" chưa!')
+        return
+      }
+      
+      const { data } = supabase.storage.from('lessons').getPublicUrl(fileName)
+      contentPayload = JSON.stringify({
+        type: 'file',
+        fileUrl: data.publicUrl,
+        fileName: file.name,
+        fileExt: fileExt,
         description: lessonForm.value.description
       })
     }
@@ -398,12 +501,18 @@ async function createLesson() {
       description: '', 
       docContent: '', 
       type: 'video', 
-      sortOrder: lessons.value.length + 2 
+      sortOrder: lessons.value.length + 2,
+      pdfFile: null,
+      pdfUrl: ''
     }
     loadClassContent()
     showCreateLessonModal.value = false
     showToast('success', 'Thành công', 'Tạo bài học thành công!')
-  } catch (err: any) { showToast('error', 'Lỗi', err.message) }
+  } catch (err: any) { 
+    showToast('error', 'Lỗi', err.message) 
+  } finally {
+    uploadingFile.value = false
+  }
 }
 
 async function createExam() {
@@ -449,11 +558,23 @@ function deleteExam(exam: any) {
 // ─── CHỈNH SỬA BÀI GIẢNG ───
 const showEditLessonModal = ref(false)
 const editingLessonId = ref<string | null>(null)
-const editLessonForm = ref({
+const originalLessonType = ref<string | null>(null)
+const editLessonForm = ref<{
+  title: string
+  type: 'video' | 'doc' | 'file'
+  youtubeUrl: string
+  docContent: string
+  pdfUrl: string
+  pdfFile: File | null
+  description: string
+  sortOrder: number
+}>({
   title: '',
   type: 'video',
   youtubeUrl: '',
   docContent: '',
+  pdfUrl: '',
+  pdfFile: null,
   description: '',
   sortOrder: 1
 })
@@ -461,11 +582,14 @@ const editLessonForm = ref({
 function startEditLesson(lesson: any) {
   editingLessonId.value = lesson.id
   const content = parseLessonContent(lesson.content)
+  originalLessonType.value = content.type === 'pdf' ? 'file' : content.type
   editLessonForm.value = {
     title: lesson.title,
-    type: content.type,
+    type: (content.type === 'pdf' ? 'file' : content.type) as 'video' | 'doc' | 'file',
     youtubeUrl: content.type === 'video' && content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
     docContent: content.type === 'doc' ? content.docContent : '',
+    pdfUrl: content.type === 'file' || content.type === 'pdf' ? content.fileUrl : '',
+    pdfFile: null,
     description: content.description || '',
     sortOrder: lesson.sort_order || lesson.sortOrder || 1
   }
@@ -474,6 +598,7 @@ function startEditLesson(lesson: any) {
 
 async function saveEditLesson() {
   if (!editingLessonId.value) return
+  uploadingFile.value = true
   try {
     let contentPayload = ''
     if (editLessonForm.value.type === 'video') {
@@ -492,7 +617,7 @@ async function saveEditLesson() {
         youtubeId: ytId,
         description: editLessonForm.value.description
       })
-    } else {
+    } else if (editLessonForm.value.type === 'doc') {
       const docHtml = (editLessonForm.value.docContent || '').trim()
       if (!docHtml) {
         showToast('warning', 'Cảnh báo', 'Vui lòng điền nội dung tài liệu bài giảng!')
@@ -501,6 +626,45 @@ async function saveEditLesson() {
       contentPayload = JSON.stringify({
         type: 'doc',
         docContent: docHtml,
+        description: editLessonForm.value.description
+      })
+    } else if (editLessonForm.value.type === 'file') {
+      let finalFileUrl = editLessonForm.value.pdfUrl
+      let finalFileName = editLessonForm.value.pdfFile ? editLessonForm.value.pdfFile.name : ''
+      let finalFileExt = editLessonForm.value.pdfFile ? (editLessonForm.value.pdfFile.name.split('.').pop() || '').toLowerCase() : ''
+      
+      if (editLessonForm.value.pdfFile) {
+        const file = editLessonForm.value.pdfFile
+        const fileName = `lesson-${Date.now()}-${Math.random().toString(36).substring(2)}.${finalFileExt}`
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('lessons')
+          .upload(fileName, file)
+        
+        if (uploadError) {
+          showToast('error', 'Lỗi tải lên', 'Không thể tải file lên Supabase. Vui lòng kiểm tra xem bạn đã tạo bucket "lessons" chưa!')
+          return
+        }
+        
+        const { data } = supabase.storage.from('lessons').getPublicUrl(fileName)
+        finalFileUrl = data.publicUrl
+      }
+      
+      if (!finalFileUrl) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng chọn file cần tải lên!')
+        return
+      }
+      
+      if (!finalFileExt && finalFileUrl) {
+        finalFileExt = finalFileUrl.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
+        finalFileName = finalFileUrl.split('/').pop()?.split('?')[0] || 'Tài liệu'
+      }
+      
+      contentPayload = JSON.stringify({
+        type: 'file',
+        fileUrl: finalFileUrl,
+        fileName: finalFileName,
+        fileExt: finalFileExt,
         description: editLessonForm.value.description
       })
     }
@@ -517,6 +681,8 @@ async function saveEditLesson() {
     showToast('success', 'Thành công', 'Cập nhật bài giảng thành công!')
   } catch (err: any) {
     showToast('error', 'Lỗi', err.message)
+  } finally {
+    uploadingFile.value = false
   }
 }
 
@@ -647,7 +813,10 @@ async function saveEditExam() {
                         <i class="pi pi-video mr-1"></i>Video
                       </span>
                       <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
-                        <i class="pi pi-file-pdf mr-1"></i>Tài liệu
+                        <i class="pi pi-file mr-1"></i>Tài liệu
+                      </span>
+                      <span v-else-if="parseLessonContent(l.content).type === 'file'" class="ml-2" :class="parseLessonContent(l.content).fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
+                        <i :class="parseLessonContent(l.content).fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>{{ parseLessonContent(l.content).fileExt === 'docx' ? 'Word' : 'PDF' }}
                       </span>
                     </div>
                     <div class="lesson-actions">
@@ -726,8 +895,8 @@ async function saveEditExam() {
                 <span><i class="pi pi-video"></i> Video YouTube</span>
               </label>
               <label class="radio-option">
-                <input type="radio" v-model="lessonForm.type" value="doc" />
-                <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
+                <input type="radio" v-model="lessonForm.type" value="file" />
+                <span><i class="pi pi-file"></i> Tải file</span>
               </label>
             </div>
           </div>
@@ -736,9 +905,17 @@ async function saveEditExam() {
             <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
           </div>
           
-          <div v-else-if="lessonForm.type === 'doc'">
-            <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
-            <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
+          <div v-else-if="lessonForm.type === 'file'">
+            <div class="file-upload-container">
+              <label class="file-upload-label">
+                <i class="pi pi-cloud-upload"></i>
+                <span>Chọn file PDF hoặc DOCX (Tối đa 100MB)</span>
+                <input type="file" accept=".pdf,.docx" @change="handleFileChange" class="hidden-file-input" />
+              </label>
+              <div v-if="lessonForm.pdfFile" class="file-name-preview">
+                <i :class="lessonForm.pdfFile.name.toLowerCase().endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'"></i> {{ lessonForm.pdfFile.name }} ({{ (lessonForm.pdfFile.size / 1024 / 1024).toFixed(2) }} MB)
+              </div>
+            </div>
           </div>
 
           <textarea v-model="lessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt bài giảng / Ghi chú cho sinh viên..."></textarea>
@@ -836,7 +1013,7 @@ async function saveEditExam() {
             <div class="added-q-list">
               <div v-for="(q, idx) in questions" :key="idx" class="added-q-item" :style="editingQuestionIndex === idx ? 'border-color: #7c3aed; background: #faf5ff;' : ''">
                 <div class="added-q-header">
-                  <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
+                  <strong class="q-title-text">Câu {{ Number(idx) + 1 }}: {{ q.text }}</strong>
                   <div>
                     <button type="button" @click="startEditQuestionInCreate(idx)" class="btn-edit-q-inline" title="Sửa câu hỏi"><i class="pi pi-pencil"></i></button>
                     <button type="button" @click="removeQuestion(idx)" class="btn-del-q" title="Xóa câu hỏi"><i class="pi pi-trash"></i></button>
@@ -908,9 +1085,36 @@ async function saveEditExam() {
           </div>
         </div>
 
-        <!-- Description for video lessons -->
-        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3">
-          <strong style="color: #374151; font-size: 0.9rem;">Mô tả:</strong>
+        <!-- Generic file content area (PDF & DOCX) -->
+        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'file'" class="instructor-file-wrapper mb-3">
+          <div class="doc-actions mb-3">
+            <a :href="parseLessonContent(selectedLessonDetail.content).fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+              <i class="pi pi-download mr-1"></i> Tải tài liệu ({{ parseLessonContent(selectedLessonDetail.content).fileExt.toUpperCase() }})
+            </a>
+          </div>
+          
+          <!-- Show inline PDF viewer if PDF -->
+          <div v-if="parseLessonContent(selectedLessonDetail.content).fileExt === 'pdf'" class="pdf-viewer-container">
+            <iframe :src="parseLessonContent(selectedLessonDetail.content).fileUrl" class="pdf-iframe-viewer" frameborder="0"></iframe>
+          </div>
+          <!-- Show premium download card if DOCX -->
+          <div v-else class="docx-download-card">
+            <div class="docx-info">
+              <i class="pi pi-file-word docx-icon"></i>
+              <div class="docx-details">
+                <span class="docx-filename">{{ parseLessonContent(selectedLessonDetail.content).fileName || 'Tài liệu Word' }}</span>
+                <span class="docx-hint">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
+              </div>
+            </div>
+            <a :href="parseLessonContent(selectedLessonDetail.content).fileUrl" target="_blank" class="btn-download-docx">
+              <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
+            </a>
+          </div>
+        </div>
+
+        <!-- Description for video and file lessons -->
+        <div v-if="['video', 'file'].includes(parseLessonContent(selectedLessonDetail.content).type) && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3">
+          <strong style="color: #374151; font-size: 0.9rem;">Mô tả / Ghi chú:</strong>
           <p style="margin-top: 0.25rem; white-space: pre-wrap;">{{ parseLessonContent(selectedLessonDetail.content).description }}</p>
         </div>
         <div v-else-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && !parseLessonContent(selectedLessonDetail.content).youtubeId" class="empty-desc">
@@ -982,8 +1186,8 @@ async function saveEditExam() {
                 <span><i class="pi pi-video"></i> Video YouTube</span>
               </label>
               <label class="radio-option">
-                <input type="radio" v-model="editLessonForm.type" value="doc" />
-                <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
+                <input type="radio" v-model="editLessonForm.type" value="file" />
+                <span><i class="pi pi-file"></i> Tải file</span>
               </label>
             </div>
           </div>
@@ -992,9 +1196,20 @@ async function saveEditExam() {
             <input v-model="editLessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube..." />
           </div>
           
-          <div v-else-if="editLessonForm.type === 'doc'">
-            <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
-            <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
+          <div v-else-if="editLessonForm.type === 'file'">
+            <div class="file-upload-container">
+              <label class="file-upload-label">
+                <i class="pi pi-cloud-upload"></i>
+                <span>Thay đổi file PDF hoặc DOCX (Tối đa 100MB)</span>
+                <input type="file" accept=".pdf,.docx" @change="handleEditFileChange" class="hidden-file-input" />
+              </label>
+              <div v-if="editLessonForm.pdfFile" class="file-name-preview">
+                <i :class="editLessonForm.pdfFile.name.toLowerCase().endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'"></i> {{ editLessonForm.pdfFile.name }} ({{ (editLessonForm.pdfFile.size / 1024 / 1024).toFixed(2) }} MB)
+              </div>
+              <div v-else-if="editLessonForm.pdfUrl" class="file-name-preview">
+                <i :class="editLessonForm.pdfUrl.toLowerCase().endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'"></i> File hiện tại: <a :href="editLessonForm.pdfUrl" target="_blank" class="pdf-link">Xem tài liệu</a>
+              </div>
+            </div>
           </div>
 
           <textarea v-model="editLessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt..."></textarea>
@@ -1082,7 +1297,7 @@ async function saveEditExam() {
             <div class="added-q-list">
               <div v-for="(q, idx) in editExamQuestions" :key="q.id || idx" class="added-q-item" :style="editingQuestionIndexInEdit === idx ? 'border-color: #7c3aed; background: #faf5ff;' : ''">
                 <div class="added-q-header">
-                  <strong class="q-title-text">Câu {{ idx + 1 }}: {{ q.text }}</strong>
+                  <strong class="q-title-text">Câu {{ Number(idx) + 1 }}: {{ q.text }}</strong>
                   <div>
                     <button type="button" @click="startEditQuestionInEdit(idx)" class="btn-edit-q-inline" title="Sửa câu hỏi"><i class="pi pi-pencil"></i></button>
                     <button type="button" @click="removeQuestionFromEditExam(idx)" class="btn-del-q" title="Xóa câu hỏi"><i class="pi pi-trash"></i></button>
@@ -1271,6 +1486,143 @@ async function saveEditExam() {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;
+}
+.badge-pdf {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.badge-word {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.docx-download-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  gap: 1rem;
+}
+.docx-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.docx-icon {
+  font-size: 2.5rem;
+  color: #1d4ed8;
+}
+.docx-details {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.docx-filename {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  word-break: break-all;
+}
+.docx-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+.btn-download-docx {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.btn-download-docx:hover {
+  background: #1e40af;
+  box-shadow: 0 4px 6px -1px rgba(29, 78, 216, 0.2);
+}
+.file-upload-container {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.file-upload-container:hover {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+}
+.file-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #4b5563;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+.file-upload-label i {
+  font-size: 2rem;
+  color: #7c3aed;
+}
+.hidden-file-input {
+  display: none;
+}
+.file-name-preview {
+  font-size: 0.85rem;
+  color: #1e293b;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #e2e8f0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+}
+.pdf-link {
+  color: #7c3aed;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pdf-viewer-container {
+  width: 100%;
+  height: 600px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.pdf-iframe-viewer {
+  width: 100%;
+  height: 100%;
 }
 .instructor-doc-wrapper {
   margin-top: 0.5rem;

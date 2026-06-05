@@ -164,10 +164,19 @@ function toggleStudentLessonExpand(id: string) {
 function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
+    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.pdfUrl || parsed.fileUrl ? 'file' : 'doc'))
+    const fileUrl = parsed.fileUrl || parsed.pdfUrl || ''
+    const fileExt = parsed.fileExt || (fileUrl.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf')
+    const fileName = parsed.fileName || (fileUrl ? fileUrl.split('/').pop()?.split('?')[0] || 'Tài liệu' : '')
+    
     return {
-      type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
+      type: type === 'pdf' ? 'file' : type,
       youtubeId: parsed.youtubeId || '',
       docContent: parsed.docContent || '',
+      fileUrl,
+      pdfUrl: fileUrl,
+      fileName,
+      fileExt,
       description: parsed.description || '',
     }
   } catch {
@@ -175,6 +184,10 @@ function parseLessonContent(contentStr: string) {
       type: 'video',
       youtubeId: '',
       docContent: '',
+      fileUrl: '',
+      pdfUrl: '',
+      fileName: '',
+      fileExt: '',
       description: contentStr || '',
     }
   }
@@ -608,13 +621,16 @@ onMounted(() => {
             <div v-for="(l, idx) in classLessons" :key="l.id" class="student-lesson-item">
               <div class="student-lesson-header" @click="toggleStudentLessonExpand(l.id)">
                 <div class="student-lesson-title">
-                  <span class="lesson-index">Bài {{ idx + 1 }}</span>
+                  <span class="lesson-index">Bài {{ Number(idx) + 1 }}</span>
                   <span class="lesson-name">{{ l.title }}</span>
                   <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
                     <i class="pi pi-video mr-1"></i>Video
                   </span>
                   <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
-                    <i class="pi pi-file-pdf mr-1"></i>Tài liệu
+                    <i class="pi pi-file mr-1"></i>Tài liệu
+                  </span>
+                  <span v-else-if="parseLessonContent(l.content).type === 'file'" class="ml-2" :class="parseLessonContent(l.content).fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
+                    <i :class="parseLessonContent(l.content).fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>{{ parseLessonContent(l.content).fileExt === 'docx' ? 'Word' : 'PDF' }}
                   </span>
                 </div>
                 <i
@@ -680,8 +696,36 @@ onMounted(() => {
                   </div>
                 </div>
 
-                <!-- Description for Video/legacy -->
-                <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).description" class="student-lesson-desc">
+                <!-- Generic file content area (PDF & DOCX) -->
+                <div v-if="parseLessonContent(l.content).type === 'file'" class="student-pdf-wrapper mb-3">
+                  <div class="doc-actions mb-3">
+                    <a :href="parseLessonContent(l.content).fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                      <i class="pi pi-download mr-1"></i> Tải tài liệu ({{ parseLessonContent(l.content).fileExt.toUpperCase() }})
+                    </a>
+                  </div>
+                  
+                  <!-- Show inline PDF viewer if PDF -->
+                  <div v-if="parseLessonContent(l.content).fileExt === 'pdf'" class="pdf-viewer-container">
+                    <iframe :src="parseLessonContent(l.content).fileUrl" class="pdf-iframe-viewer" frameborder="0"></iframe>
+                  </div>
+                  <!-- Show premium download card if DOCX -->
+                  <div v-else class="docx-download-card">
+                    <div class="docx-info">
+                      <i class="pi pi-file-word docx-icon"></i>
+                      <div class="docx-details">
+                        <span class="docx-filename">{{ parseLessonContent(l.content).fileName || 'Tài liệu Word' }}</span>
+                        <span class="docx-hint">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
+                      </div>
+                    </div>
+                    <a :href="parseLessonContent(l.content).fileUrl" target="_blank" class="btn-download-docx">
+                      <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
+                    </a>
+                  </div>
+                </div>
+
+                <!-- Description for Video and File lessons -->
+                <div v-if="['video', 'file'].includes(parseLessonContent(l.content).type) && parseLessonContent(l.content).description" class="student-lesson-desc">
+                  <strong style="color: #374151; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Mô tả / Ghi chú:</strong>
                   {{ parseLessonContent(l.content).description }}
                 </div>
                 <div v-else-if="parseLessonContent(l.content).type === 'video' && !parseLessonContent(l.content).youtubeId" class="empty-desc">
@@ -1419,6 +1463,97 @@ onMounted(() => {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;
+}
+.badge-pdf {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.badge-word {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.docx-download-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  gap: 1rem;
+}
+.docx-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.docx-icon {
+  font-size: 2.5rem;
+  color: #1d4ed8;
+}
+.docx-details {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.docx-filename {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  word-break: break-all;
+}
+.docx-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+.btn-download-docx {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.btn-download-docx:hover {
+  background: #1e40af;
+  box-shadow: 0 4px 6px -1px rgba(29, 78, 216, 0.2);
+}
+.student-pdf-wrapper {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+}
+.pdf-viewer-container {
+  width: 100%;
+  height: 600px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.pdf-iframe-viewer {
+  width: 100%;
+  height: 100%;
 }
 .student-doc-wrapper {
   margin-top: 0.5rem;
