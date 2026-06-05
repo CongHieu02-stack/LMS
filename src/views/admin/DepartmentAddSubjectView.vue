@@ -221,11 +221,12 @@ function getStatusBadge(status: string) {
 
 .proposal-list { gap: 0.75rem; }
 .proposal-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
-.proposal-code { font-weight: 700; color: #111827; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; }
-.dep-badge { font-size: 0.7rem; font-weight: 500; color: #7c3aed; background-color: #f5f3ff; padding: 0.1rem 0.35rem; border-radius: 4px; }
+.proposal-item > div:first-child { flex: 1; min-width: 0; margin-right: 0.75rem; }
+.proposal-code { font-weight: 700; color: #111827; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.dep-badge { font-size: 0.7rem; font-weight: 500; color: #7c3aed; background-color: #f5f3ff; padding: 0.1rem 0.35rem; border-radius: 4px; white-space: normal; word-break: break-word; }
 .proposal-name { font-size: 0.8rem; color: #6b7280; margin-top: 0.2rem; }
 
-.status-badge { font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 9999px; }
+.status-badge { font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; text-align: center; }
 .badge-pending { background: #fef3c7; color: #92400e; }
 .badge-approved { background: #dcfce7; color: #166534; }
 .badge-rejected { background: #fee2e2; color: #991b1b; }
