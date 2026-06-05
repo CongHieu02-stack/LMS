@@ -248,6 +248,13 @@ function getYouTubeId(url: string) {
   return (match && match[2].length === 11) ? match[2] : url
 }
 
+function isYouTubeUrl(url: string) {
+  if (!url) return false
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+  const match = url.match(regExp)
+  return !!(match && match[2].length === 11)
+}
+
 function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
@@ -350,16 +357,30 @@ async function createLesson() {
   try {
     let contentPayload = ''
     if (lessonForm.value.type === 'video') {
-      const ytId = getYouTubeId(lessonForm.value.youtubeUrl)
+      const url = (lessonForm.value.youtubeUrl || '').trim()
+      if (!url) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng điền link Video YouTube!')
+        return
+      }
+      if (!isYouTubeUrl(url)) {
+        showToast('warning', 'Cảnh báo', 'Link YouTube không đúng định dạng! (Ví dụ đúng: https://www.youtube.com/watch?v=...)')
+        return
+      }
+      const ytId = getYouTubeId(url)
       contentPayload = JSON.stringify({
         type: 'video',
         youtubeId: ytId,
         description: lessonForm.value.description
       })
     } else {
+      const docHtml = (lessonForm.value.docContent || '').trim()
+      if (!docHtml) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng điền nội dung tài liệu bài giảng!')
+        return
+      }
       contentPayload = JSON.stringify({
         type: 'doc',
-        docContent: lessonForm.value.docContent,
+        docContent: docHtml,
         description: lessonForm.value.description
       })
     }
@@ -456,16 +477,30 @@ async function saveEditLesson() {
   try {
     let contentPayload = ''
     if (editLessonForm.value.type === 'video') {
-      const ytId = getYouTubeId(editLessonForm.value.youtubeUrl)
+      const url = (editLessonForm.value.youtubeUrl || '').trim()
+      if (!url) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng điền link Video YouTube!')
+        return
+      }
+      if (!isYouTubeUrl(url)) {
+        showToast('warning', 'Cảnh báo', 'Link YouTube không đúng định dạng! (Ví dụ đúng: https://www.youtube.com/watch?v=...)')
+        return
+      }
+      const ytId = getYouTubeId(url)
       contentPayload = JSON.stringify({
         type: 'video',
         youtubeId: ytId,
         description: editLessonForm.value.description
       })
     } else {
+      const docHtml = (editLessonForm.value.docContent || '').trim()
+      if (!docHtml) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng điền nội dung tài liệu bài giảng!')
+        return
+      }
       contentPayload = JSON.stringify({
         type: 'doc',
-        docContent: editLessonForm.value.docContent,
+        docContent: docHtml,
         description: editLessonForm.value.description
       })
     }
@@ -959,6 +994,7 @@ async function saveEditExam() {
           
           <div v-else-if="editLessonForm.type === 'doc'">
             <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
+            <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
           </div>
 
           <textarea v-model="editLessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt..."></textarea>
