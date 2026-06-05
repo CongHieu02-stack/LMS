@@ -7,12 +7,13 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1Ni
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function check() {
-  console.log('Fetching profiles...');
-  const { data, error } = await supabase.from('profiles').select('id, email, full_name, role, department');
+  console.log('Fetching rooms...');
+  const { data, error } = await supabase.from('rooms').select('id, name, capacity');
   if (error) {
     console.error(error);
   } else {
-    console.log(JSON.stringify(data, null, 2));
+    console.log(`Fetched ${data.length} rooms`);
+    console.log(JSON.stringify(data.slice(0, 5), null, 2));
   }
 }
 

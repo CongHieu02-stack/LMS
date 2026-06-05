@@ -12,6 +12,9 @@ router.use(authMiddleware)
 // GET /api/classes — Danh sách lớp học
 router.get('/', classController.listClasses)
 
+// GET /api/classes/rooms — Danh sách phòng học
+router.get('/rooms', classController.listRooms)
+
 // GET /api/classes/my-registrations — Lớp đã đăng ký của SV
 router.get('/my-registrations', classController.getMyRegistrations)
 

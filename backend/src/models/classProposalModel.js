@@ -71,6 +71,9 @@ export async function updateStatus(id, status, reviewerId) {
     const subjectDept = data.subject?.department
     let managerId = data.proposed_by
     const maxStudents = data.max_students || 50
+    const schedule = data.schedule || ''
+    const startDate = data.start_date || null
+    const endDate = data.end_date || null
 
     // Tìm Trưởng bộ môn phụ trách Khoa/Bộ môn này
     if (subjectDept) {
@@ -113,8 +116,10 @@ export async function updateStatus(id, status, reviewerId) {
         max_students: maxStudents,
         max_slots: maxStudents,
         remaining_slots: maxStudents,
-        schedule: '',
-        room: ''
+        schedule: schedule,
+        room: '',
+        start_date: startDate,
+        end_date: endDate
       })
     }
 
