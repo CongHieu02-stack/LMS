@@ -55,6 +55,11 @@ const menuGroups = ref<MainMenuGroup[]>([
         to: '/admin/permissions',
         requiredPermission: 'user_manage_senior',
       },
+      {
+        label: 'Lịch sử hoạt động',
+        to: '/admin/activity-logs',
+        requiredPermission: 'user_manage_senior',
+      },
     ],
   },
   {

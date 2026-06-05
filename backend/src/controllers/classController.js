@@ -7,6 +7,7 @@
 import * as classModel from '../models/classModel.js'
 import * as classView from '../views/classView.js'
 import * as profileModel from '../models/profileModel.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 /**
  * GET /api/classes — Lấy danh sách tất cả lớp học đang hoạt động.
@@ -53,6 +54,10 @@ export async function registerToClass(req, res) {
 
     // Gọi Model → RPC Supabase
     const result = await classModel.registerStudent(classId, studentId)
+
+    if (result.success) {
+      await logActivity(req, 'REGISTER_CLASS', result.message || `Đăng ký vào lớp học thành công (ID: ${classId})`)
+    }
 
     // Format response qua View
     const formatted = classView.formatRegistrationResult(result)
@@ -124,6 +129,9 @@ export async function createClass(req, res) {
       semester: semester || '',
       manager_id: finalManagerId
     })
+
+    await logActivity(req, 'CREATE_CLASS', `Tạo lớp học mới: ${name} (Sĩ số tối đa: ${maxSlots}, Học kỳ: ${semester || 'N/A'})`)
+
     return res.status(201).json({ success: true, message: 'Tạo lớp học thành công.', data: newClass })
   } catch (err) {
     console.error('[ClassController.createClass]', err.message)
@@ -170,6 +178,9 @@ export async function assignInstructor(req, res) {
     }
 
     const updated = await classModel.assignInstructor(req.params.id, instructorId)
+    
+    await logActivity(req, 'ASSIGN_INSTRUCTOR', `Phân công giảng viên ${instructorData.email} (Họ tên: ${instructorData.fullName}) phụ trách lớp: ${classData.name}`)
+
     return res.json({ success: true, message: 'Phân công giảng viên thành công.', data: updated })
   } catch (err) {
     console.error('[ClassController.assignInstructor]', err.message)
@@ -293,6 +304,8 @@ export async function approveClass(req, res) {
         return res.status(500).json({ error: `Lỗi khi duyệt mở lớp: ${updateErr.message}` })
       }
 
+      await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${trimmedRoom}, Lịch học: ${finalSchedule || 'Chưa xếp'})`)
+
       return res.json({
         success: true,
         message: `Duyệt lớp học và gán phòng ${trimmedRoom} thành công.`,
@@ -301,6 +314,9 @@ export async function approveClass(req, res) {
     } else {
       // Tự động xếp phòng ngẫu nhiên
       const result = await classModel.approveClassAndRandomRoom(id, parseInt(maxStudents))
+      
+      await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${result.room || 'Chưa xếp'}, Lịch học: ${result.schedule || 'Chưa xếp'})`)
+
       return res.json({
         success: true,
         message: `Duyệt lớp học và tự động xếp phòng thành công.`,
@@ -328,6 +344,8 @@ export async function rejectClass(req, res) {
       .single()
 
     if (error) throw error
+
+    await logActivity(req, 'REJECT_CLASS', `Từ chối đề xuất mở lớp học (ID: ${id})`)
 
     return res.json({
       success: true,

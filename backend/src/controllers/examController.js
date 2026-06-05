@@ -6,6 +6,7 @@ import * as examModel from '../models/examModel.js'
 import * as examView from '../views/examView.js'
 import * as examManageModel from '../models/examManageModel.js'
 import * as gradeModel from '../models/gradeModel.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 export async function submitExam(req, res) {
   try {
@@ -123,6 +124,8 @@ export async function submitExam(req, res) {
 
     const response = examView.formatSubmissionResult(submission)
     response.score = score
+
+    await logActivity(req, 'SUBMIT_EXAM', `Nộp bài thi: ${examTitle}. Điểm số: ${score}, Số lần vi phạm: ${violations}`)
 
     return res.json(response)
   } catch (err) {

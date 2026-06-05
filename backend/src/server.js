@@ -13,3 +13,5 @@ app.listen(PORT, () => {
   console.log(`[LMS Backend] Server đang chạy tại http://localhost:${PORT}`)
   console.log(`[LMS Backend] Môi trường: ${process.env.NODE_ENV || 'development'}`)
 })
+
+// Watch reload trigger
