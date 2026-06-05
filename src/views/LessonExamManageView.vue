@@ -16,7 +16,7 @@ const msg = ref<string | null>(null)
 
 // Forms
 const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
-const examForm = ref({ title: '', durationMinutes: 60 })
+const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm' })
 
 // Modal state variables
 const showCreateLessonModal = ref(false)
@@ -267,6 +267,14 @@ function parseLessonContent(contentStr: string) {
   }
 }
 
+function getExamTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    midterm: 'Giữa kỳ',
+    final: 'Cuối kỳ'
+  }
+  return labels[type] || type
+}
+
 const currentClassObj = computed(() => {
   return classes.value.find(c => c.id === selectedClass.value)
 })
@@ -387,9 +395,10 @@ async function createExam() {
       classId: selectedClass.value,
       title: examForm.value.title,
       durationMinutes: examForm.value.durationMinutes,
+      examType: examForm.value.examType,
       questions: questions.value
     })
-    examForm.value = { title: '', durationMinutes: 60 }
+    examForm.value = { title: '', durationMinutes: 60, examType: 'other' }
     questions.value = []
     editingQuestionIndex.value = null
     loadClassContent()
@@ -480,7 +489,8 @@ const showEditExamModal = ref(false)
 const editingExamId = ref<string | null>(null)
 const editExamForm = ref({
   title: '',
-  durationMinutes: 60
+  durationMinutes: 60,
+  examType: 'midterm'
 })
 const editExamQuestions = ref<any[]>([])
 
@@ -493,7 +503,8 @@ function startEditExam(exam: any) {
   editingExamId.value = exam.id
   editExamForm.value = {
     title: exam.title,
-    durationMinutes: exam.duration_minutes || exam.durationMinutes || 60
+    durationMinutes: exam.duration_minutes || exam.durationMinutes || 60,
+    examType: exam.exam_type || exam.examType || 'midterm'
   }
   // Deep copy questions
   editExamQuestions.value = (exam.questions || []).map((q: any) => ({
@@ -540,6 +551,7 @@ async function saveEditExam() {
     await apiPut(`/exam-manage/${editingExamId.value}`, {
       title: editExamForm.value.title,
       duration_minutes: editExamForm.value.durationMinutes,
+      examType: editExamForm.value.examType,
       questions: editExamQuestions.value
     })
     showEditExamModal.value = false
@@ -636,8 +648,8 @@ async function saveEditExam() {
                       <span class="badge-duration ml-2">
                         <i class="pi pi-clock mr-1"></i>{{ e.duration_minutes }} phút
                       </span>
-                      <span class="badge-qcount ml-2">
-                        <i class="pi pi-list mr-1"></i>{{ e.questions?.length || 0 }} câu hỏi
+                      <span class="badge-exam-type ml-2" :class="'badge-' + (e.exam_type || 'other')">
+                        <i class="pi pi-file mr-1"></i>{{ getExamTypeLabel(e.exam_type) }}
                       </span>
                     </div>
                     <div class="ex-acts">
@@ -717,6 +729,13 @@ async function saveEditExam() {
           <div style="display:flex;gap:1rem;align-items:center">
             <label>Thời gian (phút):</label>
             <input v-model="examForm.durationMinutes" type="number" class="inp" style="width:80px" required />
+          </div>
+          <div style="display:flex;gap:1rem;align-items:center">
+            <label>Loại bài thi:</label>
+            <select v-model="examForm.examType" class="si">
+              <option value="midterm">Giữa kỳ</option>
+              <option value="final">Cuối kỳ</option>
+            </select>
           </div>
 
           <!-- BỘ TẠO CÂU HỎI TRẮC NGHIỆM TƯƠNG TÁC -->
@@ -969,6 +988,13 @@ async function saveEditExam() {
           <div style="display:flex;gap:1rem;align-items:center">
             <label>Thời gian (phút):</label>
             <input v-model="editExamForm.durationMinutes" type="number" class="inp" style="width:80px" required />
+          </div>
+          <div style="display:flex;gap:1rem;align-items:center">
+            <label>Loại bài thi:</label>
+            <select v-model="editExamForm.examType" class="si">
+              <option value="midterm">Giữa kỳ</option>
+              <option value="final">Cuối kỳ</option>
+            </select>
           </div>
 
           <!-- Bộ soạn câu hỏi trong Edit modal -->
@@ -1391,15 +1417,21 @@ async function saveEditExam() {
   border-radius: 999px;
   font-weight: 600;
 }
-.badge-qcount {
+.badge-exam-type {
   display: inline-flex;
   align-items: center;
   font-size: 0.7rem;
-  background: #fef3c7;
-  color: #92400e;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;
+}
+.badge-midterm {
+  background: #fef3c7;
+  color: #92400e;
+}
+.badge-final {
+  background: #dcfce7;
+  color: #15803d;
 }
 .exam-card-body {
   padding: 1.25rem;

@@ -6,25 +6,27 @@ import { apiGet } from '@/lib/api'
    TYPES
 ========================= */
 interface GradeItem {
-  id: string
   subjectCode: string
   subjectName: string
   credits: number
-  score: number
+  midtermScore: number | null
+  finalScore: number | null
+  averageScore: number
+  pass: boolean
+  semester: string
   className: string
 }
 
 interface RawGrade {
-  id: string
-  score: string | number
-  class?: {
-    name?: string
-    subject?: {
-      code?: string
-      name?: string
-      credits?: number
-    } | null
-  } | null
+  subjectCode: string
+  subjectName: string
+  credits: number
+  midtermScore: number | null
+  finalScore: number | null
+  averageScore: number
+  pass: boolean
+  semester: string
+  className: string
 }
 
 /* =========================
@@ -40,7 +42,6 @@ type GroupedGrade = GradeItem & {
 ========================= */
 const grades = ref<GradeItem[]>([])
 const loading = ref(true)
-const passingScore = 5.0
 
 /* =========================
    LOAD DATA
@@ -52,12 +53,15 @@ async function loadGrades() {
     const res = await apiGet<{ success: boolean; data: RawGrade[] }>('/grades/me')
 
     grades.value = (res.data || []).map((g: RawGrade): GradeItem => ({
-      id: g.id,
-      subjectCode: g.class?.subject?.code || 'N/A',
-      subjectName: g.class?.subject?.name || 'N/A',
-      credits: g.class?.subject?.credits || 0,
-      score: parseFloat(String(g.score)) || 0,
-      className: g.class?.name || ''
+      subjectCode: g.subjectCode,
+      subjectName: g.subjectName,
+      credits: g.credits,
+      midtermScore: g.midtermScore,
+      finalScore: g.finalScore,
+      averageScore: g.averageScore,
+      pass: g.pass,
+      semester: g.semester,
+      className: g.className
     }))
   } catch (err) {
     console.log(err)
@@ -67,30 +71,22 @@ async function loadGrades() {
 }
 
 /* =========================
-   GROUP BY SUBJECT
+   GROUP BY SEMESTER
 ========================= */
-const groupedGrades = computed<GroupedGrade[]>(() => {
-  const map = new Map<string, GroupedGrade>()
+const groupedBySemester = computed(() => {
+  const map = new Map<string, GradeItem[]>()
 
   for (const g of grades.value) {
-    const key = g.subjectCode
-
+    const key = g.semester
     if (!map.has(key)) {
-      map.set(key, {
-        ...g,
-        totalScore: g.score,
-        count: 1
-      })
-    } else {
-      const existing = map.get(key)!
-      existing.totalScore += g.score
-      existing.count += 1
+      map.set(key, [])
     }
+    map.get(key)!.push(g)
   }
 
-  return Array.from(map.values()).map((g: GroupedGrade) => ({
-    ...g,
-    score: g.totalScore / g.count
+  return Array.from(map.entries()).map(([semester, items]) => ({
+    semester,
+    items
   }))
 })
 
@@ -98,6 +94,7 @@ const groupedGrades = computed<GroupedGrade[]>(() => {
    CONVERSION HELPERS
 ========================= */
 function toScale4(score: number): number {
+  if (score === null || score === undefined) return 0.0
   if (score >= 8.5) return 4.0
   if (score >= 8.0) return 3.5
   if (score >= 7.0) return 3.0
@@ -109,6 +106,7 @@ function toScale4(score: number): number {
 }
 
 function toLetter(score: number): string {
+  if (score === null || score === undefined) return '-'
   if (score >= 8.5) return 'A'
   if (score >= 8.0) return 'B+'
   if (score >= 7.0) return 'B'
@@ -120,38 +118,84 @@ function toLetter(score: number): string {
 }
 
 /* =========================
-   GPA
+   GPA 10-POINT SCALE
 ========================= */
 const gpa10 = computed(() => {
-  if (groupedGrades.value.length === 0) return '0.00'
+  if (grades.value.length === 0) return '0.00'
 
-  const total = groupedGrades.value.reduce(
-    (acc: number, g: GroupedGrade) => acc + g.score * g.credits,
+  const total = grades.value.reduce(
+    (acc: number, g: GradeItem) => acc + g.averageScore * g.credits,
     0
   )
 
-  const credits = groupedGrades.value.reduce(
-    (acc: number, g: GroupedGrade) => acc + g.credits,
+  const credits = grades.value.reduce(
+    (acc: number, g: GradeItem) => acc + g.credits,
     0
   )
 
-  return (total / credits).toFixed(2)
+  return credits > 0 ? (total / credits).toFixed(2) : '0.00'
 })
 
+/* =========================
+   GPA 4-POINT SCALE
+========================= */
 const gpa4 = computed(() => {
-  if (groupedGrades.value.length === 0) return '0.00'
+  if (grades.value.length === 0) return '0.00'
 
-  const total = groupedGrades.value.reduce(
-    (acc: number, g: GroupedGrade) => acc + toScale4(g.score) * g.credits,
+  const total = grades.value.reduce(
+    (acc: number, g: GradeItem) => acc + toScale4(g.averageScore) * g.credits,
     0
   )
 
-  const credits = groupedGrades.value.reduce(
-    (acc: number, g: GroupedGrade) => acc + g.credits,
+  const credits = grades.value.reduce(
+    (acc: number, g: GradeItem) => acc + g.credits,
     0
   )
 
-  return (total / credits).toFixed(2)
+  return credits > 0 ? (total / credits).toFixed(2) : '0.00'
+})
+
+/* =========================
+   SEMESTER GPA SCALES
+========================= */
+const semesterGpa10 = computed(() => {
+  const result = new Map<string, string>()
+
+  for (const { semester, items } of groupedBySemester.value) {
+    const total = items.reduce(
+      (acc: number, g: GradeItem) => acc + g.averageScore * g.credits,
+      0
+    )
+
+    const credits = items.reduce(
+      (acc: number, g: GradeItem) => acc + g.credits,
+      0
+    )
+
+    result.set(semester, credits > 0 ? (total / credits).toFixed(2) : '0.00')
+  }
+
+  return result
+})
+
+const semesterGpa4 = computed(() => {
+  const result = new Map<string, string>()
+
+  for (const { semester, items } of groupedBySemester.value) {
+    const total = items.reduce(
+      (acc: number, g: GradeItem) => acc + toScale4(g.averageScore) * g.credits,
+      0
+    )
+
+    const credits = items.reduce(
+      (acc: number, g: GradeItem) => acc + g.credits,
+      0
+    )
+
+    result.set(semester, credits > 0 ? (total / credits).toFixed(2) : '0.00')
+  }
+
+  return result
 })
 
 /* =========================
@@ -160,7 +204,7 @@ const gpa4 = computed(() => {
 const totalCredits = computed(() => {
   const unique = new Map<string, number>()
 
-  for (const g of groupedGrades.value) {
+  for (const g of grades.value) {
     unique.set(g.subjectCode, g.credits)
   }
 
@@ -176,8 +220,8 @@ const totalCredits = computed(() => {
 const passedCredits = computed(() => {
   const unique = new Map<string, number>()
 
-  for (const g of groupedGrades.value) {
-    if (g.score >= passingScore) {
+  for (const g of grades.value) {
+    if (g.pass) {
       unique.set(g.subjectCode, g.credits)
     }
   }
@@ -191,8 +235,9 @@ const passedCredits = computed(() => {
 /* =========================
    STATUS
 ========================= */
-function getStatus(score: number) {
-  return score >= passingScore ? 'PASS' : 'FAIL'
+function getStatus(pass: boolean) {
+  if (pass === null || pass === undefined) return '-'
+  return pass ? 'PASS' : 'FAIL'
 }
 
 onMounted(loadGrades)
@@ -224,7 +269,7 @@ onMounted(loadGrades)
             <i class="pi pi-chart-line"></i>
           </div>
           <div>
-            <div class="stat-label">Điểm Trung Bình (Hệ 10)</div>
+            <div class="stat-label">GPA (Hệ 10)</div>
             <div class="stat-value">{{ gpa10 }}</div>
           </div>
         </div>
@@ -234,7 +279,7 @@ onMounted(loadGrades)
             <i class="pi pi-chart-line"></i>
           </div>
           <div>
-            <div class="stat-label">Điểm Trung Bình (Hệ 4)</div>
+            <div class="stat-label">GPA (Hệ 4)</div>
             <div class="stat-value">{{ gpa4 }}</div>
           </div>
         </div>
@@ -253,55 +298,63 @@ onMounted(loadGrades)
         </div>
       </div>
 
-      <!-- TABLE -->
-      <div class="mono-card mt-8" v-if="groupedGrades.length > 0">
-        <div class="card-header">
-          <span>Chi tiết điểm số</span>
-        </div>
+      <!-- SEMESTER TABLES -->
+      <template v-if="groupedBySemester.length > 0">
+        <template v-for="semesterData in groupedBySemester" :key="semesterData.semester">
+          <div class="mono-card mt-8" v-if="semesterData.items.length > 0">
+            <div class="card-header">
+              <span>{{ semesterData.semester }} — GPA (Hệ 10): {{ semesterGpa10.get(semesterData.semester) }} | GPA (Hệ 4): {{ semesterGpa4.get(semesterData.semester) }}</span>
+            </div>
 
-        <div class="table-container">
-          <table class="mono-table">
+            <div class="table-container">
+              <table class="mono-table">
 
-            <thead>
-              <tr>
-                <th>Mã Môn</th>
-                <th>Tên Môn Học</th>
-                <th class="tc">Số TC</th>
-                <th class="tc">Hệ 10</th>
-                <th class="tc">Hệ 4</th>
-                <th class="tc">Điểm Chữ</th>
-                <th class="tc">Trạng Thái</th>
-              </tr>
-            </thead>
+                <thead>
+                  <tr>
+                    <th>Mã Môn</th>
+                    <th>Tên Môn Học</th>
+                    <th class="tc">Số TC</th>
+                    <th class="tc">Điểm GK</th>
+                    <th class="tc">Điểm CK</th>
+                    <th class="tc">Hệ 10</th>
+                    <th class="tc">Hệ 4</th>
+                    <th class="tc">Điểm Chữ</th>
+                    <th class="tc">Trạng Thái</th>
+                  </tr>
+                </thead>
 
-            <tbody>
-              <tr v-for="g in groupedGrades" :key="g.subjectCode">
-                <td class="font-mono">{{ g.subjectCode }}</td>
-                <td class="fw-600">{{ g.subjectName }}</td>
-                <td class="tc">{{ g.credits }}</td>
-                <td class="tc fw-700"
-                    :class="g.score >= passingScore ? 'text-green' : 'text-red'">
-                  {{ g.score.toFixed(1) }}
-                </td>
-                <td class="tc fw-700">
-                  {{ toScale4(g.score).toFixed(2) }}
-                </td>
-                <td class="tc font-mono fw-700"
-                    :class="toLetter(g.score) !== 'F' ? 'text-green' : 'text-red'">
-                  {{ toLetter(g.score) }}
-                </td>
-                <td class="tc">
-                  <span class="status-badge"
-                        :class="getStatus(g.score) === 'PASS' ? 'badge-pass' : 'badge-fail'">
-                    {{ getStatus(g.score) }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
+                <tbody>
+                  <tr v-for="g in semesterData.items" :key="g.subjectCode">
+                    <td class="font-mono">{{ g.subjectCode }}</td>
+                    <td class="fw-600">{{ g.subjectName }}</td>
+                    <td class="tc">{{ g.credits }}</td>
+                    <td class="tc">{{ g.midtermScore !== null ? g.midtermScore.toFixed(1) : '-' }}</td>
+                    <td class="tc">{{ g.finalScore !== null ? g.finalScore.toFixed(1) : '-' }}</td>
+                    <td class="tc fw-700"
+                        :class="g.averageScore !== null && g.pass ? 'text-green' : (g.averageScore !== null && !g.pass ? 'text-red' : '')">
+                      {{ g.averageScore !== null ? g.averageScore.toFixed(1) : '-' }}
+                    </td>
+                    <td class="tc fw-700">
+                      {{ g.averageScore !== null ? toScale4(g.averageScore).toFixed(2) : '-' }}
+                    </td>
+                    <td class="tc font-mono fw-700"
+                        :class="g.averageScore !== null && toLetter(g.averageScore) !== 'F' ? 'text-green' : 'text-red'">
+                      {{ g.averageScore !== null ? toLetter(g.averageScore) : '-' }}
+                    </td>
+                    <td class="tc">
+                      <span class="status-badge"
+                            :class="g.pass ? 'badge-pass' : 'badge-fail'">
+                        {{ getStatus(g.pass) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
 
-          </table>
-        </div>
-      </div>
+              </table>
+            </div>
+          </div>
+        </template>
+      </template>
 
       <!-- EMPTY -->
       <div v-else class="empty-state">
@@ -355,6 +408,7 @@ onMounted(loadGrades)
 
 .mono-table { width:100%; border-collapse:collapse; }
 .mono-table th { background:#f9fafb; padding:1rem; font-size:0.8rem; text-align:left; }
+.mono-table th.tc { text-align:center; }
 .mono-table td { padding:1rem; border-top:1px solid #e5e7eb; }
 
 .tc { text-align:center; }

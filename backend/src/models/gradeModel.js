@@ -20,9 +20,11 @@ export async function findByStudent(studentId) {
       exam:exams(
         id,
         title,
+        exam_type,
         class:classes(
           id,
           name,
+          semester,
           subject:subjects(
             id,
             code,
@@ -43,10 +45,8 @@ export async function findByStudent(studentId) {
     score: g.score,
     graded_at: g.graded_at,
     graded_by: g.graded_by,
-
-    // dùng để group theo môn
+    exam_type: g.exam?.exam_type || 'other',
     class_id: g.class_id,
-
     class: g.exam?.class || null,
     grader: g.grader
   }))
