@@ -585,7 +585,7 @@ function startEditLesson(lesson: any) {
   originalLessonType.value = content.type === 'pdf' ? 'file' : content.type
   editLessonForm.value = {
     title: lesson.title,
-    type: (content.type === 'pdf' ? 'file' : content.type) as 'video' | 'doc' | 'file',
+    type: (content.type === 'video' ? 'video' : 'file') as 'video' | 'file',
     youtubeUrl: content.type === 'video' && content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
     docContent: content.type === 'doc' ? content.docContent : '',
     pdfUrl: content.type === 'file' || content.type === 'pdf' ? content.fileUrl : '',
