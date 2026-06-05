@@ -311,6 +311,14 @@ function formatTime(seconds: number) {
   return `${m}:${s}`
 }
 
+function getExamTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    midterm: 'Giữa kỳ',
+    final: 'Cuối kỳ'
+  }
+  return labels[type] || type
+}
+
 onUnmounted(() => {
   clearInterval(timerInterval)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -348,6 +356,11 @@ onUnmounted(() => {
           <h3 class="font-bold">{{ e.title }}</h3>
           <p class="text-sm text-gray-500 mb-4">{{ e.subjectName }}</p>
           <div class="info-row"><i class="pi pi-clock"></i> {{ e.duration_minutes }} phút</div>
+          <div class="info-row">
+            <span class="badge-exam-type" :class="'badge-' + (e.exam_type || 'other')">
+              <i class="pi pi-file"></i> {{ getExamTypeLabel(e.exam_type) }}
+            </span>
+          </div>
           <button class="btn-submit w-full mt-4" @click="selectExamToStart(e)">Bắt đầu kiểm tra</button>
         </div>
       </div>
@@ -528,6 +541,23 @@ onUnmounted(() => {
 .flex-gap { display: flex; gap: 1rem; }
 .flex-1 { flex: 1; } .flex-2 { flex: 2; }
 .info-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #4b5563; }
+.badge-exam-type {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+  gap: 0.25rem;
+}
+.badge-midterm {
+  background: #fef3c7;
+  color: #92400e;
+}
+.badge-final {
+  background: #dcfce7;
+  color: #15803d;
+}
 
 /* Card */
 .mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
