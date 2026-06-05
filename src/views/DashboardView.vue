@@ -24,6 +24,11 @@ const classLink = computed(() => {
   return '/dashboard'
 })
 
+const departmentLink = computed(() => {
+  if (authStore.hasPermission('department_manage')) return '/admin/departments/approve'
+  return '/dashboard'
+})
+
 /** Thông tin thẻ thống kê cho Admin */
 const statsCards = computed(() => [
   {
@@ -498,26 +503,32 @@ onMounted(() => {
         </div>
 
         <!-- Quick actions -->
-        <div v-if="subjectLink !== '/dashboard' || classLink !== '/dashboard'" class="actions-section mt-xl">
+        <div v-if="subjectLink !== '/dashboard' || classLink !== '/dashboard' || authStore.hasPermission('user_manage_staff') || departmentLink !== '/dashboard'" class="actions-section mt-xl">
           <h3 class="section-title">Khám phá tính năng</h3>
           <div class="actions-grid">
-            <RouterLink v-if="subjectLink !== '/dashboard'" :to="subjectLink" class="lms-card action-card">
+            <div v-if="authStore.hasPermission('user_manage_staff')" class="lms-card action-card">
+              <div class="action-icon-wrapper green"><i class="pi pi-users"></i></div>
+              <div class="action-content">
+                <span class="action-label">Quản lý người dùng</span>
+                <span class="action-desc">Tạo mới, phân quyền và khóa/mở khóa tài khoản nhân sự</span>
+              </div>
+            </div>
+
+            <div v-if="subjectLink !== '/dashboard' || departmentLink !== '/dashboard'" class="lms-card action-card">
               <div class="action-icon-wrapper blue"><i class="pi pi-book"></i></div>
               <div class="action-content">
-                <span class="action-label">Quản lý học phần</span>
-                <span class="action-desc">Xem và phê duyệt học phần</span>
+                <span class="action-label">Quản lý môn học</span>
+                <span class="action-desc">Đề xuất môn học, phê duyệt học phần và phân công môn học bộ môn</span>
               </div>
-              <i class="pi pi-chevron-right action-arrow"></i>
-            </RouterLink>
+            </div>
 
-            <RouterLink v-if="classLink !== '/dashboard'" :to="classLink" class="lms-card action-card">
+            <div v-if="classLink !== '/dashboard'" class="lms-card action-card">
               <div class="action-icon-wrapper purple"><i class="pi pi-sitemap"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý lớp học</span>
                 <span class="action-desc">Quản lý và phân công lớp học</span>
               </div>
-              <i class="pi pi-chevron-right action-arrow"></i>
-            </RouterLink>
+            </div>
           </div>
         </div>
       </div>
@@ -1043,11 +1054,7 @@ onMounted(() => {
   padding: 1.25rem;
   transition: all 0.2s;
 }
-.action-card:hover {
-  border-color: #d1d5db;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
+
 .action-icon-wrapper {
   width: 48px;
   height: 48px;
@@ -1065,6 +1072,14 @@ onMounted(() => {
 .action-icon-wrapper.purple {
   background: #f3e8ff;
   color: #9333ea;
+}
+.action-icon-wrapper.green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.action-icon-wrapper.orange {
+  background: #ffedd5;
+  color: #ea580c;
 }
 .action-content {
   flex: 1;

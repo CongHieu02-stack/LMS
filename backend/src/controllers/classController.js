@@ -88,6 +88,30 @@ export async function createClass(req, res) {
     if (!subjectId || !name || !maxSlots) {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: subjectId, name, maxSlots.' })
     }
+
+    let finalManagerId = managerId || null
+    if (!finalManagerId) {
+      const { supabaseAdmin } = await import('../config/supabase.js')
+      const { data: subj } = await supabaseAdmin
+        .from('subjects')
+        .select('department')
+        .eq('id', subjectId)
+        .single()
+      
+      if (subj?.department) {
+        const { data: tbm } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('role', 'TRUONG_BO_MON')
+          .eq('department', subj.department)
+          .limit(1)
+          .maybeSingle()
+        if (tbm) {
+          finalManagerId = tbm.id
+        }
+      }
+    }
+
     const newClass = await classModel.create({
       subject_id: subjectId,
       code: name,
@@ -98,7 +122,7 @@ export async function createClass(req, res) {
       schedule: schedule || '',
       room: room || '',
       semester: semester || '',
-      manager_id: managerId || null
+      manager_id: finalManagerId
     })
     return res.status(201).json({ success: true, message: 'Tạo lớp học thành công.', data: newClass })
   } catch (err) {

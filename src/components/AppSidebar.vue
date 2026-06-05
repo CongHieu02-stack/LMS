@@ -58,7 +58,7 @@ const menuGroups = ref<MainMenuGroup[]>([
     ],
   },
   {
-    label: 'Quản lý Học phần',
+    label: 'Quản lý Môn học',
     icon: 'pi pi-book',
     isOpen: false,
     items: [
@@ -76,6 +76,16 @@ const menuGroups = ref<MainMenuGroup[]>([
         label: 'Danh sách & Khóa học phần',
         to: '/admin/subjects/list',
         requiredPermission: 'subject_approve',
+      },
+      {
+        label: 'Thêm môn học',
+        to: '/admin/departments/add-subject',
+        requiredPermission: 'department_manage',
+      },
+      {
+        label: 'Phê duyệt môn',
+        to: '/admin/departments/approve',
+        requiredPermission: 'department_manage',
       },
     ],
   },
@@ -118,23 +128,6 @@ const menuGroups = ref<MainMenuGroup[]>([
         label: 'Tra cứu lớp (Bộ lọc)',
         to: '/admin/classes/search',
         requiredPermission: 'class_create',
-      },
-    ],
-  },
-  {
-    label: 'Quản lý Bộ môn',
-    icon: 'pi pi-briefcase',
-    isOpen: false,
-    items: [
-      {
-        label: 'Thêm môn học',
-        to: '/admin/departments/add-subject',
-        requiredPermission: 'department_manage',
-      },
-      {
-        label: 'Phê duyệt môn',
-        to: '/admin/departments/approve',
-        requiredPermission: 'department_manage',
       },
     ],
   },

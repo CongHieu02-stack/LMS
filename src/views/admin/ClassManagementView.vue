@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { apiGet, apiPost } from '@/lib/api'
 
 // States
@@ -37,6 +37,29 @@ async function loadData() {
 
 onMounted(loadData)
 
+watch(
+  () => form.value.subjectId,
+  (newVal) => {
+    if (!newVal) {
+      form.value.managerId = ''
+      return
+    }
+    const selectedSub = subjects.value.find((s: any) => s.id === newVal)
+    if (selectedSub && selectedSub.department) {
+      const matchingManager = managers.value.find(
+        (m: any) => m.department === selectedSub.department
+      )
+      if (matchingManager) {
+        form.value.managerId = matchingManager.id
+      } else {
+        form.value.managerId = ''
+      }
+    } else {
+      form.value.managerId = ''
+    }
+  }
+)
+
 async function handleCreate() {
   submitting.value = true
   msg.value = null
@@ -65,7 +88,7 @@ async function handleCreate() {
     <div class="page-header">
       <div>
         <div class="breadcrumb">Quản lý Lớp học / <span>Tạo lớp học mới</span></div>
-        <h1 class="page-title">Khởi Tạo Khung Lớp Học</h1>
+        <h1 class="page-title">Khởi Tạo Lớp Học</h1>
         <div class="page-subtitle">
           Tạo lớp mới dựa trên học phần gốc đã được phê duyệt và chỉ định Trưởng bộ môn quản lý.
         </div>
@@ -73,12 +96,8 @@ async function handleCreate() {
     </div>
 
     <!-- Alert Notifications -->
-    <div v-if="msg" class="alert alert-s">
-      <i class="pi pi-check-circle"></i> {{ msg }}
-    </div>
-    <div v-if="errMsg" class="alert alert-e">
-      <i class="pi pi-times-circle"></i> {{ errMsg }}
-    </div>
+    <div v-if="msg" class="alert alert-s"><i class="pi pi-check-circle"></i> {{ msg }}</div>
+    <div v-if="errMsg" class="alert alert-e"><i class="pi pi-times-circle"></i> {{ errMsg }}</div>
 
     <!-- Loading Spinner -->
     <div v-if="loading" class="loading">
