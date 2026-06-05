@@ -9,10 +9,12 @@ interface GradeItem {
   subjectCode: string
   subjectName: string
   credits: number
+  regular1: number | null
+  regular2: number | null
   midtermScore: number | null
   finalScore: number | null
-  averageScore: number
-  pass: boolean
+  averageScore: number | null
+  pass: boolean | null
   semester: string
   className: string
 }
@@ -21,10 +23,12 @@ interface RawGrade {
   subjectCode: string
   subjectName: string
   credits: number
+  regular1: number | null
+  regular2: number | null
   midtermScore: number | null
   finalScore: number | null
-  averageScore: number
-  pass: boolean
+  averageScore: number | null
+  pass: boolean | null
   semester: string
   className: string
 }
@@ -56,6 +60,8 @@ async function loadGrades() {
       subjectCode: g.subjectCode,
       subjectName: g.subjectName,
       credits: g.credits,
+      regular1: g.regular1,
+      regular2: g.regular2,
       midtermScore: g.midtermScore,
       finalScore: g.finalScore,
       averageScore: g.averageScore,
@@ -123,12 +129,15 @@ function toLetter(score: number): string {
 const gpa10 = computed(() => {
   if (grades.value.length === 0) return '0.00'
 
-  const total = grades.value.reduce(
-    (acc: number, g: GradeItem) => acc + g.averageScore * g.credits,
+  const validGrades = grades.value.filter(g => g.averageScore !== null)
+  if (validGrades.length === 0) return '0.00'
+
+  const total = validGrades.reduce(
+    (acc: number, g: GradeItem) => acc + (g.averageScore || 0) * g.credits,
     0
   )
 
-  const credits = grades.value.reduce(
+  const credits = validGrades.reduce(
     (acc: number, g: GradeItem) => acc + g.credits,
     0
   )
@@ -142,12 +151,15 @@ const gpa10 = computed(() => {
 const gpa4 = computed(() => {
   if (grades.value.length === 0) return '0.00'
 
-  const total = grades.value.reduce(
-    (acc: number, g: GradeItem) => acc + toScale4(g.averageScore) * g.credits,
+  const validGrades = grades.value.filter(g => g.averageScore !== null)
+  if (validGrades.length === 0) return '0.00'
+
+  const total = validGrades.reduce(
+    (acc: number, g: GradeItem) => acc + toScale4(g.averageScore || 0) * g.credits,
     0
   )
 
-  const credits = grades.value.reduce(
+  const credits = validGrades.reduce(
     (acc: number, g: GradeItem) => acc + g.credits,
     0
   )
@@ -162,12 +174,18 @@ const semesterGpa10 = computed(() => {
   const result = new Map<string, string>()
 
   for (const { semester, items } of groupedBySemester.value) {
-    const total = items.reduce(
-      (acc: number, g: GradeItem) => acc + g.averageScore * g.credits,
+    const validItems = items.filter(g => g.averageScore !== null)
+    if (validItems.length === 0) {
+      result.set(semester, '0.00')
+      continue
+    }
+
+    const total = validItems.reduce(
+      (acc: number, g: GradeItem) => acc + (g.averageScore || 0) * g.credits,
       0
     )
 
-    const credits = items.reduce(
+    const credits = validItems.reduce(
       (acc: number, g: GradeItem) => acc + g.credits,
       0
     )
@@ -182,12 +200,18 @@ const semesterGpa4 = computed(() => {
   const result = new Map<string, string>()
 
   for (const { semester, items } of groupedBySemester.value) {
-    const total = items.reduce(
-      (acc: number, g: GradeItem) => acc + toScale4(g.averageScore) * g.credits,
+    const validItems = items.filter(g => g.averageScore !== null)
+    if (validItems.length === 0) {
+      result.set(semester, '0.00')
+      continue
+    }
+
+    const total = validItems.reduce(
+      (acc: number, g: GradeItem) => acc + toScale4(g.averageScore || 0) * g.credits,
       0
     )
 
-    const credits = items.reduce(
+    const credits = validItems.reduce(
       (acc: number, g: GradeItem) => acc + g.credits,
       0
     )
@@ -314,6 +338,8 @@ onMounted(loadGrades)
                     <th>Mã Môn</th>
                     <th>Tên Môn Học</th>
                     <th class="tc">Số TC</th>
+                    <th class="tc">Điểm TX1</th>
+                    <th class="tc">Điểm TX2</th>
                     <th class="tc">Điểm GK</th>
                     <th class="tc">Điểm CK</th>
                     <th class="tc">Hệ 10</th>
@@ -328,6 +354,8 @@ onMounted(loadGrades)
                     <td class="font-mono">{{ g.subjectCode }}</td>
                     <td class="fw-600">{{ g.subjectName }}</td>
                     <td class="tc">{{ g.credits }}</td>
+                    <td class="tc">{{ g.regular1 !== null ? g.regular1.toFixed(1) : '-' }}</td>
+                    <td class="tc">{{ g.regular2 !== null ? g.regular2.toFixed(1) : '-' }}</td>
                     <td class="tc">{{ g.midtermScore !== null ? g.midtermScore.toFixed(1) : '-' }}</td>
                     <td class="tc">{{ g.finalScore !== null ? g.finalScore.toFixed(1) : '-' }}</td>
                     <td class="tc fw-700"

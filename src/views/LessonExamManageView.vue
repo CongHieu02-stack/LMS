@@ -269,6 +269,7 @@ function parseLessonContent(contentStr: string) {
 
 function getExamTypeLabel(type: string) {
   const labels: Record<string, string> = {
+    regular: 'Thường xuyên',
     midterm: 'Giữa kỳ',
     final: 'Cuối kỳ'
   }
@@ -733,6 +734,7 @@ async function saveEditExam() {
           <div style="display:flex;gap:1rem;align-items:center">
             <label>Loại bài thi:</label>
             <select v-model="examForm.examType" class="si">
+              <option value="regular">Thường xuyên</option>
               <option value="midterm">Giữa kỳ</option>
               <option value="final">Cuối kỳ</option>
             </select>
@@ -992,6 +994,7 @@ async function saveEditExam() {
           <div style="display:flex;gap:1rem;align-items:center">
             <label>Loại bài thi:</label>
             <select v-model="editExamForm.examType" class="si">
+              <option value="regular">Thường xuyên</option>
               <option value="midterm">Giữa kỳ</option>
               <option value="final">Cuối kỳ</option>
             </select>
@@ -1424,6 +1427,10 @@ async function saveEditExam() {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;
+}
+.badge-regular {
+  background: #e0f2fe;
+  color: #0369a1;
 }
 .badge-midterm {
   background: #fef3c7;
