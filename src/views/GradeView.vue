@@ -101,14 +101,7 @@ const groupedBySemester = computed(() => {
 ========================= */
 function toScale4(score: number): number {
   if (score === null || score === undefined) return 0.0
-  if (score >= 8.5) return 4.0
-  if (score >= 8.0) return 3.5
-  if (score >= 7.0) return 3.0
-  if (score >= 6.5) return 2.5
-  if (score >= 5.5) return 2.0
-  if (score >= 5.0) return 1.5
-  if (score >= 4.0) return 1.0
-  return 0.0
+  return score * 0.4
 }
 
 function toLetter(score: number): string {
@@ -366,12 +359,12 @@ onMounted(loadGrades)
                       {{ g.averageScore !== null ? toScale4(g.averageScore).toFixed(2) : '-' }}
                     </td>
                     <td class="tc font-mono fw-700"
-                        :class="g.averageScore !== null && toLetter(g.averageScore) !== 'F' ? 'text-green' : 'text-red'">
+                        :class="g.averageScore !== null ? (toLetter(g.averageScore) !== 'F' ? 'text-green' : 'text-red') : ''">
                       {{ g.averageScore !== null ? toLetter(g.averageScore) : '-' }}
                     </td>
                     <td class="tc">
                       <span class="status-badge"
-                            :class="g.pass ? 'badge-pass' : 'badge-fail'">
+                            :class="g.pass === null || g.pass === undefined ? 'badge-pending' : (g.pass ? 'badge-pass' : 'badge-fail')">
                         {{ getStatus(g.pass) }}
                       </span>
                     </td>
@@ -456,6 +449,7 @@ onMounted(loadGrades)
 
 .badge-pass { background:#dcfce7; color:#166534; }
 .badge-fail { background:#fee2e2; color:#991b1b; }
+.badge-pending { background:#ffffff; color:#6b7280; border: 1px solid #e5e7eb; }
 
 .empty-state { text-align:center; padding:4rem; color:#6b7280; }
 </style>

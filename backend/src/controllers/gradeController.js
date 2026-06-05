@@ -41,7 +41,7 @@ export async function getMyGrades(req, res) {
       }
     }
     
-    // Calculate average for each subject: regular 20%, midterm 30%, final 60%
+    // Calculate average for each subject: regular 10%, midterm 30%, final 60%
     // Only calculate average when all required scores exist
     const processedGrades = Array.from(subjectMap.values()).map(subject => {
       let avgScore = null
@@ -60,7 +60,7 @@ export async function getMyGrades(req, res) {
       
       // Calculate final average only when all components exist
       if (regularAvg !== null && subject.midtermScore !== null && subject.finalScore !== null) {
-        avgScore = (regularAvg * 0.2) + (subject.midtermScore * 0.3) + (subject.finalScore * 0.6)
+        avgScore = (regularAvg * 0.1) + (subject.midtermScore * 0.3) + (subject.finalScore * 0.6)
         avgScore = Math.round(avgScore * 10) / 10 // Round to 1 decimal place
         pass = avgScore >= 5.0
       }

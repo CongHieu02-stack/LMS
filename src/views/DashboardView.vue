@@ -224,25 +224,20 @@ async function loadStudentData() {
 
     // Helper to convert to scale 4
     function toScale4(score: number): number {
-      if (score >= 8.5) return 4.0
-      if (score >= 8.0) return 3.5
-      if (score >= 7.0) return 3.0
-      if (score >= 6.5) return 2.5
-      if (score >= 5.5) return 2.0
-      if (score >= 5.0) return 1.5
-      if (score >= 4.0) return 1.0
-      return 0.0
+      if (score === null || score === undefined) return 0.0
+      return score * 0.4
     }
 
     // 2. Điểm GPA
     const grades = gradeRes.data || []
+    const validGrades = grades.filter(g => g.averageScore !== null)
     let totalCredits = 0
     let totalScore10 = 0
     let totalScore4 = 0
-    grades.forEach((g) => {
-      const tc = g.class?.subject?.credits || 0
+    validGrades.forEach((g) => {
+      const tc = g.credits || 0
       totalCredits += tc
-      const rawScore = parseFloat(g.score) || 0
+      const rawScore = parseFloat(g.averageScore) || 0
       totalScore10 += rawScore * tc
       totalScore4 += toScale4(rawScore) * tc
     })
@@ -250,6 +245,8 @@ async function loadStudentData() {
       const g10 = (totalScore10 / totalCredits).toFixed(2)
       const g4 = (totalScore4 / totalCredits).toFixed(2)
       gpaDisplay.value = `${g10} / ${g4}`
+    } else {
+      gpaDisplay.value = '0.00 / 0.00'
     }
 
     // 3. Lớp đang mở (Gợi ý 2 lớp chưa đăng ký)
