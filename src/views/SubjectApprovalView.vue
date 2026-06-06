@@ -25,6 +25,30 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
+// Custom Confirm Dialog State
+const isConfirmModalOpen = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmOkText = ref('Xác nhận')
+let onConfirmCallback: (() => void) | null = null
+
+function showCustomConfirm(title: string, message: string, onConfirm: () => void, okText = 'Xác nhận') {
+  confirmTitle.value = title
+  confirmMessage.value = message
+  confirmOkText.value = okText
+  onConfirmCallback = onConfirm
+  isConfirmModalOpen.value = true
+}
+
+function handleConfirmAccept() {
+  if (onConfirmCallback) onConfirmCallback()
+  isConfirmModalOpen.value = false
+}
+
+function handleConfirmCancel() {
+  isConfirmModalOpen.value = false
+}
+
 // Modal State
 const showRejectModal = ref(false)
 const rejectReason = ref('')
@@ -38,9 +62,6 @@ async function fetchSubjects() {
   try {
     const res = await apiGet<{ success: boolean; data: Subject[] }>('/subjects')
     if (res.success && res.data) {
-      // Chỉ lấy các môn học chưa duyệt nếu đây là trang Duyệt Môn Học
-      // Nhưng theo backend thì trả về tất cả. Frontend có thể tự lọc hoặc hiển thị tất cả.
-      // Dựa trên UI cũ, ta hiển thị tất cả.
       subjects.value = res.data
     }
   } catch (err) {
@@ -52,27 +73,31 @@ async function fetchSubjects() {
 
 // Xử lý phê duyệt
 async function handleApprove(subject: Subject) {
-  const confirmAction = confirm(`Bạn có chắc chắn muốn PHÊ DUYỆT môn học "${subject.name}" (${subject.code}) không?`)
-  if (!confirmAction) return
+  showCustomConfirm(
+    'Xác nhận phê duyệt',
+    `Bạn có chắc chắn muốn PHÊ DUYỆT môn học "${subject.name}" (${subject.code}) không?`,
+    async () => {
+      loading.value = true
+      errorMessage.value = null
+      successMessage.value = null
 
-  loading.value = true
-  errorMessage.value = null
-  successMessage.value = null
+      try {
+        const res = await apiPut<{ success: boolean }>(`/subjects/${subject.id}/status`, {
+          status: 'approved'
+        })
 
-  try {
-    const res = await apiPut<{ success: boolean }>(`/subjects/${subject.id}/status`, {
-      status: 'approved'
-    })
-
-    if (res.success) {
-      successMessage.value = `Đã phê duyệt thành công môn học "${subject.name}".`
-      await fetchSubjects()
-    }
-  } catch (err) {
-    errorMessage.value = (err as Error).message || `Gặp lỗi khi phê duyệt môn học.`
-  } finally {
-    loading.value = false
-  }
+        if (res.success) {
+          successMessage.value = `Đã phê duyệt thành công môn học "${subject.name}".`
+          await fetchSubjects()
+        }
+      } catch (err) {
+        errorMessage.value = (err as Error).message || `Gặp lỗi khi phê duyệt môn học.`
+      } finally {
+        loading.value = false
+      }
+    },
+    'Phê duyệt'
+  )
 }
 
 // Xử lý mở Modal từ chối
@@ -91,7 +116,7 @@ function closeRejectModal() {
 // Gửi yêu cầu từ chối
 async function submitReject() {
   if (!rejectReason.value.trim() || !selectedSubject.value) {
-    alert('Vui lòng nhập lý do từ chối.')
+    errorMessage.value = 'Vui lòng nhập lý do từ chối môn học.'
     return
   }
 
@@ -241,6 +266,27 @@ onMounted(() => {
           <button class="btn-danger" @click="submitReject" :disabled="submittingReject || !rejectReason.trim()">
             <i v-if="submittingReject" class="pi pi-spin pi-spinner"></i>
             Xác nhận từ chối
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Confirm Dialog -->
+    <div v-if="isConfirmModalOpen" class="modal-overlay" @click.self="handleConfirmCancel">
+      <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2>{{ confirmTitle }}</h2>
+          <button class="btn-close" @click="handleConfirmCancel"><i class="pi pi-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem;">
+          <p style="font-size: 0.95rem; color: #374151; margin: 0; white-space: pre-line; line-height: 1.6;">
+            {{ confirmMessage }}
+          </p>
+        </div>
+        <div class="modal-footer" style="background: #f9fafb;">
+          <button class="btn-cancel" @click="handleConfirmCancel">Hủy bỏ</button>
+          <button class="btn-danger" style="background: #9333ea; border-color: #9333ea;" @click="handleConfirmAccept">
+            {{ confirmOkText }}
           </button>
         </div>
       </div>
