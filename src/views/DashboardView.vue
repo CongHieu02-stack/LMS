@@ -4,8 +4,11 @@ import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPut } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import html2pdf from 'html2pdf.js'
+import { useToast } from 'primevue/usetoast'
+import pvToast from 'primevue/toast'
 
 const authStore = useAuthStore()
+const toast = useToast()
 
 const isStudent = computed(() => authStore.profile?.role === 'SINH_VIEN')
 
@@ -78,11 +81,11 @@ async function handleAvatarChange(event: Event) {
   if (!file) return
 
   if (!file.type.startsWith('image/')) {
-    alert('Vui lòng chọn một file hình ảnh hợp lệ.')
+    toast.add({ severity: 'error', summary: 'Lỗi định dạng', detail: 'Vui lòng chọn một file hình ảnh hợp lệ.', life: 4000 })
     return
   }
   if (file.size > 2 * 1024 * 1024) {
-    alert('Kích thước ảnh tối đa là 2MB.')
+    toast.add({ severity: 'error', summary: 'Kích thước quá lớn', detail: 'Kích thước ảnh tối đa là 2MB.', life: 4000 })
     return
   }
 
@@ -112,7 +115,7 @@ async function handleAvatarChange(event: Event) {
     }
   } catch (error: any) {
     console.error('Lỗi khi tải lên ảnh đại diện:', error)
-    alert('Lỗi tải ảnh: ' + error.message)
+    toast.add({ severity: 'error', summary: 'Lỗi tải ảnh', detail: error.message, life: 5000 })
   } finally {
     uploadingAvatar.value = false
     if (target) target.value = ''
@@ -215,7 +218,7 @@ function exportToPDF(lesson: any) {
   }).catch((err: any) => {
     console.error('PDF export error:', err)
     exportingPDF.value = null
-    alert('Có lỗi xảy ra khi xuất file PDF.')
+    toast.add({ severity: 'error', summary: 'Lỗi xuất PDF', detail: 'Có lỗi xảy ra khi xuất file PDF.', life: 5000 })
   })
 }
 
@@ -299,6 +302,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <pv-toast />
   <div class="dashboard">
     <!-- Breadcrumb -->
     <div class="breadcrumb">Tổng quan / <span>Bảng điều khiển</span></div>

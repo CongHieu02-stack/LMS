@@ -25,6 +25,16 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     autoRefreshToken: false,
     persistSession: false
   },
+  global: {
+    fetch: (url, options) => {
+      const headers = new Headers(options?.headers)
+      headers.set('Connection', 'close')
+      return fetch(url, {
+        ...options,
+        headers
+      })
+    }
+  },
   realtime: {
     transport: ws
   }

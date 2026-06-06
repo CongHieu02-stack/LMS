@@ -91,7 +91,8 @@ export function formatStudentRegistrations(rawList) {
         remainingSlots: item.class.remaining_slots,
         maxSlots: item.class.max_slots,
         subjectCode: item.class.subject?.code,
-        subjectName: item.class.subject?.name
+        subjectName: item.class.subject?.name,
+        instructor: item.class.instructor
       } : null
     })),
     total: rawList?.length || 0

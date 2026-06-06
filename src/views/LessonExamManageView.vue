@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
@@ -138,7 +138,7 @@ function saveQuestionInCreate() {
     showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
     return
   }
-  if (newOptions.value.some(o => !o.trim())) {
+  if (newOptions.value.some((o: string) => !o.trim())) {
     showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
     return
   }
@@ -179,7 +179,7 @@ function saveQuestionInEdit() {
     showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
     return
   }
-  if (editNewOptions.value.some(o => !o.trim())) {
+  if (editNewOptions.value.some((o: string) => !o.trim())) {
     showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
     return
   }
@@ -199,16 +199,9 @@ function cancelEditQuestionInEdit() {
   editNewAnswer.value = 0
 }
 
-// Active tab state driven by route path
-const route = useRoute()
-const activeTab = ref<'lessons' | 'exams'>(route.path === '/exams' ? 'exams' : 'lessons')
-
-watch(
-  () => route.path,
-  (newPath) => {
-    activeTab.value = newPath === '/exams' ? 'exams' : 'lessons'
-  }
-)
+// Active tab state
+const router = useRouter()
+const activeTab = ref<'lessons' | 'exams'>('lessons')
 
 // Multiple Choice Question Builder State
 const questions = ref<any[]>([])
@@ -221,7 +214,7 @@ function addQuestion() {
     showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
     return
   }
-  if (newOptions.value.some(o => !o.trim())) {
+  if (newOptions.value.some((o: string) => !o.trim())) {
     showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
     return
   }
@@ -245,7 +238,7 @@ function removeQuestion(index: number) {
 const expandedLessons = ref<string[]>([])
 function toggleLessonExpand(id: string) {
   if (expandedLessons.value.includes(id)) {
-    expandedLessons.value = expandedLessons.value.filter(x => x !== id)
+    expandedLessons.value = expandedLessons.value.filter((x: string) => x !== id)
   } else {
     expandedLessons.value.push(id)
   }
@@ -255,7 +248,7 @@ function toggleLessonExpand(id: string) {
 const expandedExams = ref<string[]>([])
 function toggleExamExpand(id: string) {
   if (expandedExams.value.includes(id)) {
-    expandedExams.value = expandedExams.value.filter(x => x !== id)
+    expandedExams.value = expandedExams.value.filter((x: string) => x !== id)
   } else {
     expandedExams.value.push(id)
   }
@@ -359,7 +352,7 @@ function getExamTypeLabel(type: string) {
 }
 
 const currentClassObj = computed(() => {
-  return classes.value.find(c => c.id === selectedClass.value)
+  return classes.value.find((c: any) => c.id === selectedClass.value)
 })
 
 const exportingPDF = ref<string | null>(null)
@@ -723,7 +716,7 @@ function addQuestionToEditExam() {
     showToast('warning', 'Cảnh báo', 'Nội dung câu hỏi không được để trống!')
     return
   }
-  if (editNewOptions.value.some(o => !o.trim())) {
+  if (editNewOptions.value.some((o: string) => !o.trim())) {
     showToast('warning', 'Cảnh báo', 'Vui lòng nhập đầy đủ cả 4 đáp án A, B, C, D!')
     return
   }

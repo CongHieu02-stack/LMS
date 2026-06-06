@@ -198,11 +198,11 @@ async function handleCreateUser() {
 async function handleDeleteUser(user: any) {
   const actorRank = authStore.profile?.rank || 0
   if (user.rank >= actorRank) {
-    alert('Bạn không có quyền xóa tài khoản có cấp bậc bằng hoặc cao hơn.')
+    errorMessage.value = 'Bạn không có quyền xóa tài khoản có cấp bậc bằng hoặc cao hơn.'
     return
   }
   if (user.id === authStore.profile?.id) {
-    alert('Bạn không thể tự xóa chính mình.')
+    errorMessage.value = 'Bạn không thể tự xóa chính mình.'
     return
   }
 

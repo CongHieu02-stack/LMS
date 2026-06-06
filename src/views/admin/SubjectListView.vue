@@ -16,6 +16,7 @@ const showDetails = ref(false)
 const showLockModal = ref(false)
 const lockReason = ref('')
 const submittingLock = ref(false)
+const modalError = ref<string | null>(null)
 
 // Lọc hiển thị (Tất cả / Đang hoạt động / Bị khóa)
 const currentFilter = ref('all') // all, active, locked
@@ -58,24 +59,25 @@ function closeDetails() {
 function openLockModal(subject: any) {
   selectedSubject.value = subject
   lockReason.value = ''
+  modalError.value = null
   showLockModal.value = true
 }
 
 function closeLockModal() {
   showLockModal.value = false
   lockReason.value = ''
-  // Nếu panel chi tiết đang mở và môn bị khóa là môn đó, giữ nguyên selectedSubject để xem tiếp
 }
 
 async function submitLock() {
   if (!lockReason.value.trim()) {
-    alert('Vui lòng nhập lý do khóa môn học.')
+    modalError.value = 'Vui lòng nhập lý do khóa môn học.'
     return
   }
 
   submittingLock.value = true
   errorMessage.value = null
   successMessage.value = null
+  modalError.value = null
 
   try {
     const res = await apiPut<any>(`/subjects/${selectedSubject.value.id}/lock`, {
@@ -95,7 +97,7 @@ async function submitLock() {
       await fetchSubjects()
     }
   } catch (err) {
-    errorMessage.value = (err as Error).message || `Gặp lỗi khi khóa môn học.`
+    modalError.value = (err as Error).message || `Gặp lỗi khi khóa môn học.`
   } finally {
     submittingLock.value = false
   }
@@ -297,6 +299,10 @@ onMounted(() => {
           <button class="btn-close" @click="closeLockModal"><i class="pi pi-times"></i></button>
         </div>
         <div class="modal-body">
+          <div v-if="modalError" class="mono-alert alert-error" style="margin-bottom: 1rem; padding: 0.5rem 1rem; border-radius: 6px;">
+            <i class="pi pi-exclamation-triangle"></i>
+            <div>{{ modalError }}</div>
+          </div>
           <p>
             Khi khóa môn học <strong>{{ selectedSubject?.name }}</strong
             >, các lớp học mới sẽ không thể được mở thêm cho môn này. Các lớp đang diễn ra vẫn hoạt

@@ -75,7 +75,8 @@ export async function findRegistrationsByStudent(studentId) {
       id,
       registered_at,
       class:classes(id, name, remaining_slots, max_slots,
-        subject:subjects(code, name)
+        subject:subjects(code, name),
+        instructor:profiles!instructor_id(id, full_name, email)
       )
     `)
     .eq('student_id', studentId)
