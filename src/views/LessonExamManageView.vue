@@ -15,7 +15,7 @@ const loading = ref(true)
 const msg = ref<string | null>(null)
 
 // Forms
-const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
+const lessonForm = ref({ title: '', youtubeUrl: '', videoUrl: '', fileUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1, videoFile: null, docFile: null })
 const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm' })
 
 // Modal state variables
@@ -254,14 +254,18 @@ function parseLessonContent(contentStr: string) {
     return {
       type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
       youtubeId: parsed.youtubeId || '',
+      videoUrl: parsed.videoUrl || '',
       docContent: parsed.docContent || '',
+      fileUrl: parsed.fileUrl || '',
       description: parsed.description || ''
     }
   } catch {
     return {
       type: 'video',
       youtubeId: '',
+      videoUrl: '',
       docContent: '',
+      fileUrl: '',
       description: contentStr || ''
     }
   }
@@ -345,21 +349,56 @@ async function loadClassContent() {
 
 onMounted(loadClasses)
 
+async function uploadFile(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/lessons/upload`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${authStore.token}`
+    },
+    body: formData
+  })
+
+  const data = await res.json()
+  if (!data.success) {
+    throw new Error(data.error || 'Lỗi khi tải lên file')
+  }
+
+  return data.fileUrl
+}
+
 async function createLesson() {
   if (!selectedClass.value) return
   try {
+    let videoUrl = lessonForm.value.videoUrl
+    let fileUrl = lessonForm.value.fileUrl
+
+    // Upload video file if provided
+    if (lessonForm.value.videoFile) {
+      videoUrl = await uploadFile(lessonForm.value.videoFile)
+    }
+
+    // Upload document file if provided
+    if (lessonForm.value.docFile) {
+      fileUrl = await uploadFile(lessonForm.value.docFile)
+    }
+
     let contentPayload = ''
     if (lessonForm.value.type === 'video') {
       const ytId = getYouTubeId(lessonForm.value.youtubeUrl)
       contentPayload = JSON.stringify({
         type: 'video',
         youtubeId: ytId,
+        videoUrl: videoUrl,
         description: lessonForm.value.description
       })
     } else {
       contentPayload = JSON.stringify({
         type: 'doc',
         docContent: lessonForm.value.docContent,
+        fileUrl: fileUrl,
         description: lessonForm.value.description
       })
     }
@@ -370,14 +409,18 @@ async function createLesson() {
       content: contentPayload,
       sortOrder: lessonForm.value.sortOrder
     })
-    
-    lessonForm.value = { 
-      title: '', 
-      youtubeUrl: '', 
-      description: '', 
-      docContent: '', 
-      type: 'video', 
-      sortOrder: lessons.value.length + 2 
+
+    lessonForm.value = {
+      title: '',
+      youtubeUrl: '',
+      videoUrl: '',
+      fileUrl: '',
+      description: '',
+      docContent: '',
+      type: 'video',
+      sortOrder: lessons.value.length + 2,
+      videoFile: null,
+      docFile: null
     }
     loadClassContent()
     showCreateLessonModal.value = false
@@ -432,9 +475,13 @@ const editLessonForm = ref({
   title: '',
   type: 'video',
   youtubeUrl: '',
+  videoUrl: '',
+  fileUrl: '',
   docContent: '',
   description: '',
-  sortOrder: 1
+  sortOrder: 1,
+  videoFile: null,
+  docFile: null
 })
 
 function startEditLesson(lesson: any) {
@@ -444,9 +491,13 @@ function startEditLesson(lesson: any) {
     title: lesson.title,
     type: content.type,
     youtubeUrl: content.type === 'video' && content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
+    videoUrl: content.videoUrl || '',
+    fileUrl: content.fileUrl || '',
     docContent: content.type === 'doc' ? content.docContent : '',
     description: content.description || '',
-    sortOrder: lesson.sort_order || lesson.sortOrder || 1
+    sortOrder: lesson.sort_order || lesson.sortOrder || 1,
+    videoFile: null,
+    docFile: null
   }
   showEditLessonModal.value = true
 }
@@ -454,18 +505,33 @@ function startEditLesson(lesson: any) {
 async function saveEditLesson() {
   if (!editingLessonId.value) return
   try {
+    let videoUrl = editLessonForm.value.videoUrl
+    let fileUrl = editLessonForm.value.fileUrl
+
+    // Upload video file if provided
+    if (editLessonForm.value.videoFile) {
+      videoUrl = await uploadFile(editLessonForm.value.videoFile)
+    }
+
+    // Upload document file if provided
+    if (editLessonForm.value.docFile) {
+      fileUrl = await uploadFile(editLessonForm.value.docFile)
+    }
+
     let contentPayload = ''
     if (editLessonForm.value.type === 'video') {
       const ytId = getYouTubeId(editLessonForm.value.youtubeUrl)
       contentPayload = JSON.stringify({
         type: 'video',
         youtubeId: ytId,
+        videoUrl: videoUrl,
         description: editLessonForm.value.description
       })
     } else {
       contentPayload = JSON.stringify({
         type: 'doc',
         docContent: editLessonForm.value.docContent,
+        fileUrl: fileUrl,
         description: editLessonForm.value.description
       })
     }
@@ -699,10 +765,20 @@ async function saveEditExam() {
 
           <div v-if="lessonForm.type === 'video'">
             <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
+            <input v-model="lessonForm.videoUrl" class="inp w-full mt-2" placeholder="Link Video tải lên (mp4, webm...)..." />
+            <div class="mt-2">
+              <label class="text-sm font-semibold text-gray-700">Hoặc tải lên file video:</label>
+              <input type="file" accept="video/*" @change="(e: any) => lessonForm.videoFile = e.target.files[0]" class="inp w-full mt-1" />
+            </div>
           </div>
-          
+
           <div v-else-if="lessonForm.type === 'doc'">
-            <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
+            <input v-model="lessonForm.fileUrl" class="inp w-full" placeholder="Link tài liệu (PDF, Word...)..." />
+            <div class="mt-2">
+              <label class="text-sm font-semibold text-gray-700">Hoặc tải lên file tài liệu:</label>
+              <input type="file" accept=".pdf,.doc,.docx" @change="(e: any) => lessonForm.docFile = e.target.files[0]" class="inp w-full mt-1" />
+            </div>
+            <textarea v-model="lessonForm.docContent" class="inp w-full html-editor mt-2" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
             <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
           </div>
 
@@ -955,10 +1031,20 @@ async function saveEditExam() {
 
           <div v-if="editLessonForm.type === 'video'">
             <input v-model="editLessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube..." />
+            <input v-model="editLessonForm.videoUrl" class="inp w-full mt-2" placeholder="Link Video tải lên (mp4, webm...)..." />
+            <div class="mt-2">
+              <label class="text-sm font-semibold text-gray-700">Hoặc tải lên file video:</label>
+              <input type="file" accept="video/*" @change="(e: any) => editLessonForm.videoFile = e.target.files[0]" class="inp w-full mt-1" />
+            </div>
           </div>
-          
+
           <div v-else-if="editLessonForm.type === 'doc'">
-            <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
+            <input v-model="editLessonForm.fileUrl" class="inp w-full" placeholder="Link tài liệu (PDF, Word...)..." />
+            <div class="mt-2">
+              <label class="text-sm font-semibold text-gray-700">Hoặc tải lên file tài liệu:</label>
+              <input type="file" accept=".pdf,.doc,.docx" @change="(e: any) => editLessonForm.docFile = e.target.files[0]" class="inp w-full mt-1" />
+            </div>
+            <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor mt-2" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
           </div>
 
           <textarea v-model="editLessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt..."></textarea>

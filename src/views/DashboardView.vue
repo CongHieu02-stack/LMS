@@ -167,14 +167,18 @@ function parseLessonContent(contentStr: string) {
     return {
       type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
       youtubeId: parsed.youtubeId || '',
+      videoUrl: parsed.videoUrl || '',
       docContent: parsed.docContent || '',
+      fileUrl: parsed.fileUrl || '',
       description: parsed.description || '',
     }
   } catch {
     return {
       type: 'video',
       youtubeId: '',
+      videoUrl: '',
       docContent: '',
+      fileUrl: '',
       description: contentStr || '',
     }
   }
@@ -620,14 +624,34 @@ onMounted(() => {
                     <i class="pi pi-file-pdf mr-1"></i>Tài liệu
                   </span>
                 </div>
-                <i
-                  class="pi"
-                  :class="
-                    expandedStudentLessons.includes(l.id)
-                      ? 'pi-chevron-up text-purple-600'
-                      : 'pi-chevron-down'
-                  "
-                ></i>
+                <div class="student-lesson-actions">
+                  <a
+                    v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).videoUrl"
+                    :href="parseLessonContent(l.content).videoUrl"
+                    class="btn-download-small"
+                    download
+                    @click.stop
+                  >
+                    <i class="pi pi-download"></i>
+                  </a>
+                  <a
+                    v-if="parseLessonContent(l.content).type === 'doc' && parseLessonContent(l.content).fileUrl"
+                    :href="parseLessonContent(l.content).fileUrl"
+                    class="btn-download-small"
+                    download
+                    @click.stop
+                  >
+                    <i class="pi pi-download"></i>
+                  </a>
+                  <i
+                    class="pi"
+                    :class="
+                      expandedStudentLessons.includes(l.id)
+                        ? 'pi-chevron-up text-purple-600'
+                        : 'pi-chevron-down'
+                    "
+                  ></i>
+                </div>
               </div>
 
               <div v-if="expandedStudentLessons.includes(l.id)" class="student-lesson-body">
@@ -652,6 +676,17 @@ onMounted(() => {
                     allowfullscreen
                   >
                   </iframe>
+                </div>
+
+                <!-- Non-YouTube video -->
+                <div
+                  v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).videoUrl"
+                  class="student-video-wrapper mb-3"
+                >
+                  <video controls class="w-full" style="max-height: 400px">
+                    <source :src="parseLessonContent(l.content).videoUrl" type="video/mp4">
+                    Trình duyệt của bạn không hỗ trợ phát video.
+                  </video>
                 </div>
 
                 <!-- Document viewer -->
@@ -1354,6 +1389,27 @@ onMounted(() => {
   align-items: center;
   font-weight: 600;
   color: #111827;
+  flex: 1;
+}
+.student-lesson-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.btn-download-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #10b981;
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.btn-download-small:hover {
+  background: #059669;
 }
 .lesson-index {
   font-size: 0.8rem;
@@ -1437,17 +1493,34 @@ onMounted(() => {
   padding: 0.5rem 1rem;
   border-radius: 8px;
   font-size: 0.85rem;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s;
 }
 .btn-pdf-download:hover:not(:disabled) {
   background: #dc2626;
-  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);
 }
 .btn-pdf-download:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+.video-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.btn-video-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ff0000;
+  color: #fff;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+.btn-video-link:hover {
+  background: #cc0000;
 }
 .pdf-print-area {
   background: #ffffff;
