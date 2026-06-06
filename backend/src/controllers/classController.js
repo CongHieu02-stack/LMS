@@ -188,40 +188,141 @@ export async function assignInstructor(req, res) {
   }
 }
 
+
 /**
- * PUT /api/classes/:id/approve — Duyệt mở lớp và tự động xếp phòng ngẫu nhiên.
+ * PUT /api/classes/:id/approve — Duyệt mở lớp. Hỗ trợ tự động xếp phòng hoặc chỉ định phòng cụ thể.
  */
 export async function approveClass(req, res) {
   try {
     const { id } = req.params
-    const { maxStudents, schedule } = req.body
+    const { maxStudents, schedule, roomName, startDate, endDate } = req.body
 
     if (!maxStudents || parseInt(maxStudents) <= 0) {
       return res.status(400).json({ error: 'Số lượng sinh viên tối đa phải lớn hơn 0.' })
     }
 
-    // Nếu PĐT nhập lịch học, cập nhật vào DB trước khi gọi RPC tìm phòng
-    // (RPC đọc schedule từ DB để kiểm tra trùng lịch)
-    if (schedule && schedule.trim()) {
-      const { supabaseAdmin } = await import('../config/supabase.js')
-      const { error: schedErr } = await supabaseAdmin
-        .from('classes')
-        .update({ schedule: schedule.trim(), updated_at: new Date().toISOString() })
-        .eq('id', id)
-      if (schedErr) {
-        return res.status(500).json({ error: `Lỗi khi lưu lịch học: ${schedErr.message}` })
+    // Kiểm tra ràng buộc ngày tháng
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: 'Định dạng ngày tháng không hợp lệ.' })
+      }
+
+      if (end < start) {
+        return res.status(400).json({ error: 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.' })
+      }
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const minStartDate = new Date(today)
+      minStartDate.setDate(minStartDate.getDate() + 14)
+
+      start.setHours(0, 0, 0, 0)
+      if (start < minStartDate) {
+        return res.status(400).json({ error: 'Ngày bắt đầu phải cách ngày hiện tại ít nhất 2 tuần (14 ngày).' })
       }
     }
 
-    const result = await classModel.approveClassAndRandomRoom(id, parseInt(maxStudents))
-    
-    await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${result.room || 'Chưa xếp'}, Lịch học: ${result.schedule || 'Chưa xếp'})`)
+    const { supabaseAdmin } = await import('../config/supabase.js')
 
-    return res.json({
-      success: true,
-      message: `Duyệt lớp học và xếp phòng tự động thành công.`,
-      data: result
-    })
+    // 1. Lưu lịch học và ngày tháng học vụ trước (hoặc thiết lập null nếu không nhập)
+    const finalSchedule = schedule && schedule.trim() ? schedule.trim() : null
+    const updatePayload = { 
+      schedule: finalSchedule, 
+      updated_at: new Date().toISOString() 
+    }
+    if (startDate) updatePayload.start_date = startDate
+    if (endDate) updatePayload.end_date = endDate
+
+    const { error: schedErr } = await supabaseAdmin
+      .from('classes')
+      .update(updatePayload)
+      .eq('id', id)
+
+    if (schedErr) {
+      return res.status(500).json({ error: `Lỗi khi lưu lịch học & thời gian: ${schedErr.message}` })
+    }
+
+    // 2. Kiểm tra nếu chỉ định phòng học cụ thể
+    if (roomName && roomName.trim() && roomName.trim() !== 'auto') {
+      const trimmedRoom = roomName.trim()
+
+      // Kiểm tra trùng lịch phòng học
+      const { data: overlapData, error: overlapErr } = await supabaseAdmin
+        .rpc('check_room_overlap_for_approve', {
+          p_room_name: trimmedRoom,
+          p_schedule: finalSchedule || '',
+          p_class_id: id
+        })
+
+      if (overlapErr) {
+        console.warn('[ClassController.approveClass] check_room_overlap_for_approve error, fallback to warning only', overlapErr)
+      } else if (overlapData && overlapData.has_overlap) {
+        return res.status(400).json({ error: `Phòng học ${trimmedRoom} đã bị trùng lịch với lớp khác trong thời gian này!` })
+      }
+
+      // Lấy capacity của phòng
+      const { data: roomObj, error: roomErr } = await supabaseAdmin
+        .from('rooms')
+        .select('id, name, capacity')
+        .eq('name', trimmedRoom)
+        .maybeSingle()
+
+      if (roomErr) {
+        return res.status(500).json({ error: `Lỗi khi kiểm tra thông tin phòng: ${roomErr.message}` })
+      }
+
+      if (roomObj) {
+        if (parseInt(maxStudents) > roomObj.capacity) {
+          return res.status(400).json({
+            error: `Sức chứa của phòng ${trimmedRoom} (${roomObj.capacity} chỗ) nhỏ hơn sĩ số tối đa yêu cầu (${maxStudents}).`
+          })
+        }
+      }
+
+      const roomId = roomObj ? roomObj.id : null
+
+      // Duyệt trực tiếp với phòng được chọn
+      const { data: updatedClass, error: updateErr } = await supabaseAdmin
+        .from('classes')
+        .update({
+          status: 'APPROVED',
+          room_id: roomId,
+          room: trimmedRoom,
+          max_students: parseInt(maxStudents),
+          max_slots: parseInt(maxStudents),
+          remaining_slots: parseInt(maxStudents),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateErr) {
+        return res.status(500).json({ error: `Lỗi khi duyệt mở lớp: ${updateErr.message}` })
+      }
+
+      await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${trimmedRoom}, Lịch học: ${finalSchedule || 'Chưa xếp'})`)
+
+      return res.json({
+        success: true,
+        message: `Duyệt lớp học và gán phòng ${trimmedRoom} thành công.`,
+        data: updatedClass
+      })
+    } else {
+      // Tự động xếp phòng ngẫu nhiên
+      const result = await classModel.approveClassAndRandomRoom(id, parseInt(maxStudents))
+      
+      await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${result.room || 'Chưa xếp'}, Lịch học: ${result.schedule || 'Chưa xếp'})`)
+
+      return res.json({
+        success: true,
+        message: `Duyệt lớp học và tự động xếp phòng thành công.`,
+        data: result
+      })
+    }
   } catch (err) {
     console.error('[ClassController.approveClass]', err.message)
     return res.status(400).json({ error: err.message || 'Lỗi khi duyệt lớp học.' })
@@ -254,6 +355,29 @@ export async function rejectClass(req, res) {
   } catch (err) {
     console.error('[ClassController.rejectClass]', err.message)
     return res.status(500).json({ error: 'Lỗi khi từ chối mở lớp.' })
+  }
+}
+
+/**
+ * GET /api/classes/rooms — Lấy danh sách phòng học.
+ */
+export async function listRooms(req, res) {
+  try {
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data, error } = await supabaseAdmin
+      .from('rooms')
+      .select('id, name, capacity')
+      .order('name', { ascending: true })
+
+    if (error) throw error
+
+    return res.json({
+      success: true,
+      data: data || []
+    })
+  } catch (err) {
+    console.error('[ClassController.listRooms]', err.message)
+    return res.status(500).json({ error: 'Không thể tải danh sách phòng học.' })
   }
 }
 

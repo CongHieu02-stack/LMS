@@ -313,6 +313,7 @@ function formatTime(seconds: number) {
 
 function getExamTypeLabel(type: string) {
   const labels: Record<string, string> = {
+    regular: 'Thường xuyên',
     midterm: 'Giữa kỳ',
     final: 'Cuối kỳ'
   }
@@ -549,6 +550,10 @@ onUnmounted(() => {
   border-radius: 999px;
   font-weight: 600;
   gap: 0.25rem;
+}
+.badge-regular {
+  background: #e0f2fe;
+  color: #0369a1;
 }
 .badge-midterm {
   background: #fef3c7;

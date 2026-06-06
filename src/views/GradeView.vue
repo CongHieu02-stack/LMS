@@ -9,10 +9,12 @@ interface GradeItem {
   subjectCode: string
   subjectName: string
   credits: number
+  regular1: number | null
+  regular2: number | null
   midtermScore: number | null
   finalScore: number | null
-  averageScore: number
-  pass: boolean
+  averageScore: number | null
+  pass: boolean | null
   semester: string
   className: string
 }
@@ -21,10 +23,12 @@ interface RawGrade {
   subjectCode: string
   subjectName: string
   credits: number
+  regular1: number | null
+  regular2: number | null
   midtermScore: number | null
   finalScore: number | null
-  averageScore: number
-  pass: boolean
+  averageScore: number | null
+  pass: boolean | null
   semester: string
   className: string
 }
@@ -56,6 +60,8 @@ async function loadGrades() {
       subjectCode: g.subjectCode,
       subjectName: g.subjectName,
       credits: g.credits,
+      regular1: g.regular1,
+      regular2: g.regular2,
       midtermScore: g.midtermScore,
       finalScore: g.finalScore,
       averageScore: g.averageScore,
@@ -95,14 +101,7 @@ const groupedBySemester = computed(() => {
 ========================= */
 function toScale4(score: number): number {
   if (score === null || score === undefined) return 0.0
-  if (score >= 8.5) return 4.0
-  if (score >= 8.0) return 3.5
-  if (score >= 7.0) return 3.0
-  if (score >= 6.5) return 2.5
-  if (score >= 5.5) return 2.0
-  if (score >= 5.0) return 1.5
-  if (score >= 4.0) return 1.0
-  return 0.0
+  return score * 0.4
 }
 
 function toLetter(score: number): string {
@@ -123,12 +122,15 @@ function toLetter(score: number): string {
 const gpa10 = computed(() => {
   if (grades.value.length === 0) return '0.00'
 
-  const total = grades.value.reduce(
-    (acc: number, g: GradeItem) => acc + g.averageScore * g.credits,
+  const validGrades = grades.value.filter(g => g.averageScore !== null)
+  if (validGrades.length === 0) return '0.00'
+
+  const total = validGrades.reduce(
+    (acc: number, g: GradeItem) => acc + (g.averageScore || 0) * g.credits,
     0
   )
 
-  const credits = grades.value.reduce(
+  const credits = validGrades.reduce(
     (acc: number, g: GradeItem) => acc + g.credits,
     0
   )
@@ -142,12 +144,15 @@ const gpa10 = computed(() => {
 const gpa4 = computed(() => {
   if (grades.value.length === 0) return '0.00'
 
-  const total = grades.value.reduce(
-    (acc: number, g: GradeItem) => acc + toScale4(g.averageScore) * g.credits,
+  const validGrades = grades.value.filter(g => g.averageScore !== null)
+  if (validGrades.length === 0) return '0.00'
+
+  const total = validGrades.reduce(
+    (acc: number, g: GradeItem) => acc + toScale4(g.averageScore || 0) * g.credits,
     0
   )
 
-  const credits = grades.value.reduce(
+  const credits = validGrades.reduce(
     (acc: number, g: GradeItem) => acc + g.credits,
     0
   )
@@ -162,12 +167,18 @@ const semesterGpa10 = computed(() => {
   const result = new Map<string, string>()
 
   for (const { semester, items } of groupedBySemester.value) {
-    const total = items.reduce(
-      (acc: number, g: GradeItem) => acc + g.averageScore * g.credits,
+    const validItems = items.filter(g => g.averageScore !== null)
+    if (validItems.length === 0) {
+      result.set(semester, '0.00')
+      continue
+    }
+
+    const total = validItems.reduce(
+      (acc: number, g: GradeItem) => acc + (g.averageScore || 0) * g.credits,
       0
     )
 
-    const credits = items.reduce(
+    const credits = validItems.reduce(
       (acc: number, g: GradeItem) => acc + g.credits,
       0
     )
@@ -182,12 +193,18 @@ const semesterGpa4 = computed(() => {
   const result = new Map<string, string>()
 
   for (const { semester, items } of groupedBySemester.value) {
-    const total = items.reduce(
-      (acc: number, g: GradeItem) => acc + toScale4(g.averageScore) * g.credits,
+    const validItems = items.filter(g => g.averageScore !== null)
+    if (validItems.length === 0) {
+      result.set(semester, '0.00')
+      continue
+    }
+
+    const total = validItems.reduce(
+      (acc: number, g: GradeItem) => acc + toScale4(g.averageScore || 0) * g.credits,
       0
     )
 
-    const credits = items.reduce(
+    const credits = validItems.reduce(
       (acc: number, g: GradeItem) => acc + g.credits,
       0
     )
@@ -314,6 +331,8 @@ onMounted(loadGrades)
                     <th>Mã Môn</th>
                     <th>Tên Môn Học</th>
                     <th class="tc">Số TC</th>
+                    <th class="tc">Điểm TX1</th>
+                    <th class="tc">Điểm TX2</th>
                     <th class="tc">Điểm GK</th>
                     <th class="tc">Điểm CK</th>
                     <th class="tc">Hệ 10</th>
@@ -328,6 +347,8 @@ onMounted(loadGrades)
                     <td class="font-mono">{{ g.subjectCode }}</td>
                     <td class="fw-600">{{ g.subjectName }}</td>
                     <td class="tc">{{ g.credits }}</td>
+                    <td class="tc">{{ g.regular1 !== null ? g.regular1.toFixed(1) : '-' }}</td>
+                    <td class="tc">{{ g.regular2 !== null ? g.regular2.toFixed(1) : '-' }}</td>
                     <td class="tc">{{ g.midtermScore !== null ? g.midtermScore.toFixed(1) : '-' }}</td>
                     <td class="tc">{{ g.finalScore !== null ? g.finalScore.toFixed(1) : '-' }}</td>
                     <td class="tc fw-700"
@@ -338,12 +359,12 @@ onMounted(loadGrades)
                       {{ g.averageScore !== null ? toScale4(g.averageScore).toFixed(2) : '-' }}
                     </td>
                     <td class="tc font-mono fw-700"
-                        :class="g.averageScore !== null && toLetter(g.averageScore) !== 'F' ? 'text-green' : 'text-red'">
+                        :class="g.averageScore !== null ? (toLetter(g.averageScore) !== 'F' ? 'text-green' : 'text-red') : ''">
                       {{ g.averageScore !== null ? toLetter(g.averageScore) : '-' }}
                     </td>
                     <td class="tc">
                       <span class="status-badge"
-                            :class="g.pass ? 'badge-pass' : 'badge-fail'">
+                            :class="g.pass === null || g.pass === undefined ? 'badge-pending' : (g.pass ? 'badge-pass' : 'badge-fail')">
                         {{ getStatus(g.pass) }}
                       </span>
                     </td>
@@ -428,6 +449,7 @@ onMounted(loadGrades)
 
 .badge-pass { background:#dcfce7; color:#166534; }
 .badge-fail { background:#fee2e2; color:#991b1b; }
+.badge-pending { background:#ffffff; color:#6b7280; border: 1px solid #e5e7eb; }
 
 .empty-state { text-align:center; padding:4rem; color:#6b7280; }
 </style>

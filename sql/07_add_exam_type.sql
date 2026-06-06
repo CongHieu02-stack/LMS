@@ -1,5 +1,5 @@
 -- ============================================================================
--- MIGRATION #07: Thêm exam_type để phân biệt điểm giữa kỳ và cuối kỳ
+-- MIGRATION #07: Thêm exam_type để phân biệt điểm kiểm tra thường xuyên, giữa kỳ và cuối kỳ
 -- Chạy trong Supabase SQL Editor
 -- ============================================================================
 
@@ -24,9 +24,9 @@ ALTER COLUMN exam_type SET NOT NULL;
 ALTER TABLE public.exams 
 ALTER COLUMN exam_type SET DEFAULT 'midterm';
 
--- BƯỚC 6: Thêm constraint mới chỉ cho phép midterm và final
+-- BƯỚC 6: Thêm constraint mới cho phép regular, midterm và final
 ALTER TABLE public.exams 
-ADD CONSTRAINT exams_exam_type_check CHECK (exam_type IN ('midterm', 'final'));
+ADD CONSTRAINT exams_exam_type_check CHECK (exam_type IN ('regular', 'midterm', 'final'));
 
 -- Comment cho cột mới
-COMMENT ON COLUMN public.exams.exam_type IS 'Loại bài thi: midterm (giữa kỳ 40%), final (cuối kỳ 60%)';
+COMMENT ON COLUMN public.exams.exam_type IS 'Loại bài thi: regular (thường xuyên 10%), midterm (giữa kỳ 30%), final (cuối kỳ 60%)';
