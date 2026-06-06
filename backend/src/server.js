@@ -14,4 +14,13 @@ app.listen(PORT, () => {
   console.log(`[LMS Backend] Môi trường: ${process.env.NODE_ENV || 'development'}`)
 })
 
+// Ngăn server crash khi gặp lỗi mạng/kết nối không mong muốn (như ECONNRESET)
+process.on('uncaughtException', (err) => {
+  console.error('[LMS Uncaught Exception]', err)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[LMS Unhandled Rejection] Tại:', promise, 'Lý do:', reason)
+})
+
 // Watch reload trigger
