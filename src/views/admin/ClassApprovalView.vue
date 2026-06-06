@@ -11,21 +11,52 @@ const toast = useToast()
 const activeTab = ref<'proposals' | 'classes'>('proposals')
 const classes = ref<any[]>([])
 const proposals = ref<any[]>([])
+const rooms = ref<any[]>([])
 const loading = ref(true)
 const processing = ref<string | null>(null)
 const msg = ref<string | null>(null)
+const minStartDateStr = ref('')
+
+// Custom Confirm Modal State
+const isConfirmModalOpen = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmOkText = ref('Xác nhận')
+const confirmCancelText = ref('Hủy bỏ')
+let onConfirmCallback: (() => void) | null = null
+
+function showCustomConfirm(title: string, message: string, onConfirm: () => void, okText = 'Xác nhận', cancelText = 'Hủy bỏ') {
+  confirmTitle.value = title
+  confirmMessage.value = message
+  confirmOkText.value = okText
+  confirmCancelText.value = cancelText
+  onConfirmCallback = onConfirm
+  isConfirmModalOpen.value = true
+}
+
+function handleConfirmAccept() {
+  if (onConfirmCallback) onConfirmCallback()
+  isConfirmModalOpen.value = false
+}
+
+function handleConfirmCancel() {
+  isConfirmModalOpen.value = false
+}
 
 async function loadData() {
   loading.value = true
   msg.value = null
   try {
-    const [propRes, classRes] = await Promise.all([
+    const [propRes, classRes, roomRes] = await Promise.all([
       apiGet<{ success: boolean; data: any[] }>('/class-proposals/pending'),
-      apiGet<any>('/classes')
+      apiGet<any>('/classes'),
+      apiGet<{ success: boolean; data: any[] }>('/classes/rooms')
     ])
     proposals.value = propRes.data || []
+    rooms.value = roomRes.data || []
     const allClasses = classRes.data || classRes || []
-    classes.value = allClasses.filter((c: any) => c.status === 'draft')
+    // Hiển thị cả các lớp nháp chờ duyệt lẫn lớp đã duyệt trong học kỳ này
+    classes.value = allClasses.filter((c: any) => c.status === 'draft' || c.status === 'approved' || c.status === 'APPROVED')
   } catch (err: any) {
     msg.value = err.message || 'Không thể tải dữ liệu từ máy chủ.'
   } finally {
@@ -34,35 +65,105 @@ async function loadData() {
 }
 
 async function handleProposalAction(id: string, status: 'approved' | 'rejected') {
+  const title = status === 'approved' ? 'Xác nhận duyệt đề xuất' : 'Xác nhận từ chối đề xuất'
   const confirmMsg = status === 'approved'
     ? 'Bạn có chắc chắn muốn DUYỆT đề xuất này không?\nHệ thống sẽ tự động khởi tạo các khung lớp.'
     : 'Bạn có chắc chắn muốn TỪ CHỐI đề xuất này không?'
-  if (!confirm(confirmMsg)) return
 
-  processing.value = id
-  try {
-    const res = await apiPut<{ success: boolean; message: string }>(`/class-proposals/${id}/status`, { status })
-    if (res?.success) {
-      toast.add({ severity: 'success', summary: 'Thành công', detail: res.message || 'Đã cập nhật.', life: 4000 })
-      await loadData()
-      if (status === 'approved') activeTab.value = 'classes'
+  showCustomConfirm(title, confirmMsg, async () => {
+    processing.value = id
+    try {
+      const res = await apiPut<{ success: boolean; message: string }>(`/class-proposals/${id}/status`, { status })
+      if (res?.success) {
+        toast.add({ severity: 'success', summary: 'Thành công', detail: res.message || 'Đã cập nhật.', life: 4000 })
+        await loadData()
+        if (status === 'approved') activeTab.value = 'classes'
+      }
+    } catch (err: any) {
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: err.message, life: 5000 })
+    } finally {
+      processing.value = null
     }
-  } catch (err: any) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: err.message, life: 5000 })
-  } finally {
-    processing.value = null
+  }, status === 'approved' ? 'Phê duyệt' : 'Từ chối')
+}
+
+const approvalSessions = ref<any[]>([
+  { day: 'T2', startTime: '07:30', endTime: '10:00' }
+])
+
+function addApprovalSession() {
+  approvalSessions.value.push({ day: 'T2', startTime: '07:30', endTime: '10:00' })
+}
+
+function removeApprovalSession(index: number) {
+  approvalSessions.value.splice(index, 1)
+}
+
+function openApprovalModalWithSessions(
+  classId: string,
+  existingSchedule?: string,
+  defaultMaxStudents?: number,
+  existingRoom?: string,
+  existingStartDate?: string,
+  existingEndDate?: string
+) {
+  if (!existingSchedule || !existingSchedule.trim()) {
+    approvalSessions.value = [{ day: 'T2', startTime: '07:30', endTime: '10:00' }]
+  } else {
+    const list: any[] = []
+    const parts = existingSchedule.split(',')
+    for (const part of parts) {
+      const match = part.trim().match(/^([A-Z0-9]+)\((\d{2}:\d{2})-(\d{2}:\d{2})\)$/i)
+      if (match) {
+        list.push({
+          day: match[1],
+          startTime: match[2],
+          endTime: match[3]
+        })
+      }
+    }
+    if (list.length === 0) {
+      approvalSessions.value = [{ day: 'T2', startTime: '07:30', endTime: '10:00' }]
+    } else {
+      approvalSessions.value = list
+    }
   }
+
+  openApproveModal(classId, existingSchedule, defaultMaxStudents, existingRoom, existingStartDate, existingEndDate)
 }
 
 const {
-  isApproveModalOpen, maxStudentsInput, scheduleInput,
+  isApproveModalOpen, maxStudentsInput, scheduleInput, roomNameInput, startDateInput, endDateInput,
   submitting, errorMessage, openApproveModal, closeApproveModal, submitApproveClass
 } = useClassApproval(async () => {
-  toast.add({ severity: 'success', summary: 'Thành công', detail: 'Lớp đã được duyệt và tự động xếp phòng!', life: 4000 })
+  toast.add({ severity: 'success', summary: 'Thành công', detail: 'Lớp đã được duyệt và gán phòng học!', life: 4000 })
   await loadData()
 })
 
+function formatDate(d?: string) {
+  if (!d) return '—'
+  const dateObj = new Date(d)
+  if (isNaN(dateObj.getTime())) return d
+  const dd = String(dateObj.getDate()).padStart(2, '0')
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0')
+  const yyyy = dateObj.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
+}
+
 async function handleApproveSubmit() {
+  for (const s of approvalSessions.value) {
+    if (!s.startTime || !s.endTime) {
+      toast.add({ severity: 'error', summary: 'Lỗi lịch học', detail: 'Vui lòng nhập đầy đủ giờ học cho tất cả các buổi.', life: 5000 })
+      return
+    }
+    if (s.startTime >= s.endTime) {
+      toast.add({ severity: 'error', summary: 'Lỗi lịch học', detail: `Giờ bắt đầu (${s.startTime}) phải nhỏ hơn giờ kết thúc (${s.endTime}).`, life: 5000 })
+      return
+    }
+  }
+
+  scheduleInput.value = approvalSessions.value.map((s: any) => `${s.day}(${s.startTime}-${s.endTime})`).join(', ')
+
   await submitApproveClass()
   if (errorMessage.value) {
     toast.add({ severity: 'error', summary: 'Lỗi duyệt lớp', detail: errorMessage.value, life: 5000 })
@@ -70,22 +171,31 @@ async function handleApproveSubmit() {
 }
 
 async function handleReject(id: string) {
-  if (!confirm('Bạn có chắc chắn muốn từ chối mở lớp học này không?')) return
-  processing.value = id
-  try {
-    const res = await apiPut<{ success: boolean; message: string }>(`/classes/${id}/reject`, {})
-    if (res?.success) {
-      toast.add({ severity: 'success', summary: 'Đã từ chối', detail: 'Cập nhật trạng thái lớp thành công.', life: 4000 })
-      await loadData()
+  showCustomConfirm('Xác nhận từ chối mở lớp', 'Bạn có chắc chắn muốn từ chối mở lớp học này không?', async () => {
+    processing.value = id
+    try {
+      const res = await apiPut<{ success: boolean; message: string }>(`/classes/${id}/reject`, {})
+      if (res?.success) {
+        toast.add({ severity: 'success', summary: 'Đã từ chối', detail: 'Cập nhật trạng thái lớp thành công.', life: 4000 })
+        await loadData()
+      }
+    } catch (err: any) {
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: err.message, life: 5000 })
+    } finally {
+      processing.value = null
     }
-  } catch (err: any) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: err.message, life: 5000 })
-  } finally {
-    processing.value = null
-  }
+  }, 'Từ chối mở')
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await loadData()
+  const today = new Date()
+  today.setDate(today.getDate() + 14)
+  const yyyy = today.getFullYear()
+  const mm = String(today.getMonth() + 1).padStart(2, '0')
+  const dd = String(today.getDate()).padStart(2, '0')
+  minStartDateStr.value = `${yyyy}-${mm}-${dd}`
+})
 </script>
 
 <template>
@@ -191,7 +301,7 @@ onMounted(loadData)
         </div>
         <div v-else class="mono-card">
           <div class="card-header">
-            <span>Lớp học chờ duyệt mở &amp; xếp phòng</span>
+            <span>Danh sách lớp học và phòng học</span>
             <i class="pi pi-building"></i>
           </div>
           <div class="table-container">
@@ -201,7 +311,7 @@ onMounted(loadData)
                   <th>Môn học</th>
                   <th>Mã lớp</th>
                   <th>Học kỳ</th>
-                  <th>Lịch học</th>
+                  <th>Phòng học / Lịch học</th>
                   <th>TBM phụ trách</th>
                   <th class="text-center">Hành động</th>
                 </tr>
@@ -214,18 +324,34 @@ onMounted(loadData)
                   </td>
                   <td><strong>{{ c.code }}</strong></td>
                   <td class="semester-cell">{{ c.semester }}</td>
-                  <td class="schedule-cell">{{ c.schedule || '—' }}</td>
+                  <td>
+                    <div>
+                      <span v-if="c.room" style="font-weight: 600; color: #166534;"><i class="pi pi-home mr-1"></i>{{ c.room }}</span>
+                      <span v-else style="color: #9ca3af; font-style: italic; font-size: 0.85rem;"><i class="pi pi-question-circle mr-1"></i>Chờ xếp phòng</span>
+                    </div>
+                    <div v-if="c.schedule" style="margin-top: 0.25rem; font-size: 0.8rem; color: #7c3aed; font-weight: 500;">
+                      <i class="pi pi-calendar mr-1"></i>Lịch: {{ c.schedule }}
+                    </div>
+                    <div v-if="c.startDate || c.endDate" style="margin-top: 0.25rem; font-size: 0.75rem; color: #4b5563;">
+                      <i class="pi pi-clock mr-1"></i>Thời gian: {{ formatDate(c.startDate) }} - {{ formatDate(c.endDate) }}
+                    </div>
+                  </td>
                   <td class="user-cell">
                     <i class="pi pi-user mr-1"></i>{{ c.manager?.fullName || '—' }}
                   </td>
                   <td class="text-center">
-                    <div class="action-buttons">
-                      <button class="btn-approve" @click="openApproveModal(c.id, c.schedule, c.maxStudents)" :disabled="processing === c.id">
+                    <div v-if="c.status === 'draft'" class="action-buttons">
+                      <button class="btn-approve" @click="openApprovalModalWithSessions(c.id, c.schedule, c.maxStudents, 'auto', c.startDate, c.endDate)" :disabled="processing === c.id">
                         <i class="pi pi-check"></i> Duyệt mở
                       </button>
                       <button class="btn-reject" @click="handleReject(c.id)" :disabled="processing === c.id">
                         <i class="pi pi-times"></i> Từ chối
                       </button>
+                    </div>
+                    <div v-else-if="c.status === 'approved' || c.status === 'APPROVED'">
+                      <span class="badge-status badge-status-approved">
+                        <i class="pi pi-check-circle"></i> Đã duyệt
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -245,15 +371,53 @@ onMounted(loadData)
         </div>
         <div class="modal-body">
           <p class="modal-desc">
-            Nhập sĩ số tối đa dự kiến. Hệ thống sẽ tự động tìm một phòng trống ngẫu nhiên có sức chứa phù hợp.
+            Vui lòng xác nhận sĩ số tối đa và khung lịch học của lớp. Bạn có thể chọn chỉ định một phòng học hoặc để hệ thống tự động tìm phòng trống.
           </p>
           <div v-if="errorMessage" class="mono-alert alert-error" style="margin-bottom:0">
             <i class="pi pi-exclamation-triangle"></i>
             <div>{{ errorMessage }}</div>
           </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+            <div class="form-group">
+              <label class="form-label">Ngày bắt đầu <span class="required">*</span></label>
+              <input v-model="startDateInput" type="date" :min="minStartDateStr" class="mono-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ngày kết thúc <span class="required">*</span></label>
+              <input v-model="endDateInput" type="date" class="mono-input" required />
+            </div>
+          </div>
           <div class="form-group">
-            <label class="form-label">Lịch học <span class="form-hint">(Ví dụ: T2(T1-3), T5(T4-6))</span></label>
-            <input v-model="scheduleInput" type="text" class="mono-input" placeholder="Để trống nếu chưa xác định" />
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <span>Thời khóa biểu hàng tuần <span class="required">*</span></span>
+              <button type="button" @click="addApprovalSession" class="btn-add-session"><i class="pi pi-plus"></i> Thêm buổi học</button>
+            </label>
+            <div v-for="(session, index) in approvalSessions" :key="index" class="session-row">
+              <select v-model="session.day" class="mono-input" style="flex: 2;" required>
+                <option value="T2">Thứ 2</option>
+                <option value="T3">Thứ 3</option>
+                <option value="T4">Thứ 4</option>
+                <option value="T5">Thứ 5</option>
+                <option value="T6">Thứ 6</option>
+                <option value="T7">Thứ 7</option>
+                <option value="CN">Chủ nhật</option>
+              </select>
+              <input v-model="session.startTime" type="time" class="mono-input" style="flex: 2;" required />
+              <span class="session-separator">đến</span>
+              <input v-model="session.endTime" type="time" class="mono-input" style="flex: 2;" required />
+              <button type="button" @click="removeApprovalSession(index)" class="btn-remove-session" :disabled="approvalSessions.length <= 1">
+                <i class="pi pi-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phòng học</label>
+            <select v-model="roomNameInput" class="mono-input">
+              <option value="auto">-- Tự động xếp phòng trống phù hợp --</option>
+              <option v-for="r in rooms" :key="r.id" :value="r.name">
+                Phòng {{ r.name }} (Sức chứa: {{ r.capacity }} chỗ)
+              </option>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">Sĩ số tối đa <span class="required">*</span></label>
@@ -272,7 +436,27 @@ onMounted(loadData)
           <button class="btn-save" @click="handleApproveSubmit" :disabled="submitting">
             <i v-if="submitting" class="pi pi-spin pi-spinner"></i>
             <i v-else class="pi pi-send"></i>
-            Xác nhận duyệt &amp; tìm phòng
+            Xác nhận duyệt mở lớp
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Custom Confirm Dialog -->
+    <div v-if="isConfirmModalOpen" class="modal-overlay" @click.self="handleConfirmCancel">
+      <div class="mono-modal" style="max-width: 400px;">
+        <div class="modal-header">
+          <span>{{ confirmTitle }}</span>
+          <button class="btn-close" @click="handleConfirmCancel"><i class="pi pi-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem;">
+          <p style="font-size: 0.95rem; color: #374151; margin: 0; white-space: pre-line; line-height: 1.6;">
+            {{ confirmMessage }}
+          </p>
+        </div>
+        <div class="modal-footer" style="background: #f9fafb;">
+          <button class="btn-cancel" @click="handleConfirmCancel">Hủy bỏ</button>
+          <button class="btn-save" @click="handleConfirmAccept">
+            {{ confirmOkText }}
           </button>
         </div>
       </div>
@@ -515,6 +699,72 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-save:hover:not(:disabled) { background: #6d28d9; border-color: #6d28d9; }
 .btn-save:disabled, .btn-cancel:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.8rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.badge-status-approved {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.btn-add-session {
+  background: transparent;
+  border: none;
+  color: #7c3aed;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.btn-add-session:hover {
+  background: #faf5ff;
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  animation: fadeIn 0.2s ease-out;
+}
+.session-separator {
+  font-size: 0.85rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+.btn-remove-session {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #ef4444;
+  border-radius: 8px;
+  padding: 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.btn-remove-session:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.btn-remove-session:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 </style>

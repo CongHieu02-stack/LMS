@@ -9,6 +9,7 @@ import * as profileModel from '../models/profileModel.js'
 import * as profileView from '../views/profileView.js'
 import { supabaseAdmin } from '../config/supabase.js'
 import nodemailer from 'nodemailer'
+import { logActivity } from '../utils/activityLogger.js'
 
 
 /**
@@ -117,6 +118,9 @@ export async function updateRole(req, res) {
     }
 
     const updated = await profileModel.updateRole(targetId, role)
+    
+    await logActivity(req, 'UPDATE_ROLE', `Cập nhật vai trò tài khoản ${targetProfile.email} thành ${role}`)
+
     return res.json({
       success: true,
       message: `Đã cập nhật role thành ${role}.`,
@@ -264,6 +268,8 @@ export async function createProfile(req, res) {
       throw dbError
     }
 
+    await logActivity(req, 'CREATE_PROFILE', `Tạo tài khoản mới: ${email} với vai trò ${role} (Họ tên: ${fullName})`)
+
     return res.status(201).json({
       success: true,
       message: `Tạo tài khoản "${fullName}" với vai trò ${role} thành công.`,
@@ -336,6 +342,9 @@ export async function deleteProfile(req, res) {
       )
       deleted = targetProfile
     }
+
+    await logActivity(req, 'DELETE_PROFILE', `Xóa tài khoản: ${targetProfile.email} (Họ tên: ${targetProfile.full_name})`)
+
     return res.json(profileView.formatDeleteResult(deleted))
   } catch (err) {
     console.error('[ProfileController.deleteProfile]', err.message)
@@ -469,6 +478,10 @@ export async function lockProfile(req, res) {
       isLocked ? reason.trim() : null,
     )
 
+    const actionName = isLocked ? 'Khóa tài khoản' : 'Mở khóa tài khoản'
+    const detailMsg = `${actionName}: ${targetProfile.email}${isLocked && reason ? `. Lý do: ${reason}` : ''}`
+    await logActivity(req, 'LOCK_USER', detailMsg)
+
     return res.json({
       success: true,
       message: isLocked ? 'Đã khóa tài khoản thành công.' : 'Đã mở khóa tài khoản thành công.',
@@ -566,6 +579,8 @@ export async function resetPassword(req, res) {
         mailError = err.message
       }
     }
+
+    await logActivity(req, 'RESET_PASSWORD', `Yêu cầu đặt lại mật khẩu cho tài khoản: ${targetProfile.email}`)
 
     return res.json({
       success: true,

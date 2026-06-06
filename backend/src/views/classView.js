@@ -24,6 +24,8 @@ export function formatClass(raw) {
     status: raw.status || 'draft',
     maxStudents: raw.max_students || null,
     roomId: raw.room_id || null,
+    startDate: raw.start_date || null,
+    endDate: raw.end_date || null,
     subject: raw.subject ? {
       id: raw.subject.id,
       code: raw.subject.code,

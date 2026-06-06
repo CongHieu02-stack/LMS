@@ -4,6 +4,7 @@
 // ============================================================================
 
 import * as subjectModel from '../models/subjectModel.js'
+import { logActivity } from '../utils/activityLogger.js'
 
 /**
  * GET /api/subjects — Lấy danh sách tất cả môn học.
@@ -45,6 +46,16 @@ export async function updateApproval(req, res) {
     }
 
     const updatedSubject = await subjectModel.updateApproval(id, status, rejection_reason)
+    
+    await logActivity(
+      req, 
+      status === 'approved' ? 'APPROVE_SUBJECT' : 'REJECT_SUBJECT',
+      status === 'approved' 
+        ? `Phê duyệt học phần: ${updatedSubject.name} (${updatedSubject.code})` 
+        : `Từ chối học phần: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${rejection_reason}`,
+      { targetType: 'subject', targetId: id }
+    )
+
     return res.json({
       success: true,
       message: `Đã cập nhật trạng thái môn học thành công.`,
@@ -75,6 +86,14 @@ export async function lock(req, res) {
     }
 
     const updatedSubject = await subjectModel.lockSubject(id, lock_reason)
+    
+    await logActivity(
+      req,
+      'LOCK_SUBJECT',
+      `Khóa học phần: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${lock_reason}`,
+      { targetType: 'subject', targetId: id }
+    )
+
     return res.json({
       success: true,
       message: `Đã khóa môn học thành công.`,
@@ -105,6 +124,14 @@ export async function create(req, res) {
       creator_id: req.user.id,
       status: 'pending',
     })
+
+    await logActivity(
+      req,
+      'PROPOSE_SUBJECT',
+      `Đề xuất học phần mới: ${name} (${code.toUpperCase()})`,
+      { targetType: 'subject', targetId: subject.id }
+    )
+
     return res.status(201).json({
       success: true,
       message: 'Đề xuất môn học đã được gửi tới Hiệu trưởng để phê duyệt.',
