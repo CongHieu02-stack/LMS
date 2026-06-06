@@ -101,6 +101,21 @@ onMounted(() => {
   minStartDateStr.value = `${yyyy}-${mm}-${dd}`
 })
 
+const dayLabels: Record<string, string> = {
+  'T2': 'Thứ 2',
+  'T3': 'Thứ 3',
+  'T4': 'Thứ 4',
+  'T5': 'Thứ 5',
+  'T6': 'Thứ 6',
+  'T7': 'Thứ 7',
+  'CN': 'Chủ nhật'
+}
+
+function timeToMinutes(timeStr: string): number {
+  const [hh, mm] = timeStr.split(':').map(Number)
+  return hh * 60 + mm
+}
+
 async function handleSubmit() {
   submitting.value = true; successMsg.value = null; errorMsg.value = null
 
@@ -197,7 +212,7 @@ async function handleSubmit() {
     return
   }
 
-  // Kiểm tra thời gian của các buổi học
+  // Kiểm tra thời gian của các buổi học và kiểm tra trùng lặp
   for (const session of formSessions.value) {
     if (!session.startTime || !session.endTime) {
       const msg = 'Vui lòng nhập đầy đủ giờ học cho tất cả các buổi.'
@@ -212,6 +227,33 @@ async function handleSubmit() {
       toast.add({ severity: 'error', summary: 'Giờ học không hợp lệ', detail: msg, life: 5000 })
       submitting.value = false
       return
+    }
+  }
+
+  // Kiểm tra trùng hoặc chồng chéo thời gian giữa các buổi học trong cùng lịch đề xuất (yêu cầu cách nhau ít nhất 5 phút)
+  for (let i = 0; i < formSessions.value.length; i++) {
+    for (let j = i + 1; j < formSessions.value.length; j++) {
+      const s1 = formSessions.value[i]
+      const s2 = formSessions.value[j]
+      if (s1.day === s2.day) {
+        const m1_start = timeToMinutes(s1.startTime)
+        const m1_end = timeToMinutes(s1.endTime)
+        const m2_start = timeToMinutes(s2.startTime)
+        const m2_end = timeToMinutes(s2.endTime)
+
+        const [firstStart, firstEnd, secondStart, secondEnd] = m1_start <= m2_start
+          ? [m1_start, m1_end, m2_start, m2_end]
+          : [m2_start, m2_end, m1_start, m1_end]
+
+        if (secondStart < firstEnd + 5) {
+          const dayText = dayLabels[s1.day] || s1.day
+          const msg = `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`
+          errorMsg.value = msg
+          toast.add({ severity: 'error', summary: 'Trùng lịch học', detail: msg, life: 5000 })
+          submitting.value = false
+          return
+        }
+      }
     }
   }
 
@@ -296,10 +338,10 @@ function statusBadge(s: string) {
             </div>
           </div>
           <div class="fg">
-            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <div class="fg-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
               <span>Thời khóa biểu hàng tuần <span class="required">*</span></span>
               <button type="button" @click="addSession" class="btn-add-session"><i class="pi pi-plus"></i> Thêm buổi học</button>
-            </label>
+            </div>
             <div v-for="(session, index) in formSessions" :key="index" class="session-row">
               <select v-model="session.day" class="mono-input" style="flex: 2;" required>
                 <option value="T2">Thứ 2</option>
@@ -361,7 +403,7 @@ function statusBadge(s: string) {
 .card-header { background: #f9fafb; padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827; }
 .card-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
 .fg { display: flex; flex-direction: column; gap: 0.4rem; }
-.fg label { font-size: 0.85rem; font-weight: 600; color: #374151; }
+.fg label, .fg-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
 .mono-input { width: 100%; padding: 0.6rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; box-sizing: border-box; transition: border 0.2s; }
 .mono-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
 .ta { min-height: 80px; resize: vertical; }

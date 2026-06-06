@@ -64,31 +64,59 @@ const filteredSubjects = computed(() => {
   })
 })
 
+// Custom Confirm Dialog State
+const isConfirmModalOpen = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmOkText = ref('Xác nhận')
+let onConfirmCallback: (() => void) | null = null
+
+function showCustomConfirm(title: string, message: string, onConfirm: () => void, okText = 'Xác nhận') {
+  confirmTitle.value = title
+  confirmMessage.value = message
+  confirmOkText.value = okText
+  onConfirmCallback = onConfirm
+  isConfirmModalOpen.value = true
+}
+
+function handleConfirmAccept() {
+  if (onConfirmCallback) onConfirmCallback()
+  isConfirmModalOpen.value = false
+}
+
+function handleConfirmCancel() {
+  isConfirmModalOpen.value = false
+}
+
 // Action handlers
 async function handleApprove(subject: any) {
-  const confirm = window.confirm(`Bạn có chắc chắn muốn DUYỆT môn học "${subject.name}" (${subject.code})?`)
-  if (!confirm) return
+  showCustomConfirm(
+    'Xác nhận duyệt môn học',
+    `Bạn có chắc chắn muốn DUYỆT môn học "${subject.name}" (${subject.code})?`,
+    async () => {
+      loading.value = true
+      errorMessage.value = null
+      successMessage.value = null
 
-  loading.value = true
-  errorMessage.value = null
-  successMessage.value = null
-
-  try {
-    const res = await apiPost<{ success: boolean; message: string }>('/admin/action', {
-      entity: 'department',
-      targetId: subject.id,
-      action: 'DUYET',
-      reason: null
-    })
-    if (res && res.success) {
-      successMessage.value = `Đã duyệt thành công môn học "${subject.name}".`
-      await fetchSubjects()
-    }
-  } catch (err: any) {
-    errorMessage.value = err.message || 'Gặp lỗi khi phê duyệt môn học.'
-  } finally {
-    loading.value = false
-  }
+      try {
+        const res = await apiPost<{ success: boolean; message: string }>('/admin/action', {
+          entity: 'department',
+          targetId: subject.id,
+          action: 'DUYET',
+          reason: null
+        })
+        if (res && res.success) {
+          successMessage.value = `Đã duyệt thành công môn học "${subject.name}".`
+          await fetchSubjects()
+        }
+      } catch (err: any) {
+        errorMessage.value = err.message || 'Gặp lỗi khi phê duyệt môn học.'
+      } finally {
+        loading.value = false
+      }
+    },
+    'Duyệt môn'
+  )
 }
 
 function handleReject(subject: any) {
@@ -237,6 +265,26 @@ function getStatusBadge(s: any) {
       @submit="submitAction"
       @close="closeReasonModal"
     />
+    <!-- Custom Confirm Dialog -->
+    <div v-if="isConfirmModalOpen" class="modal-overlay" @click.self="handleConfirmCancel">
+      <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2>{{ confirmTitle }}</h2>
+          <button class="btn-close" @click="handleConfirmCancel"><i class="pi pi-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem;">
+          <p style="font-size: 0.95rem; color: #374151; margin: 0; white-space: pre-line; line-height: 1.6;">
+            {{ confirmMessage }}
+          </p>
+        </div>
+        <div class="modal-footer" style="background: #f9fafb;">
+          <button class="btn-cancel" @click="handleConfirmCancel">Hủy bỏ</button>
+          <button class="btn-save" @click="handleConfirmAccept">
+            {{ confirmOkText }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -307,4 +355,19 @@ function getStatusBadge(s: any) {
 .text-muted { font-size: 0.8rem; color: #9ca3af; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Custom Modal Styles for Confirm Dialog */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+.modal-content { background: #fff; width: 100%; max-width: 500px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; animation: slideUp 0.3s ease-out; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+.modal-header h2 { font-size: 1.1rem; font-weight: 600; margin: 0; color: #111827; }
+.btn-close { background: none; border: none; font-size: 1.25rem; color: #9ca3af; cursor: pointer; transition: color 0.2s; }
+.btn-close:hover { color: #111827; }
+.modal-body { padding: 1.5rem; }
+.modal-footer { padding: 1.25rem 1.5rem; border-top: 1px solid #e5e7eb; background: #f9fafb; display: flex; justify-content: flex-end; gap: 1rem; }
+.btn-cancel { padding: 0.5rem 1rem; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; font-weight: 500; color: #374151; cursor: pointer; transition: all 0.2s; }
+.btn-cancel:hover:not(:disabled) { background: #f3f4f6; }
+.btn-save { padding: 0.5rem 1.25rem; background: #7c3aed; border: 1px solid #7c3aed; border-radius: 6px; font-weight: 500; color: #fff; cursor: pointer; transition: all 0.2s; }
+.btn-save:hover:not(:disabled) { background: #6d28d9; border-color: #6d28d9; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>

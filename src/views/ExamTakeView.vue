@@ -20,6 +20,7 @@ const finalScore = ref<number | null>(null)
 const timeLeft = ref(0)
 let timerInterval: any = null
 const showCheatOverlay = ref(false)
+const submitReasonMessage = ref<string | null>(null)
 
 const questions = ref<any[]>([])
 const answers = ref<Record<number, number>>({})
@@ -135,7 +136,6 @@ function loadExamStateFromStorage() {
             timeLeft.value--
             saveExamStateToStorage()
           } else {
-            alert('Hết thời gian làm bài! Hệ thống tự động thu bài.')
             submitExam(false)
           }
         }, 1000)
@@ -173,7 +173,6 @@ function triggerCheatViolation() {
 
   if (cheatWarnings.value >= 2) {
     showCheatOverlay.value = true
-    alert('PHÁT HIỆN GIAN LẬN: Bạn đã rời khỏi màn hình làm bài quá 2 lần. Hệ thống tự động thu bài thi!')
     submitExam(true)
   } else {
     showCheatOverlay.value = true
@@ -251,7 +250,6 @@ async function startExam() {
       timeLeft.value--
       saveExamStateToStorage()
     } else {
-      alert('Hết thời gian làm bài! Hệ thống tự động thu bài.')
       submitExam(false)
     }
   }, 1000)
@@ -266,6 +264,14 @@ async function submitExam(isForced = false) {
   
   clearExamStateFromStorage()
   showCheatOverlay.value = false
+
+  if (isForced) {
+    submitReasonMessage.value = 'Bài thi đã bị nộp do bạn vi phạm quy chế (rời màn hình quá 2 lần).'
+  } else if (timeLeft.value <= 0) {
+    submitReasonMessage.value = 'Thời gian làm bài đã hết. Bài thi của bạn đã được hệ thống tự động thu và nộp.'
+  } else {
+    submitReasonMessage.value = null
+  }
   
   const answersList = Object.keys(answers.value).map(qid => ({
     question_id: parseInt(qid),
@@ -425,6 +431,7 @@ onUnmounted(() => {
     <div class="mono-card max-w-md mx-auto mt-10 text-center py-10">
       <i class="pi pi-check-circle text-green-500 result-icon"></i>
       <h2 class="text-2xl font-semibold mt-4 mb-2">Đã Nộp Bài Thành Công</h2>
+      <p v-if="submitReasonMessage" class="text-red-500 font-semibold mb-4 px-4">{{ submitReasonMessage }}</p>
       <p class="text-gray-500 mb-6">Bạn đã hoàn thành bài thi: {{ selectedExam.title }}.</p>
       
       <div class="score-display">
