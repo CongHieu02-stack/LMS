@@ -70,6 +70,7 @@ export async function getByClass(req, res) {
 
 export async function create(req, res) {
   try {
+    console.log('[LessonController.create] Request body received:', req.body)
     const { classId, title, content, sortOrder } = req.body
     if (!classId || !title) {
       return res.status(400).json({ error: 'Thiếu classId hoặc title.' })
@@ -80,10 +81,11 @@ export async function create(req, res) {
       content: content || '',
       sort_order: sortOrder || 0
     })
+    console.log('[LessonController.create] Lesson created successfully:', lesson)
     return res.status(201).json({ success: true, message: 'Tạo bài học thành công.', data: lesson })
   } catch (err) {
-    console.error('[LessonController.create]', err.message)
-    return res.status(500).json({ error: 'Lỗi khi tạo bài học.' })
+    console.error('[LessonController.create] Detailed Error:', err)
+    return res.status(500).json({ error: 'Lỗi khi tạo bài học: ' + err.message })
   }
 }
 
