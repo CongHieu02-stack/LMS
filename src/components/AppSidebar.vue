@@ -67,10 +67,10 @@ const menuGroups = ref<MainMenuGroup[]>([
     icon: 'pi pi-book',
     isOpen: false,
     items: [
-      { 
-        label: 'Đề xuất môn học mới', 
-        to: '/subjects/propose', 
-        requiredPermission: 'subject_propose' 
+      {
+        label: 'Đề xuất môn học mới',
+        to: '/subjects/propose',
+        requiredPermission: 'subject_propose'
       },
       {
         label: 'Phê duyệt học phần (Duyệt/Từ chối)',
@@ -124,10 +124,10 @@ const menuGroups = ref<MainMenuGroup[]>([
         to: '/exams',
         requiredPermission: 'lesson_exam_manage',
       },
-      { 
-        label: 'Tạo lớp học (Khung)', 
-        to: '/admin/classes', 
-        requiredPermission: 'class_create' 
+      {
+        label: 'Tạo lớp học (Khung)',
+        to: '/admin/classes',
+        requiredPermission: 'class_create'
       },
       {
         label: 'Tra cứu lớp (Bộ lọc)',
@@ -144,6 +144,7 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
   { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register', studentOnly: true },
   { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take', studentOnly: true },
   { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view', studentOnly: true },
+  { label: 'Lớp học của tôi', to: '/my-classes', icon: 'pi pi-sitemap', requiredPermission: 'class_register', studentOnly: true },
 ])
 
 // ----------------------------------------------------------------------------
@@ -198,7 +199,7 @@ function isSubItemActive(subItem: SubMenuItem) {
   }
   if (route.path.startsWith(subItem.to + '/')) {
     // Chỉ kích hoạt prefix match nếu không có menu con nào khác trùng khớp tuyệt đối với route hiện tại
-    const hasExactSiblingMatch = menuGroups.value.some(group => 
+    const hasExactSiblingMatch = menuGroups.value.some(group =>
       group.items.some(item => route.path === item.to)
     )
     return !hasExactSiblingMatch

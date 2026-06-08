@@ -217,6 +217,11 @@ export async function assignInstructor(req, res) {
       return res.status(404).json({ error: 'Không tìm thấy lớp học.' })
     }
 
+    // Ràng buộc: Nếu lớp đã được gán giảng viên rồi thì không cho phép thay đổi
+    if (classData.instructor_id) {
+      return res.status(400).json({ error: 'Lớp học này đã được phân công giảng viên và không thể thay đổi.' })
+    }
+
     // 2. Lấy thông tin giảng viên để kiểm tra khoa
     const instructorData = await profileModel.findById(instructorId)
     if (!instructorData) {
@@ -241,7 +246,7 @@ export async function assignInstructor(req, res) {
 
     const updated = await classModel.assignInstructor(req.params.id, instructorId)
     
-    await logActivity(req, 'ASSIGN_INSTRUCTOR', `Phân công giảng viên ${instructorData.email} (Họ tên: ${instructorData.fullName}) phụ trách lớp: ${classData.name}`)
+    await logActivity(req, 'ASSIGN_INSTRUCTOR', `Phân công giảng viên ${instructorData.email} (Họ tên: ${instructorData.full_name}) phụ trách lớp: ${classData.name}`)
 
     return res.json({ success: true, message: 'Phân công giảng viên thành công.', data: updated })
   } catch (err) {
