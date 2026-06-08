@@ -189,6 +189,8 @@ const hourLabels = computed(() => {
 
 // ─── Total classes + credits ───
 const totalCredits = computed(() => classes.value.reduce((sum, c) => sum + (c.credits || 0), 0))
+
+const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON'].includes(role.value))
 </script>
 
 <template>
@@ -199,6 +201,7 @@ const totalCredits = computed(() => classes.value.reduce((sum, c) => sum + (c.cr
         <div class="breadcrumb">Học tập / <span>Thời khoá biểu</span></div>
         <h1 class="tt-title">Thời Khoá Biểu</h1>
         <p class="tt-subtitle" v-if="role === 'SINH_VIEN'">Lịch học cá nhân của bạn dựa trên các lớp đã đăng ký.</p>
+        <p class="tt-subtitle" v-else-if="isAdminView">Tổng quan thời khoá biểu toàn bộ lớp học trong hệ thống.</p>
         <p class="tt-subtitle" v-else>Lịch giảng dạy của bạn dựa trên các lớp được phân công.</p>
       </div>
       <div class="tt-actions" v-if="!loading">
@@ -221,7 +224,7 @@ const totalCredits = computed(() => classes.value.reduce((sum, c) => sum + (c.cr
     <div class="tt-stats" v-if="!loading && classes.length > 0">
       <div class="stat-pill">
         <i class="pi pi-book"></i>
-        <span>{{ classes.length }} {{ role === 'SINH_VIEN' ? 'lớp đã đăng ký' : 'lớp đang dạy' }}</span>
+        <span>{{ classes.length }} {{ role === 'SINH_VIEN' ? 'lớp đã đăng ký' : isAdminView ? 'lớp trong hệ thống' : 'lớp đang dạy' }}</span>
       </div>
       <div class="stat-pill">
         <i class="pi pi-star"></i>
@@ -248,7 +251,8 @@ const totalCredits = computed(() => classes.value.reduce((sum, c) => sum + (c.cr
     <div v-else-if="classes.length === 0" class="tt-empty">
       <i class="pi pi-calendar-times"></i>
       <h3>Chưa có lịch học</h3>
-      <p v-if="role === 'SINH_VIEN'">Bạn chưa đăng ký lớp học nào hoặc chưa có lớp nào được duyệt.</p>
+      <p v-if="role === 'SINH_VIEN'">Bạn chưa đăng ký lớp học nào hoặc chưa có lớp nào có lịch.</p>
+      <p v-else-if="isAdminView">Chưa có lớp học nào trong hệ thống có lịch học cụ thể.</p>
       <p v-else>Bạn chưa được phân công giảng dạy lớp nào.</p>
     </div>
 
