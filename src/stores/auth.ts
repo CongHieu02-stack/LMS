@@ -207,7 +207,7 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = false
     }
 
-    // Lắng nghe thay đổi auth state (token refresh, logout từ tab khác, ...)
+    // Lắng nghe thay đổi auth state (token refresh, logout từ tab khác, cập nhật mật khẩu, ...)
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         // Chỉ chuyển hướng ở tab thực sự được mở từ link reset mật khẩu (có token/type=recovery trong URL)
