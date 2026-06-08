@@ -6,50 +6,89 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function check() {
+async function run() {
   try {
-    console.log('Fetching profiles...');
-    const { data: profiles, error: err } = await supabase
-      .from('profiles')
-      .select('id, email, role, rank')
-      .gte('rank', 60);
-      
-    if (err) {
-      console.error(err);
+    const codes = [
+      'subject_approve',
+      'class_quantity_approve',
+      'class_create',
+      'class_quantity_propose',
+      'instructor_assign',
+      'subject_propose',
+      'lesson_exam_manage'
+    ];
+
+    console.log('Fetching permissions for new defaults...');
+    const { data: perms, error: permErr } = await supabase
+      .from('permissions')
+      .select('id, code')
+      .in('code', codes);
+
+    if (permErr || !perms) {
+      console.error('Error fetching permissions:', permErr);
       return;
     }
 
-    for (const p of profiles) {
-      console.log(`\nUser: ${p.email} | Role: ${p.role} | Rank: ${p.rank}`);
-      
-      // Query user_permissions
-      const { data: userPerms, error: uErr } = await supabase
-        .from('user_permissions')
-        .select('permissions(code)')
-        .eq('user_id', p.id);
-        
-      if (uErr) {
-        console.error('Error fetching user_permissions:', uErr);
-      } else {
-        console.log('  user_permissions:', userPerms.map(x => x.permissions?.code));
-      }
+    console.log(`Found ${perms.length} permissions to set as default.`);
 
-      // Query role_default_permissions
-      const { data: rolePerms, error: rErr } = await supabase
-        .from('role_default_permissions')
-        .select('permissions(code)')
-        .eq('role', p.role);
-        
-      if (rErr) {
-        console.error('Error fetching role_default_permissions:', rErr);
-      } else {
-        console.log('  role_default_permissions:', rolePerms.map(x => x.permissions?.code));
+    console.log('Deleting existing default permissions for HIEU_TRUONG...');
+    const { error: delDefaultErr } = await supabase
+      .from('role_default_permissions')
+      .delete()
+      .eq('role', 'HIEU_TRUONG');
+
+    if (delDefaultErr) {
+      console.error('Error deleting default permissions:', delDefaultErr);
+      return;
+    }
+
+    console.log('Inserting new default permissions for HIEU_TRUONG...');
+    const defaultPairs = perms.map(p => ({
+      role: 'HIEU_TRUONG',
+      permission_id: p.id
+    }));
+
+    const { error: insertDefaultErr } = await supabase
+      .from('role_default_permissions')
+      .insert(defaultPairs);
+
+    if (insertDefaultErr) {
+      console.error('Error inserting default permissions:', insertDefaultErr);
+      return;
+    }
+
+    console.log('Fetching all Rector profiles...');
+    const { data: rectors, error: rErr } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('role', 'HIEU_TRUONG');
+
+    if (rErr || !rectors) {
+      console.error('Error fetching rectors:', rErr);
+      return;
+    }
+
+    const rectorIds = rectors.map(r => r.id);
+    console.log(`Found ${rectors.length} Rector accounts:`, rectors.map(r => r.email));
+
+    if (rectorIds.length > 0) {
+      console.log('Resetting (deleting) custom overrides in user_permissions for all Rector accounts...');
+      const { error: delCustomErr } = await supabase
+        .from('user_permissions')
+        .delete()
+        .in('user_id', rectorIds);
+
+      if (delCustomErr) {
+        console.error('Error deleting custom overrides:', delCustomErr);
+        return;
       }
     }
+
+    console.log('Rector permissions successfully configured with new defaults and reset!');
   } catch (e) {
     console.error(e);
   }
 }
 
-check();
+run();
 
