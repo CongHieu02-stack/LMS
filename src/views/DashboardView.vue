@@ -524,7 +524,12 @@ onMounted(() => {
             <div class="stat-icon-wrapper"><i :class="stat.icon"></i></div>
             <div class="stat-content">
               <div class="stat-value">{{ stat.value }}</div>
-              <div class="stat-label">{{ stat.label }}</div>
+              <div class="stat-label">
+                {{ stat.label }}
+                <div v-if="stat.label === 'Vai trò hiện tại' && authStore.profile?.department" class="stat-dept">
+                  {{ authStore.profile.department }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -532,7 +537,12 @@ onMounted(() => {
         <!-- Quyền hạn -->
         <div class="lms-card mt-lg permissions-card">
           <h3 class="card-title">Phạm vi quyền hạn</h3>
-          <p class="card-text">{{ rankDescription[authStore.profile?.rank || 10] }}</p>
+          <p class="card-text">
+            {{ rankDescription[authStore.profile?.rank || 10] }}
+            <span v-if="authStore.profile?.role === 'TRUONG_BO_MON' && authStore.profile?.department" class="text-purple-600 font-semibold">
+              (Khoa quản lý: {{ authStore.profile.department }})
+            </span>
+          </p>
         </div>
 
         <!-- Quick actions -->
@@ -579,9 +589,19 @@ onMounted(() => {
           </div>
           <input type="file" accept="image/*" ref="fileInput" hidden @change="handleAvatarChange" />
           <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
-          <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
+          <span class="lms-tag lms-tag-primary profile-role" :style="{ marginBottom: authStore.profile?.department ? '0.5rem' : '1.5rem' }">
+            {{ authStore.displayRole }}
+          </span>
+          <div v-if="authStore.profile?.department" class="profile-dept-badge">
+            <i class="pi pi-building mr-1 text-purple-600"></i>
+            <span>{{ authStore.profile.department }}</span>
+          </div>
           <div class="profile-divider"></div>
           <div class="profile-detail">
+            <div v-if="authStore.profile?.department" class="detail-row">
+              <span class="detail-label">Khoa quản lý</span>
+              <span class="detail-value text-purple-600 font-semibold text-right">{{ authStore.profile.department }}</span>
+            </div>
             <div class="detail-row">
               <span class="detail-label">Ngày tham gia</span>
               <span class="detail-value">Hôm nay</span>
@@ -862,6 +882,24 @@ onMounted(() => {
   font-size: 0.8rem;
   color: #6b7280;
   font-weight: 500;
+}
+.stat-dept {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-top: 4px;
+}
+.profile-dept-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 1.5rem;
 }
 
 /* Dashboard Widgets */
