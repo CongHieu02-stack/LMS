@@ -13,12 +13,14 @@ import { supabaseAdmin } from '../config/supabase.js'
 export async function findAll() {
   const { data, error } = await supabaseAdmin
     .from('classes')
-    .select(`
+    .select(
+      `
       *,
       subject:subjects(id, code, name, credits, department),
       instructor:profiles!instructor_id(id, full_name, email),
       manager:profiles!manager_id(id, full_name, email)
-    `)
+    `,
+    )
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -33,12 +35,14 @@ export async function findAll() {
 export async function findById(id) {
   const { data, error } = await supabaseAdmin
     .from('classes')
-    .select(`
+    .select(
+      `
       *,
       subject:subjects(id, code, name, credits, department),
       instructor:profiles!instructor_id(id, full_name, email),
       manager:profiles!manager_id(id, full_name, email)
-    `)
+    `,
+    )
     .eq('id', id)
     .single()
 
@@ -53,11 +57,10 @@ export async function findById(id) {
  * @returns {object} — Kết quả { success, message/error, remaining? }
  */
 export async function registerStudent(classId, studentId) {
-  const { data, error } = await supabaseAdmin
-    .rpc('register_student_to_class', {
-      target_class_id: classId,
-      target_student_id: studentId
-    })
+  const { data, error } = await supabaseAdmin.rpc('register_student_to_class', {
+    target_class_id: classId,
+    target_student_id: studentId,
+  })
 
   if (error) throw error
   return data
@@ -71,14 +74,16 @@ export async function registerStudent(classId, studentId) {
 export async function findRegistrationsByStudent(studentId) {
   const { data, error } = await supabaseAdmin
     .from('class_registrations')
-    .select(`
+    .select(
+      `
       id,
       registered_at,
       class:classes(id, name, remaining_slots, max_slots,
         subject:subjects(code, name),
         instructor:profiles!instructor_id(id, full_name, email)
       )
-    `)
+    `,
+    )
     .eq('student_id', studentId)
     .order('registered_at', { ascending: false })
 
@@ -107,7 +112,9 @@ export async function assignInstructor(classId, instructorId) {
     .from('classes')
     .update({ instructor_id: instructorId })
     .eq('id', classId)
-    .select(`*, subject:subjects(id, code, name, department), instructor:profiles!instructor_id(id, full_name, email)`)
+    .select(
+      `*, subject:subjects(id, code, name, department), instructor:profiles!instructor_id(id, full_name, email)`,
+    )
     .single()
   if (error) throw error
   return data
@@ -120,12 +127,10 @@ export async function assignInstructor(classId, instructorId) {
  * @returns {object} — Kết quả từ RPC
  */
 export async function approveClassAndRandomRoom(classId, maxStudents) {
-  const { data, error } = await supabaseAdmin
-    .rpc('approve_class_and_random_room', {
-      p_class_id: classId,
-      p_max_students: maxStudents
-    })
+  const { data, error } = await supabaseAdmin.rpc('approve_class_and_random_room', {
+    p_class_id: classId,
+    p_max_students: maxStudents,
+  })
   if (error) throw error
   return data
 }
-

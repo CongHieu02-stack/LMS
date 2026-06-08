@@ -84,7 +84,7 @@ async function handleAssign(classId: string) {
             </td>
             <td>{{ c.instructor?.fullName || c.instructor?.full_name || '—' }}</td>
             <td>
-              <select v-model="selectedInstructor[c.id]" class="si">
+              <select v-model="selectedInstructor[c.id]" class="si" :disabled="!!c.instructorId || !!c.instructor">
                 <option value="">-- Chọn --</option>
                 <option v-for="i in instructors" :key="i.id" :value="i.id">
                   {{ i.fullName || i.full_name }}
@@ -92,7 +92,7 @@ async function handleAssign(classId: string) {
               </select>
             </td>
             <td>
-              <button class="btn" @click="handleAssign(c.id)" :disabled="!selectedInstructor[c.id] || saving===c.id">
+              <button class="btn" @click="handleAssign(c.id)" :disabled="!!c.instructorId || !!c.instructor || !selectedInstructor[c.id] || saving===c.id">
                 <i v-if="saving===c.id" class="pi pi-spin pi-spinner"></i>
                 <i v-else class="pi pi-user-plus"></i> Gán
               </button>

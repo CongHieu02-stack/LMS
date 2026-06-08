@@ -26,24 +26,30 @@ export function formatClass(raw) {
     roomId: raw.room_id || null,
     startDate: raw.start_date || null,
     endDate: raw.end_date || null,
-    subject: raw.subject ? {
-      id: raw.subject.id,
-      code: raw.subject.code,
-      name: raw.subject.name,
-      credits: raw.subject.credits,
-      department: raw.subject.department
-    } : null,
-    instructor: raw.instructor ? {
-      id: raw.instructor.id,
-      fullName: raw.instructor.full_name,
-      email: raw.instructor.email
-    } : null,
-    manager: raw.manager ? {
-      id: raw.manager.id,
-      fullName: raw.manager.full_name,
-      email: raw.manager.email
-    } : null,
-    createdAt: raw.created_at
+    subject: raw.subject
+      ? {
+          id: raw.subject.id,
+          code: raw.subject.code,
+          name: raw.subject.name,
+          credits: raw.subject.credits,
+          department: raw.subject.department,
+        }
+      : null,
+    instructor: raw.instructor
+      ? {
+          id: raw.instructor.id,
+          fullName: raw.instructor.full_name,
+          email: raw.instructor.email,
+        }
+      : null,
+    manager: raw.manager
+      ? {
+          id: raw.manager.id,
+          fullName: raw.manager.full_name,
+          email: raw.manager.email,
+        }
+      : null,
+    createdAt: raw.created_at,
   }
 }
 
@@ -55,7 +61,7 @@ export function formatClass(raw) {
 export function formatClassList(rawList) {
   return {
     data: (rawList || []).map(formatClass),
-    total: rawList?.length || 0
+    total: rawList?.length || 0,
   }
 }
 
@@ -71,7 +77,7 @@ export function formatRegistrationResult(rpcResult) {
   return {
     success: rpcResult.success,
     message: rpcResult.success ? rpcResult.message : rpcResult.error,
-    remainingSlots: rpcResult.remaining ?? null
+    remainingSlots: rpcResult.remaining ?? null,
   }
 }
 
@@ -82,19 +88,21 @@ export function formatRegistrationResult(rpcResult) {
  */
 export function formatStudentRegistrations(rawList) {
   return {
-    data: (rawList || []).map(item => ({
+    data: (rawList || []).map((item) => ({
       id: item.id,
       registeredAt: item.registered_at,
-      class: item.class ? {
-        id: item.class.id,
-        name: item.class.name,
-        remainingSlots: item.class.remaining_slots,
-        maxSlots: item.class.max_slots,
-        subjectCode: item.class.subject?.code,
-        subjectName: item.class.subject?.name,
-        instructor: item.class.instructor
-      } : null
+      class: item.class
+        ? {
+            id: item.class.id,
+            name: item.class.name,
+            remainingSlots: item.class.remaining_slots,
+            maxSlots: item.class.max_slots,
+            subjectCode: item.class.subject?.code,
+            subjectName: item.class.subject?.name,
+            instructor: item.class.instructor,
+          }
+        : null,
     })),
-    total: rawList?.length || 0
+    total: rawList?.length || 0,
   }
 }
