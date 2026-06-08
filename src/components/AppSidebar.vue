@@ -141,6 +141,7 @@ const menuGroups = ref<MainMenuGroup[]>([
 // Thêm các menu độc lập cho Sinh viên / Giảng viên (Không thuộc 4 nhóm trên)
 const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
   { label: 'Tổng quan', to: '/dashboard', icon: 'pi pi-th-large' },
+  { label: 'Thời khoá biểu', to: '/timetable', icon: 'pi pi-calendar' },
   { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register', studentOnly: true },
   { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take', studentOnly: true },
   { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view', studentOnly: true },

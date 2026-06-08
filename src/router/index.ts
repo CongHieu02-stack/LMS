@@ -165,6 +165,12 @@ const router = createRouter({
       component: () => import('@/views/GradeView.vue'),
       meta: { requiresAuth: true, requirePermission: 'grade_view' },
     },
+    {
+      path: '/timetable',
+      name: 'timetable',
+      component: () => import('@/views/TimetableView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
