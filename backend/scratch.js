@@ -15,7 +15,8 @@ async function run() {
       'class_quantity_propose',
       'instructor_assign',
       'subject_propose',
-      'lesson_exam_manage'
+      'lesson_exam_manage',
+      'user_manage_staff'
     ];
 
     console.log('Fetching permissions for new defaults...');

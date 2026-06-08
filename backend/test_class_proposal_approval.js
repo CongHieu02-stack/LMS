@@ -28,7 +28,7 @@ async function run() {
     // 3. TBM creates subject proposal
     const randomCode = 'TEST' + Math.floor(100 + Math.random() * 900);
     console.log(`TBM creating pending subject: ${randomCode}...`);
-    const createSubj = await fetch('http://localhost:3000/api/subjects', {
+    const createSubj = await fetch('http://127.0.0.1:3000/api/subjects', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ async function run() {
 
     // 4. HIEU_TRUONG approves subject
     console.log(`HIEU_TRUONG approving subject: ${subjectId}...`);
-    const approveSubj = await fetch(`http://localhost:3000/api/subjects/${subjectId}/status`, {
+    const approveSubj = await fetch(`http://127.0.0.1:3000/api/subjects/${subjectId}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ async function run() {
 
     // 5. TBM creates class proposal for the approved subject
     console.log(`TBM creating class proposal for subject: ${subjectId}...`);
-    const createProp = await fetch('http://localhost:3000/api/class-proposals', {
+    const createProp = await fetch('http://127.0.0.1:3000/api/class-proposals', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -87,7 +87,7 @@ async function run() {
 
     // 6. HIEU_TRUONG approves class proposal
     console.log(`HIEU_TRUONG approving class proposal: ${proposalId}...`);
-    const approveProp = await fetch(`http://localhost:3000/api/class-proposals/${proposalId}/status`, {
+    const approveProp = await fetch(`http://127.0.0.1:3000/api/class-proposals/${proposalId}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

@@ -62,8 +62,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** Kiểm tra user có sở hữu quyền cụ thể không */
   function hasPermission(code: string): boolean {
-    // Admin và Hiệu trưởng (Rank >= 90) có toàn quyền truy cập chức năng (Super User)
-    if (profile.value && profile.value.rank >= 90) {
+    // Chỉ Admin (Rank 100) có toàn quyền truy cập chức năng (Super User)
+    if (profile.value && profile.value.rank === 100) {
       return true
     }
     return profile.value?.permissions?.includes(code) || false
