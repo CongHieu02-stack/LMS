@@ -96,41 +96,234 @@ interface GridBlock {
   heightPx: number
 }
 
+interface VisualBlock extends GridBlock {
+  left: string
+  width: string
+}
+
+// ─── Overlap Layout Algorithm ───
+function computeDayLayout(blocks: GridBlock[]): VisualBlock[] {
+  if (blocks.length === 0) return []
+  
+  // Sort blocks by start time (topPx)
+  const sorted = [...blocks].sort((a, b) => a.topPx - b.topPx)
+  
+  // Group overlapping events together (connected components)
+  const groups: GridBlock[][] = []
+  let currentGroup: GridBlock[] = []
+  let groupEnd = 0
+  
+  for (const block of sorted) {
+    const blockEnd = block.topPx + block.heightPx
+    if (currentGroup.length === 0) {
+      currentGroup.push(block)
+      groupEnd = blockEnd
+    } else if (block.topPx < groupEnd) {
+      currentGroup.push(block)
+      groupEnd = Math.max(groupEnd, blockEnd)
+    } else {
+      groups.push(currentGroup)
+      currentGroup = [block]
+      groupEnd = blockEnd
+    }
+  }
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup)
+  }
+  
+  const visualBlocks: VisualBlock[] = []
+  
+  // Distribute into columns
+  for (const group of groups) {
+    const columns: GridBlock[][] = []
+    
+    for (const block of group) {
+      let placed = false
+      for (let i = 0; i < columns.length; i++) {
+        const lastInCol = columns[i][columns[i].length - 1]
+        if (block.topPx >= lastInCol.topPx + lastInCol.heightPx) {
+          columns[i].push(block)
+          placed = true
+          break
+        }
+      }
+      if (!placed) {
+        columns.push([block])
+      }
+    }
+    
+    const colCount = columns.length
+    for (let colIndex = 0; colIndex < colCount; colIndex++) {
+      const colWidth = 100 / colCount
+      const colLeft = colIndex * colWidth
+      for (const block of columns[colIndex]) {
+        visualBlocks.push({
+          ...block,
+          left: `${colLeft}%`,
+          width: `${colWidth}%`
+        })
+      }
+    }
+  }
+  
+  return visualBlocks
+}
+
+// ─── Week navigation state ───
+const currentDate = ref(new Date())
+
+function getMonday(d: Date) {
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(d.setDate(diff))
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+const currentMonday = computed(() => getMonday(new Date(currentDate.value)))
+
+const weekDays = computed(() => {
+  const start = currentMonday.value
+  const days: { dayCode: typeof DAYS[number]; date: Date; dateStr: string; label: string }[] = []
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    const dayCode = DAYS[i]
+    const dateStr = d.toISOString().split('T')[0]
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const label = `${DAY_LABELS[dayCode]} (${dd}/${mm})`
+    days.push({ dayCode, date: d, dateStr, label })
+  }
+  return days
+})
+
+function prevWeek() {
+  const newDate = new Date(currentDate.value)
+  newDate.setDate(newDate.getDate() - 7)
+  currentDate.value = newDate
+}
+
+function nextWeek() {
+  const newDate = new Date(currentDate.value)
+  newDate.setDate(newDate.getDate() + 7)
+  currentDate.value = newDate
+}
+
+function goToday() {
+  currentDate.value = new Date()
+}
+
+function formatWeekRange(monday: Date) {
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const format = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  }
+  return `${format(monday)} - ${format(sunday)}`
+}
+
+function onDateInput(e: Event) {
+  const val = (e.target as HTMLInputElement).value
+  if (val) {
+    currentDate.value = new Date(val)
+  }
+}
+
+function isCurrentWeek(date: Date) {
+  const todayDate = new Date()
+  return date.getDate() === todayDate.getDate() &&
+         date.getMonth() === todayDate.getMonth() &&
+         date.getFullYear() === todayDate.getFullYear()
+}
+
+function formatDateDDMM(d: Date) {
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}`
+}
+
+function isSessionActiveOnDate(date: Date, startDateStr: string | null, endDateStr: string | null) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  
+  if (startDateStr) {
+    const start = new Date(startDateStr)
+    start.setHours(0, 0, 0, 0)
+    if (d < start) return false
+  }
+  
+  if (endDateStr) {
+    const end = new Date(endDateStr)
+    end.setHours(0, 0, 0, 0)
+    if (d > end) return false
+  }
+  
+  return true
+}
+
+// ─── Grid blocks ───
 const gridBlocks = computed(() => {
-  const blocks: Record<string, GridBlock[]> = {}
-  for (const day of DAYS) blocks[day] = []
+  const rawBlocks: Record<string, GridBlock[]> = {}
+  for (const day of DAYS) rawBlocks[day] = []
+
+  const dayDates = weekDays.value.reduce((acc: Record<string, Date>, wd: any) => {
+    acc[wd.dayCode] = wd.date
+    return acc
+  }, {} as Record<string, Date>)
 
   for (const cls of classes.value) {
     const color = getColorForSubject(cls.subjectCode)
     for (const session of cls.sessions) {
+      const sessionDate = dayDates[session.day]
+      if (!sessionDate) continue
+      if (!isSessionActiveOnDate(sessionDate, cls.startDate, cls.endDate)) {
+        continue
+      }
+
       const startMin = timeToMinutes(session.startTime)
       const endMin = timeToMinutes(session.endTime)
       const topPx = ((startMin - START_HOUR * 60) / 60) * SLOT_HEIGHT
       const heightPx = ((endMin - startMin) / 60) * SLOT_HEIGHT
-      if (blocks[session.day]) {
-        blocks[session.day].push({ cls, session, color, topPx, heightPx })
+      if (rawBlocks[session.day]) {
+        rawBlocks[session.day].push({ cls, session, color, topPx, heightPx })
       }
     }
   }
-  return blocks
+
+  const blocksWithLayout: Record<string, VisualBlock[]> = {}
+  for (const day of DAYS) {
+    blocksWithLayout[day] = computeDayLayout(rawBlocks[day])
+  }
+  return blocksWithLayout
 })
 
 // ─── List view: group by day ───
 const listByDay = computed(() => {
-  const result: { day: string; label: string; items: { cls: TimetableClass; session: SessionItem; color: ReturnType<typeof getColorForSubject> }[] }[] = []
-  for (const day of DAYS) {
+  const result: { day: string; label: string; dateLabel: string; items: { cls: TimetableClass; session: SessionItem; color: ReturnType<typeof getColorForSubject> }[] }[] = []
+  for (const wd of weekDays.value) {
     const items: typeof result[0]['items'] = []
     for (const cls of classes.value) {
       const color = getColorForSubject(cls.subjectCode)
       for (const session of cls.sessions) {
-        if (session.day === day) {
-          items.push({ cls, session, color })
+        if (session.day === wd.dayCode) {
+          if (isSessionActiveOnDate(wd.date, cls.startDate, cls.endDate)) {
+            items.push({ cls, session, color })
+          }
         }
       }
     }
     if (items.length > 0) {
       items.sort((a, b) => a.session.startTime.localeCompare(b.session.startTime))
-      result.push({ day, label: DAY_LABELS[day], items })
+      result.push({
+        day: wd.dayCode,
+        label: DAY_LABELS[wd.dayCode],
+        dateLabel: wd.label,
+        items
+      })
     }
   }
   return result
@@ -167,9 +360,9 @@ async function exportPDF() {
     const opt = {
       margin: [10, 10, 10, 10] as [number, number, number, number],
       filename: `thoi-khoa-bieu-${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const }
     }
     await html2pdf().set(opt).from(timetableRef.value).save()
   } catch (e) {
@@ -220,6 +413,34 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
       </div>
     </div>
 
+    <!-- Week Navigation Bar -->
+    <div class="week-navigator-bar" v-if="!loading && classes.length > 0">
+      <div class="nav-controls">
+        <button class="nav-btn" @click="prevWeek" title="Tuần trước">
+          <i class="pi pi-chevron-left"></i>
+        </button>
+        <button class="nav-today-btn" @click="goToday">
+          <i class="pi pi-calendar"></i> Tuần này
+        </button>
+        <button class="nav-btn" @click="nextWeek" title="Tuần sau">
+          <i class="pi pi-chevron-right"></i>
+        </button>
+      </div>
+      <div class="current-week-label">
+        <i class="pi pi-calendar"></i>
+        <span>{{ formatWeekRange(currentMonday) }}</span>
+      </div>
+      <div class="date-picker-wrapper">
+        <span class="picker-label">Chọn ngày:</span>
+        <input 
+          type="date" 
+          class="date-input" 
+          :value="currentDate.toISOString().split('T')[0]" 
+          @input="onDateInput"
+        />
+      </div>
+    </div>
+
     <!-- Stats bar -->
     <div class="tt-stats" v-if="!loading && classes.length > 0">
       <div class="stat-pill">
@@ -266,12 +487,12 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
             <span>Giờ</span>
           </div>
           <div
-            v-for="day in DAYS" :key="day"
+            v-for="wd in weekDays" :key="wd.dayCode"
             class="grid-day-header"
-            :class="{ 'is-today': day === today }"
+            :class="{ 'is-today': wd.dayCode === today && isCurrentWeek(wd.date) }"
           >
-            <span class="day-label">{{ DAY_LABELS[day] }}</span>
-            <span class="day-code">{{ day }}</span>
+            <span class="day-label">{{ DAY_LABELS[wd.dayCode] }}</span>
+            <span class="day-date">{{ formatDateDDMM(wd.date) }}</span>
           </div>
 
           <!-- Time column + day columns -->
@@ -285,9 +506,9 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
             <!-- Day columns -->
             <div
-              v-for="day in DAYS" :key="day"
+              v-for="wd in weekDays" :key="wd.dayCode"
               class="grid-day-col"
-              :class="{ 'is-today-col': day === today }"
+              :class="{ 'is-today-col': wd.dayCode === today && isCurrentWeek(wd.date) }"
               :style="{ height: (END_HOUR - START_HOUR + 1) * SLOT_HEIGHT + 'px' }"
             >
               <!-- Hour grid lines -->
@@ -299,7 +520,7 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
               <!-- Blocks -->
               <div
-                v-for="(block, idx) in gridBlocks[day]" :key="idx"
+                v-for="(block, idx) in gridBlocks[wd.dayCode]" :key="idx"
                 class="tt-block"
                 :style="{
                   top: block.topPx + 'px',
@@ -307,6 +528,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                   backgroundColor: block.color.bg,
                   borderLeftColor: block.color.border,
                   color: block.color.text,
+                  left: `calc(${block.left} + 3px)`,
+                  width: `calc(${block.width} - 6px)`
                 }"
                 :title="`${block.cls.subjectCode} — ${block.cls.subjectName}\n${block.session.startTime} - ${block.session.endTime}\nPhòng: ${block.cls.room || 'Chưa xếp'}`"
               >
@@ -327,10 +550,14 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
       <!-- === LIST VIEW === -->
       <div v-else class="list-container">
-        <div v-for="group in listByDay" :key="group.day" class="list-day-group">
+        <div v-if="listByDay.length === 0" class="list-empty-week">
+          <i class="pi pi-calendar-times"></i>
+          <p>Không có lịch học trong tuần này.</p>
+        </div>
+        <div v-else v-for="group in listByDay" :key="group.day" class="list-day-group">
           <div class="list-day-header" :class="{ 'is-today': group.day === today }">
             <span class="day-icon">{{ group.day }}</span>
-            <span>{{ group.label }}</span>
+            <span>{{ group.dateLabel }}</span>
             <span class="day-count">{{ group.items.length }} buổi</span>
           </div>
           <div class="list-items">
@@ -415,9 +642,9 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 .grid-day-header:last-child { border-right: none; }
 .grid-day-header.is-today { background: #ede9fe; border-bottom-color: #7c3aed; }
 .day-label { font-size: 0.85rem; font-weight: 600; color: #111827; }
-.day-code { font-size: 0.7rem; color: #9ca3af; margin-top: 2px; }
+.day-date { font-size: 0.75rem; font-weight: 500; color: #6b7280; margin-top: 2px; }
 .grid-day-header.is-today .day-label { color: #7c3aed; }
-.grid-day-header.is-today .day-code { color: #7c3aed; }
+.grid-day-header.is-today .day-date { color: #7c3aed; }
 
 .grid-body { display: contents; }
 .grid-time-col { grid-column: 1; border-right: 1px solid #e5e7eb; }
@@ -465,9 +692,128 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ─── Week Navigator ─── */
+.week-navigator-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.nav-today-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 36px;
+  padding: 0 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-today-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.current-week-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+.current-week-label i {
+  color: #7c3aed;
+}
+
+.date-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.picker-label {
+  font-size: 0.85rem;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.date-input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  color: #374151;
+  outline: none;
+  background: #ffffff;
+  transition: border-color 0.15s ease;
+}
+
+.date-input:focus {
+  border-color: #7c3aed;
+}
+
+.list-empty-week {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+  color: #9ca3af;
+}
+
+.list-empty-week i {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.list-empty-week p {
+  font-size: 0.875rem;
+}
+
 /* ─── Print / PDF adjustments ─── */
 @media print {
-  .tt-actions, .view-toggle, .btn-pdf { display: none !important; }
+  .tt-actions, .view-toggle, .btn-pdf, .week-navigator-bar { display: none !important; }
   .tt-wrapper { padding: 0; }
 }
 </style>
