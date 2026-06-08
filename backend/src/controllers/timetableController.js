@@ -59,7 +59,7 @@ export async function getMyTimetable(req, res) {
       if (error) throw error
 
       classes = (data || [])
-        .filter(r => r.class && r.class.status === 'APPROVED')
+        .filter(r => r.class && r.class.schedule)
         .map(r => {
           const c = r.class
           return {
@@ -90,7 +90,7 @@ export async function getMyTimetable(req, res) {
           registrations:class_registrations(count)
         `)
         .eq('instructor_id', userId)
-        .eq('status', 'APPROVED')
+        .neq('status', 'rejected')
 
       if (error) throw error
 
