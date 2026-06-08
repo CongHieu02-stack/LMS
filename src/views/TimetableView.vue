@@ -303,7 +303,7 @@ const gridBlocks = computed(() => {
 
 // ─── List view: group by day ───
 const listByDay = computed(() => {
-  const result: { day: string; label: string; dateLabel: string; items: { cls: TimetableClass; session: SessionItem; color: ReturnType<typeof getColorForSubject> }[] }[] = []
+  const result: { day: string; label: string; dateLabel: string; items: { cls: TimetableClass; session: SessionItem; color: ReturnType<typeof getColorForSubject>; type: string; periods: string }[] }[] = []
   for (const wd of weekDays.value) {
     const items: typeof result[0]['items'] = []
     for (const cls of classes.value) {
@@ -311,7 +311,9 @@ const listByDay = computed(() => {
       for (const session of cls.sessions) {
         if (session.day === wd.dayCode) {
           if (isSessionActiveOnDate(wd.date, cls.startDate, cls.endDate)) {
-            items.push({ cls, session, color })
+            const type = getClassType(cls.subjectName, cls.className)
+            const periods = getTimePeriods(session.startTime, session.endTime)
+            items.push({ cls, session, color, type, periods })
           }
         }
       }
@@ -331,6 +333,97 @@ const listByDay = computed(() => {
 
 // ─── Today highlight ───
 const today = todayDayCode()
+
+// ─── Shift and Period helpers ───
+function getClassType(subjectName: string, className: string): 'theory' | 'practice' | 'online' | 'exam' | 'suspended' {
+  const name = (subjectName + ' ' + className).toLowerCase()
+  if (name.includes('thực hành') || name.includes('thực tập') || name.includes('lab') || name.includes('tập sự') || name.includes('đồ án')) {
+    return 'practice'
+  }
+  if (name.includes('trực tuyến') || name.includes('online') || name.includes('zoom') || name.includes('teams')) {
+    return 'online'
+  }
+  if (name.includes('thi') || name.includes('kiểm tra') || name.includes('exam') || name.includes('test') || name.includes('tiểu luận') || name.includes('vấn đáp')) {
+    return 'exam'
+  }
+  if (name.includes('tạm ngưng') || name.includes('hoãn') || name.includes('nghỉ')) {
+    return 'suspended'
+  }
+  return 'theory'
+}
+
+function getSessionShift(startTime: string): 'Sáng' | 'Chiều' | 'Tối' {
+  const hour = Number(startTime.split(':')[0])
+  if (hour < 12) return 'Sáng'
+  if (hour < 18) return 'Chiều'
+  return 'Tối'
+}
+
+function getTimePeriods(startTime: string, endTime: string): string {
+  const parse = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+  const startMin = parse(startTime)
+  const endMin = parse(endTime)
+  
+  let startPeriod = 1
+  if (startMin <= 7 * 60 + 15) startPeriod = 1
+  else if (startMin <= 8 * 60 + 10) startPeriod = 2
+  else if (startMin <= 9 * 60 + 5) startPeriod = 3
+  else if (startMin <= 10 * 60) startPeriod = 4
+  else if (startMin <= 11 * 60) startPeriod = 5
+  else if (startMin <= 12 * 60 + 30) startPeriod = 7
+  else if (startMin <= 13 * 60 + 30) startPeriod = 8
+  else if (startMin <= 14 * 60 + 30) startPeriod = 9
+  else if (startMin <= 15 * 60 + 30) startPeriod = 10
+  else if (startMin <= 16 * 60 + 30) startPeriod = 11
+  else if (startMin <= 17 * 60 + 30) startPeriod = 12
+  else startPeriod = 13
+  
+  let endPeriod = startPeriod
+  if (endMin <= 7 * 60 + 35) endPeriod = 1
+  else if (endMin <= 8 * 60 + 25) endPeriod = 2
+  else if (endMin <= 9 * 60 + 15) endPeriod = 3
+  else if (endMin <= 10 * 60 + 15) endPeriod = 4
+  else if (endMin <= 11 * 60 + 15) endPeriod = 5
+  else if (endMin <= 12 * 60 + 15) endPeriod = 6
+  else if (endMin <= 13 * 60 + 15) endPeriod = 7
+  else if (endMin <= 14 * 60 + 15) endPeriod = 8
+  else if (endMin <= 15 * 60 + 15) endPeriod = 9
+  else if (endMin <= 16 * 60 + 15) endPeriod = 10
+  else if (endMin <= 17 * 60 + 15) endPeriod = 11
+  else if (endMin <= 18 * 60 + 15) endPeriod = 12
+  else endPeriod = 13
+  
+  if (startPeriod === endPeriod) return `Tiết: ${startPeriod}`
+  return `Tiết: ${startPeriod} - ${endPeriod}`
+}
+
+function getShiftBlocks(dayCode: string, shift: 'Sáng' | 'Chiều' | 'Tối') {
+  const blocks = gridBlocks.value[dayCode] || []
+  return blocks
+    .map((block: any) => {
+      const startTime = block.session.startTime
+      const s = getSessionShift(startTime)
+      const type = getClassType(block.cls.subjectName, block.cls.className)
+      const periods = getTimePeriods(startTime, block.session.endTime)
+      return {
+        ...block,
+        shift: s,
+        type,
+        periods
+      }
+    })
+    .filter((b: any) => b.shift === shift)
+}
+
+function formatDateDDMMYYYY(d: Date) {
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
+}
 
 // ─── Fetch data ───
 async function loadTimetable() {
@@ -480,74 +573,100 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
     <!-- Content -->
     <div v-else ref="timetableRef">
       <!-- === GRID VIEW === -->
-      <div v-if="effectiveView === 'grid'" class="grid-container">
-        <div class="grid-table">
-          <!-- Header row: days -->
-          <div class="grid-corner">
-            <span>Giờ</span>
-          </div>
-          <div
-            v-for="wd in weekDays" :key="wd.dayCode"
-            class="grid-day-header"
-            :class="{ 'is-today': wd.dayCode === today && isCurrentWeek(wd.date) }"
-          >
-            <span class="day-label">{{ DAY_LABELS[wd.dayCode] }}</span>
-            <span class="day-date">{{ formatDateDDMM(wd.date) }}</span>
-          </div>
-
-          <!-- Time column + day columns -->
-          <div class="grid-body">
-            <!-- Time labels -->
-            <div class="grid-time-col">
-              <div v-for="hour in hourLabels" :key="hour" class="time-label" :style="{ height: SLOT_HEIGHT + 'px' }">
-                {{ hour }}
-              </div>
-            </div>
-
-            <!-- Day columns -->
-            <div
-              v-for="wd in weekDays" :key="wd.dayCode"
-              class="grid-day-col"
-              :class="{ 'is-today-col': wd.dayCode === today && isCurrentWeek(wd.date) }"
-              :style="{ height: (END_HOUR - START_HOUR + 1) * SLOT_HEIGHT + 'px' }"
-            >
-              <!-- Hour grid lines -->
-              <div
-                v-for="i in (END_HOUR - START_HOUR + 1)" :key="'line-'+i"
-                class="hour-line"
-                :style="{ top: (i - 1) * SLOT_HEIGHT + 'px' }"
-              ></div>
-
-              <!-- Blocks -->
-              <div
-                v-for="(block, idx) in gridBlocks[wd.dayCode]" :key="idx"
-                class="tt-block"
-                :style="{
-                  top: block.topPx + 'px',
-                  height: Math.max(block.heightPx, 30) + 'px',
-                  backgroundColor: block.color.bg,
-                  borderLeftColor: block.color.border,
-                  color: block.color.text,
-                  left: `calc(${block.left} + 3px)`,
-                  width: `calc(${block.width} - 6px)`
-                }"
-                :title="`${block.cls.subjectCode} — ${block.cls.subjectName}\n${block.session.startTime} - ${block.session.endTime}\nPhòng: ${block.cls.room || 'Chưa xếp'}`"
+      <div v-if="effectiveView === 'grid'" class="shift-grid-container">
+        <table class="shift-grid-table">
+          <thead>
+            <tr>
+              <th class="col-shift">Ca học</th>
+              <th 
+                v-for="wd in weekDays" :key="wd.dayCode" 
+                :class="{ 'is-today': wd.dayCode === today && isCurrentWeek(wd.date) }"
               >
-                <div class="block-code">{{ block.cls.subjectCode }}</div>
-                <div class="block-name" v-if="block.heightPx > 50">{{ block.cls.subjectName }}</div>
-                <div class="block-room" v-if="block.heightPx > 70">
-                  <i class="pi pi-map-marker"></i> {{ block.cls.room || '—' }}
+                <div class="th-day-label">{{ DAY_LABELS[wd.dayCode] }}</div>
+                <div class="th-day-date">{{ formatDateDDMMYYYY(wd.date) }}</div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- SÁNG -->
+            <tr>
+              <td class="row-shift sáng-header">Sáng</td>
+              <td v-for="wd in weekDays" :key="wd.dayCode" class="shift-cell">
+                <div class="shift-cell-content">
+                  <div 
+                    v-for="(block, idx) in getShiftBlocks(wd.dayCode, 'Sáng')" 
+                    :key="idx"
+                    class="class-card"
+                    :class="block.type"
+                  >
+                    <div class="card-title">{{ block.cls.subjectName || block.cls.className }}</div>
+                    <div class="card-code">{{ block.cls.subjectCode }} - {{ block.cls.className }}</div>
+                    <div class="card-meta">{{ block.periods }}</div>
+                    <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
+                    <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
+                    <div class="card-meta">
+                      GV: 
+                      <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
+                      <span v-else class="no-instructor">Chưa phân công</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="block-time">{{ block.session.startTime }} - {{ block.session.endTime }}</div>
-                <div class="block-teacher" v-if="block.heightPx > 90">
-                  <i class="pi pi-user"></i>
-                  <span v-if="block.cls.instructor">{{ block.cls.instructor.fullName }}</span>
-                  <span v-else class="no-instructor">Chưa phân công GV</span>
+              </td>
+            </tr>
+
+            <!-- CHIỀU -->
+            <tr>
+              <td class="row-shift chiều-header">Chiều</td>
+              <td v-for="wd in weekDays" :key="wd.dayCode" class="shift-cell">
+                <div class="shift-cell-content">
+                  <div 
+                    v-for="(block, idx) in getShiftBlocks(wd.dayCode, 'Chiều')" 
+                    :key="idx"
+                    class="class-card"
+                    :class="block.type"
+                  >
+                    <div class="card-title">{{ block.cls.subjectName || block.cls.className }}</div>
+                    <div class="card-code">{{ block.cls.subjectCode }} - {{ block.cls.className }}</div>
+                    <div class="card-meta">{{ block.periods }}</div>
+                    <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
+                    <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
+                    <div class="card-meta">
+                      GV: 
+                      <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
+                      <span v-else class="no-instructor">Chưa phân công</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              </td>
+            </tr>
+
+            <!-- TỐI -->
+            <tr>
+              <td class="row-shift tối-header">Tối</td>
+              <td v-for="wd in weekDays" :key="wd.dayCode" class="shift-cell">
+                <div class="shift-cell-content">
+                  <div 
+                    v-for="(block, idx) in getShiftBlocks(wd.dayCode, 'Tối')" 
+                    :key="idx"
+                    class="class-card"
+                    :class="block.type"
+                  >
+                    <div class="card-title">{{ block.cls.subjectName || block.cls.className }}</div>
+                    <div class="card-code">{{ block.cls.subjectCode }} - {{ block.cls.className }}</div>
+                    <div class="card-meta">{{ block.periods }}</div>
+                    <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
+                    <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
+                    <div class="card-meta">
+                      GV: 
+                      <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
+                      <span v-else class="no-instructor">Chưa phân công</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- === LIST VIEW === -->
@@ -566,24 +685,25 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
             <div
               v-for="(item, idx) in group.items" :key="idx"
               class="list-item"
-              :style="{ borderLeftColor: item.color.border }"
+              :class="item.type"
             >
-              <div class="li-time" :style="{ color: item.color.text }">
+              <div class="li-time">
                 {{ item.session.startTime }} - {{ item.session.endTime }}
               </div>
               <div class="li-info">
                 <div class="li-subject">
-                  <span class="li-code" :style="{ backgroundColor: item.color.bg, color: item.color.text }">{{ item.cls.subjectCode }}</span>
-                  {{ item.cls.subjectName }}
+                  {{ item.cls.subjectName || item.cls.className }}
                 </div>
                 <div class="li-meta">
-                  <span v-if="item.cls.room"><i class="pi pi-map-marker"></i> {{ item.cls.room }}</span>
+                  <span>Mã lớp: {{ item.cls.subjectCode }} - {{ item.cls.className }}</span>
+                  <span>{{ item.periods }}</span>
+                  <span v-if="item.cls.room"><i class="pi pi-map-marker"></i> Phòng: {{ item.cls.room }}</span>
                   <span>
                     <i class="pi pi-user"></i>
-                    <span v-if="item.cls.instructor">{{ item.cls.instructor.fullName }}</span>
-                    <span v-else class="no-instructor">Chưa phân công GV</span>
+                    GV: 
+                    <span v-if="item.cls.instructor" class="teacher-link">{{ item.cls.instructor.fullName }}</span>
+                    <span v-else class="no-instructor">Chưa phân công</span>
                   </span>
-                  <span v-if="item.cls.className"><i class="pi pi-bookmark"></i> {{ item.cls.className }}</span>
                 </div>
               </div>
             </div>
@@ -591,16 +711,13 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
         </div>
       </div>
 
-      <!-- Legend -->
-      <div class="tt-legend">
-        <span class="legend-title">Chú thích:</span>
-        <div
-          v-for="cls in classes" :key="cls.classId"
-          class="legend-item"
-          :style="{ backgroundColor: getColorForSubject(cls.subjectCode).bg, borderColor: getColorForSubject(cls.subjectCode).border, color: getColorForSubject(cls.subjectCode).text }"
-        >
-          {{ cls.subjectCode }} — {{ cls.subjectName }}
-        </div>
+      <!-- Shift Legend -->
+      <div class="shift-legend-bar">
+        <div class="legend-item"><span class="legend-color-box theory"></span> Lịch học lý thuyết</div>
+        <div class="legend-item"><span class="legend-color-box practice"></span> Lịch học thực hành</div>
+        <div class="legend-item"><span class="legend-color-box online"></span> Lịch học trực tuyến</div>
+        <div class="legend-item"><span class="legend-color-box exam"></span> Lịch thi</div>
+        <div class="legend-item"><span class="legend-color-box suspended"></span> Lịch tạm ngưng</div>
       </div>
     </div>
   </div>
@@ -640,36 +757,201 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 .tt-empty h3 { font-size: 1.25rem; color: #6b7280; margin: 0; }
 .tt-empty p { font-size: 0.875rem; margin: 0; }
 
-/* ─── GRID VIEW ─── */
-.grid-container { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.grid-table { display: grid; grid-template-columns: 64px repeat(7, 1fr); min-width: 900px; }
-.grid-corner { display: flex; align-items: center; justify-content: center; background: #f9fafb; border-bottom: 2px solid #e5e7eb; border-right: 1px solid #e5e7eb; padding: 0.75rem; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; }
-.grid-day-header { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.75rem 0.5rem; background: #f9fafb; border-bottom: 2px solid #e5e7eb; border-right: 1px solid #f3f4f6; transition: background 0.2s; }
-.grid-day-header:last-child { border-right: none; }
-.grid-day-header.is-today { background: #ede9fe; border-bottom-color: #7c3aed; }
-.day-label { font-size: 0.85rem; font-weight: 600; color: #111827; }
-.day-date { font-size: 0.75rem; font-weight: 500; color: #6b7280; margin-top: 2px; }
-.grid-day-header.is-today .day-label { color: #7c3aed; }
-.grid-day-header.is-today .day-date { color: #7c3aed; }
+/* ─── GRID SHIFT VIEW ─── */
+.shift-grid-container {
+  overflow-x: auto;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
 
-.grid-body { display: contents; }
-.grid-time-col { grid-column: 1; border-right: 1px solid #e5e7eb; }
-.time-label { display: flex; align-items: flex-start; justify-content: center; padding-top: 0; font-size: 0.7rem; color: #9ca3af; font-weight: 500; border-bottom: 1px solid #f3f4f6; box-sizing: border-box; }
-.grid-day-col { position: relative; border-right: 1px solid #f3f4f6; }
-.grid-day-col:last-child { border-right: none; }
-.grid-day-col.is-today-col { background: rgba(124, 58, 237, 0.03); }
-.hour-line { position: absolute; left: 0; right: 0; border-top: 1px solid #f3f4f6; height: 0; }
+.shift-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
 
-/* ─── Blocks ─── */
-.tt-block { position: absolute; left: 3px; right: 3px; border-radius: 6px; border-left: 3px solid; padding: 4px 6px; overflow: hidden; cursor: default; transition: box-shadow 0.2s, transform 0.15s; z-index: 1; font-size: 0.72rem; line-height: 1.3; }
-.tt-block:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-1px); z-index: 10; }
-.block-code { font-weight: 700; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.block-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }
-.block-room { display: flex; align-items: center; gap: 2px; font-size: 0.68rem; opacity: 0.75; }
-.block-room i { font-size: 0.6rem; }
-.block-time { font-size: 0.68rem; opacity: 0.7; }
-.block-teacher { display: flex; align-items: center; gap: 2px; font-size: 0.68rem; opacity: 0.75; margin-top: 1px; }
-.block-teacher i { font-size: 0.6rem; }
+.shift-grid-table th, 
+.shift-grid-table td {
+  border: 1px solid #dcdcdc;
+}
+
+.shift-grid-table th {
+  background-color: #f7fafc;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.88rem;
+  color: #2b6cb0; /* blue */
+  width: calc(100% / 8);
+}
+
+.shift-grid-table th.col-shift {
+  width: 60px;
+  color: #4b5563;
+  background-color: #f3f4f6;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.shift-grid-table th.is-today {
+  background-color: #ebf8ff;
+  border-bottom: 3px solid #3182ce;
+}
+
+.th-day-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.th-day-date {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.row-shift {
+  background-color: #fffdf0;
+  font-weight: bold;
+  color: #2b6cb0;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 0.95rem;
+  width: 60px;
+  padding: 1.5rem 0.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.shift-cell {
+  background-image: 
+    linear-gradient(to right, rgba(200, 220, 240, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(200, 220, 240, 0.2) 1px, transparent 1px);
+  background-size: 16px 16px;
+  vertical-align: top;
+  padding: 0.5rem;
+  min-height: 120px;
+}
+
+.shift-cell-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 100px;
+}
+
+/* ─── Class Cards ─── */
+.class-card {
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-left: 4px solid #4b5563;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.class-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+}
+
+.card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+  color: #1e3a8a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.card-code {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 2px;
+}
+
+.card-meta {
+  font-size: 0.72rem;
+  color: #4b5563;
+  margin-bottom: 1px;
+}
+
+.teacher-link {
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.teacher-link:hover {
+  color: #1d4ed8;
+}
+
+/* Themes colors matching Vietnamese schedule system */
+.class-card.theory {
+  background-color: #e8ecf4;
+  border-left-color: #1e3a8a;
+  color: #1e3a8a;
+}
+.class-card.theory .card-title {
+  color: #1e3a8a;
+}
+
+.class-card.practice {
+  background-color: #73cf36;
+  border-left-color: #1e5a07;
+  color: #103d02;
+}
+.class-card.practice .card-title {
+  color: #103d02;
+}
+.class-card.practice .card-code,
+.class-card.practice .card-meta {
+  color: #1d5508;
+}
+.class-card.practice .teacher-link {
+  color: #103d02;
+}
+
+.class-card.online {
+  background-color: #cbe8ff;
+  border-left-color: #0ea5e9;
+  color: #0369a1;
+}
+.class-card.online .card-title {
+  color: #0369a1;
+}
+
+.class-card.exam {
+  background-color: #fff67a;
+  border-left-color: #b7791f;
+  color: #744210;
+}
+.class-card.exam .card-title {
+  color: #744210;
+}
+.class-card.exam .card-code,
+.class-card.exam .card-meta {
+  color: #85531d;
+}
+
+.class-card.suspended {
+  background-color: #feb2b2;
+  border-left-color: #c53030;
+  color: #742a2a;
+}
+.class-card.suspended .card-title {
+  color: #742a2a;
+}
 
 /* ─── LIST VIEW ─── */
 .list-container { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -680,21 +962,71 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 .list-day-header.is-today .day-icon { background: #7c3aed; color: #fff; }
 .day-count { margin-left: auto; font-size: 0.75rem; font-weight: 500; color: #9ca3af; }
 
-.list-items { padding: 0.5rem 0; }
-.list-item { display: flex; align-items: flex-start; gap: 1rem; padding: 0.75rem 1.25rem; border-left: 3px solid transparent; transition: background 0.15s; }
-.list-item:hover { background: #fafafa; }
+.list-items { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.list-item { 
+  display: flex; 
+  align-items: flex-start; 
+  gap: 1rem; 
+  padding: 0.75rem 1.25rem; 
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-left: 5px solid transparent; 
+  transition: transform 0.15s, box-shadow 0.15s; 
+}
+.list-item:hover { 
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.08); 
+}
+
+.list-item.theory { background-color: #e8ecf4; border-left-color: #1e3a8a; color: #1e3a8a; }
+.list-item.practice { background-color: #73cf36; border-left-color: #1e5a07; color: #103d02; }
+.list-item.online { background-color: #cbe8ff; border-left-color: #0ea5e9; color: #0369a1; }
+.list-item.exam { background-color: #fff67a; border-left-color: #b7791f; color: #744210; }
+.list-item.suspended { background-color: #feb2b2; border-left-color: #c53030; color: #742a2a; }
+
 .li-time { font-size: 0.85rem; font-weight: 700; white-space: nowrap; min-width: 110px; padding-top: 2px; }
 .li-info { flex: 1; min-width: 0; }
-.li-subject { font-weight: 600; font-size: 0.9rem; color: #111827; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.li-code { padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
-.li-meta { display: flex; gap: 1rem; margin-top: 0.35rem; font-size: 0.8rem; color: #6b7280; flex-wrap: wrap; }
+.li-subject { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+.li-meta { display: flex; gap: 1.25rem; font-size: 0.8rem; flex-wrap: wrap; }
 .li-meta span { display: inline-flex; align-items: center; gap: 0.25rem; }
-.li-meta i { font-size: 0.7rem; }
+.li-meta i { font-size: 0.75rem; }
 
 /* ─── Legend ─── */
-.tt-legend { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1.5rem; padding: 1rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; }
-.legend-title { font-size: 0.8rem; font-weight: 600; color: #6b7280; margin-right: 0.5rem; }
-.legend-item { padding: 0.25rem 0.75rem; border-radius: 6px; border: 1px solid; font-size: 0.75rem; font-weight: 600; }
+.shift-legend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.legend-color-box {
+  width: 24px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.1);
+  display: inline-block;
+}
+
+.legend-color-box.theory { background-color: #e8ecf4; border-left: 3px solid #1e3a8a; }
+.legend-color-box.practice { background-color: #73cf36; border-left: 3px solid #1e5a07; }
+.legend-color-box.online { background-color: #cbe8ff; border-left: 3px solid #0ea5e9; }
+.legend-color-box.exam { background-color: #fff67a; border-left: 3px solid #b7791f; }
+.legend-color-box.suspended { background-color: #feb2b2; border-left: 3px solid #c53030; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -825,7 +1157,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
 /* ─── Print / PDF adjustments ─── */
 @media print {
-  .tt-actions, .view-toggle, .btn-pdf, .week-navigator-bar { display: none !important; }
+  .tt-actions, .view-toggle, .btn-pdf, .week-navigator-bar, .shift-legend-bar { display: none !important; }
   .tt-wrapper { padding: 0; }
+  .shift-grid-container { border: none; }
 }
 </style>
