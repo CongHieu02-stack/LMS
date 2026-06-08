@@ -539,8 +539,10 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                   <i class="pi pi-map-marker"></i> {{ block.cls.room || '—' }}
                 </div>
                 <div class="block-time">{{ block.session.startTime }} - {{ block.session.endTime }}</div>
-                <div class="block-teacher" v-if="block.heightPx > 90 && block.cls.instructor">
-                  <i class="pi pi-user"></i> {{ block.cls.instructor.fullName }}
+                <div class="block-teacher" v-if="block.heightPx > 90">
+                  <i class="pi pi-user"></i>
+                  <span v-if="block.cls.instructor">{{ block.cls.instructor.fullName }}</span>
+                  <span v-else class="no-instructor">Chưa phân công GV</span>
                 </div>
               </div>
             </div>
@@ -576,7 +578,11 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                 </div>
                 <div class="li-meta">
                   <span v-if="item.cls.room"><i class="pi pi-map-marker"></i> {{ item.cls.room }}</span>
-                  <span v-if="item.cls.instructor"><i class="pi pi-user"></i> {{ item.cls.instructor.fullName }}</span>
+                  <span>
+                    <i class="pi pi-user"></i>
+                    <span v-if="item.cls.instructor">{{ item.cls.instructor.fullName }}</span>
+                    <span v-else class="no-instructor">Chưa phân công GV</span>
+                  </span>
                   <span v-if="item.cls.className"><i class="pi pi-bookmark"></i> {{ item.cls.className }}</span>
                 </div>
               </div>
@@ -809,6 +815,12 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
 .list-empty-week p {
   font-size: 0.875rem;
+}
+
+.no-instructor {
+  color: #ef4444;
+  font-style: italic;
+  font-weight: 500;
 }
 
 /* ─── Print / PDF adjustments ─── */
