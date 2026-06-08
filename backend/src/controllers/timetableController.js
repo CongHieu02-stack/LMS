@@ -109,42 +109,10 @@ export async function getMyTimetable(req, res) {
         enrolledCount: c.registrations?.[0]?.count || 0
       }))
     } else {
-      // ─── ADMIN / PĐT / HR: Xem tổng quan TKB toàn trường ───
-      const { data, error } = await supabaseAdmin
-        .from('classes')
-        .select(`
-          id, name, code, schedule, room, semester,
-          start_date, end_date, status,
-          subject:subjects(id, code, name, credits),
-          instructor:profiles!instructor_id(id, full_name, email),
-          registrations:class_registrations(count)
-        `)
-        .neq('status', 'rejected')
-        .not('schedule', 'is', null)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      classes = (data || [])
-        .filter(c => c.schedule && c.schedule.trim())
-        .map(c => ({
-          classId: c.id,
-          className: c.name || c.code,
-          subjectCode: c.subject?.code || '',
-          subjectName: c.subject?.name || '',
-          credits: c.subject?.credits || 0,
-          schedule: c.schedule || '',
-          sessions: parseSchedule(c.schedule),
-          room: c.room || '',
-          semester: c.semester || '',
-          status: c.status || 'draft',
-          startDate: c.start_date || null,
-          endDate: c.end_date || null,
-          instructor: c.instructor
-            ? { id: c.instructor.id, fullName: c.instructor.full_name, email: c.instructor.email }
-            : null,
-          enrolledCount: c.registrations?.[0]?.count || 0
-        }))
+      return res.status(403).json({
+        success: false,
+        error: 'Chức năng thời khoá biểu không hỗ trợ vai trò này.'
+      })
     }
 
     // Lấy danh sách học kỳ duy nhất để frontend render dropdown

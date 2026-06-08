@@ -169,7 +169,7 @@ const router = createRouter({
       path: '/timetable',
       name: 'timetable',
       component: () => import('@/views/TimetableView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, allowedRoles: ['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON'] },
     },
   ],
 })
@@ -200,6 +200,11 @@ router.beforeEach(async (to, _from) => {
   ) {
     return { name: 'dashboard' }
   } else if (to.meta.minRank && (authStore.profile?.rank || 0) < (to.meta.minRank as number)) {
+    return { name: 'dashboard' }
+  } else if (
+    to.meta.allowedRoles &&
+    ! (to.meta.allowedRoles as string[]).includes(authStore.profile?.role || '')
+  ) {
     return { name: 'dashboard' }
   }
   return true

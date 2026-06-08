@@ -165,7 +165,7 @@ async function exportPDF() {
   exportingPdf.value = true
   try {
     const opt = {
-      margin: [10, 10, 10, 10],
+      margin: [10, 10, 10, 10] as [number, number, number, number],
       filename: `thoi-khoa-bieu-${new Date().toISOString().split('T')[0]}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
@@ -188,7 +188,7 @@ const hourLabels = computed(() => {
 })
 
 // ─── Total classes + credits ───
-const totalCredits = computed(() => classes.value.reduce((sum, c) => sum + (c.credits || 0), 0))
+const totalCredits = computed(() => classes.value.reduce((sum: number, c: TimetableClass) => sum + (c.credits || 0), 0))
 
 const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON'].includes(role.value))
 </script>
