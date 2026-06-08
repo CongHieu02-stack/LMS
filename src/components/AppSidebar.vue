@@ -153,9 +153,19 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
 // Lọc các chức năng độc lập
 const filteredStandalone = computed(() => {
   return standaloneMenus.value.filter((item) => {
-    if (item.studentOnly && authStore.profile?.role !== 'SINH_VIEN') {
-      return false
+    // Nếu là chức năng sinh viên, chỉ hiển thị nếu là vai trò SINH_VIEN hoặc được gán quyền trực tiếp
+    if (item.studentOnly) {
+      const isStudent = authStore.profile?.role === 'SINH_VIEN'
+      const hasExplicitPermission = item.requiredPermission && 
+        (Array.isArray(item.requiredPermission)
+          ? item.requiredPermission.some(p => authStore.profile?.permissions?.includes(p))
+          : authStore.profile?.permissions?.includes(item.requiredPermission))
+      
+      if (!isStudent && !hasExplicitPermission) {
+        return false
+      }
     }
+
     if (!item.requiredPermission) return true
     if (Array.isArray(item.requiredPermission)) {
       return item.requiredPermission.some((p) => authStore.hasPermission(p))
