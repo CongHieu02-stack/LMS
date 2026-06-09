@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { Router } from 'express'
-import { authMiddleware, requireRank } from '../middleware/authMiddleware.js'
+import { authMiddleware, requireRank, requirePermissionOrRank } from '../middleware/authMiddleware.js'
 import * as subjectController from '../controllers/subjectController.js'
 
 const router = Router()
@@ -11,15 +11,15 @@ const router = Router()
 router.use(authMiddleware)
 
 // GET /api/subjects — Danh sách (Giảng viên trở lên)
-router.get('/', requireRank(50), subjectController.getAll)
+router.get('/', requirePermissionOrRank('lesson_exam_manage', 50), subjectController.getAll)
 
 // POST /api/subjects — Tạo đề xuất môn học mới (PĐT & TBM trở lên, rank >= 60)
-router.post('/', requireRank(60), subjectController.create)
+router.post('/', requirePermissionOrRank('subject_propose', 60), subjectController.create)
 
 // PUT /api/subjects/:id/status — Duyệt môn học (Hiệu trưởng trở lên)
-router.put('/:id/status', requireRank(90), subjectController.updateApproval)
+router.put('/:id/status', requirePermissionOrRank('subject_approve', 90), subjectController.updateApproval)
 
 // PUT /api/subjects/:id/lock — Khóa môn học (Hiệu trưởng trở lên)
-router.put('/:id/lock', requireRank(90), subjectController.lock)
+router.put('/:id/lock', requirePermissionOrRank('subject_approve', 90), subjectController.lock)
 
 export { router }

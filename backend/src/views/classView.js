@@ -99,6 +99,7 @@ export function formatStudentRegistrations(rawList) {
             maxSlots: item.class.max_slots,
             subjectCode: item.class.subject?.code,
             subjectName: item.class.subject?.name,
+            instructor: item.class.instructor,
           }
         : null,
     })),

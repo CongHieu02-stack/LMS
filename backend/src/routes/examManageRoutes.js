@@ -3,14 +3,14 @@
 // ============================================================================
 
 import { Router } from 'express'
-import { authMiddleware, requireRank } from '../middleware/authMiddleware.js'
+import { authMiddleware, requireRank, requirePermissionOrRank } from '../middleware/authMiddleware.js'
 import * as ctrl from '../controllers/examManageController.js'
 
 const router = Router()
 router.use(authMiddleware)
 
 // GET /api/exam-manage/class/:classId — Bài KT theo lớp (GV+)
-router.get('/class/:classId', requireRank(50), ctrl.getByClass)
+router.get('/class/:classId', requirePermissionOrRank('lesson_exam_manage', 50), ctrl.getByClass)
 
 // GET /api/exam-manage/published/:classId — Bài KT đã publish (SV xem)
 router.get('/published/:classId', ctrl.getPublishedByClass)
@@ -19,12 +19,12 @@ router.get('/published/:classId', ctrl.getPublishedByClass)
 router.get('/:id', ctrl.getById)
 
 // POST /api/exam-manage — Tạo bài KT (GV+)
-router.post('/', requireRank(50), ctrl.create)
+router.post('/', requirePermissionOrRank('lesson_exam_manage', 50), ctrl.create)
 
 // PUT /api/exam-manage/:id — Sửa bài KT
-router.put('/:id', requireRank(50), ctrl.update)
+router.put('/:id', requirePermissionOrRank('lesson_exam_manage', 50), ctrl.update)
 
 // DELETE /api/exam-manage/:id — Xóa
-router.delete('/:id', requireRank(50), ctrl.remove)
+router.delete('/:id', requirePermissionOrRank('lesson_exam_manage', 50), ctrl.remove)
 
 export { router }

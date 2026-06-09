@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { Router } from 'express'
-import { authMiddleware, requireRank } from '../middleware/authMiddleware.js'
+import { authMiddleware, requireRank, requirePermissionOrRank } from '../middleware/authMiddleware.js'
 import * as classController from '../controllers/classController.js'
 
 const router = Router()
@@ -22,16 +22,16 @@ router.get('/my-registrations', classController.getMyRegistrations)
 router.get('/:id', classController.getClassById)
 
 // POST /api/classes — Tạo lớp mới (PĐT, rank >= 70)
-router.post('/', requireRank(70), classController.createClass)
+router.post('/', requirePermissionOrRank('class_create', 70), classController.createClass)
 
 // PUT /api/classes/:id/instructor — Phân công GV (TBM, rank >= 60)
-router.put('/:id/instructor', requireRank(60), classController.assignInstructor)
+router.put('/:id/instructor', requirePermissionOrRank('instructor_assign', 60), classController.assignInstructor)
 
 // PUT /api/classes/:id/approve — Duyệt mở lớp (PĐT, rank >= 70)
-router.put('/:id/approve', requireRank(70), classController.approveClass)
+router.put('/:id/approve', requirePermissionOrRank('class_quantity_approve', 70), classController.approveClass)
 
 // PUT /api/classes/:id/reject — Từ chối mở lớp (PĐT, rank >= 70)
-router.put('/:id/reject', requireRank(70), classController.rejectClass)
+router.put('/:id/reject', requirePermissionOrRank('class_quantity_approve', 70), classController.rejectClass)
 
 // POST /api/classes/register — Đăng ký vào lớp (SV)
 router.post('/register', classController.registerToClass)

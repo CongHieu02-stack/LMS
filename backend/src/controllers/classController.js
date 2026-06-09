@@ -151,7 +151,7 @@ export async function getMyRegistrations(req, res) {
  */
 export async function createClass(req, res) {
   try {
-    const { subjectId, name, maxSlots, schedule, room, semester, managerId } = req.body
+    const { subjectId, name, maxSlots, schedule, room, semester, managerId, startDate, endDate } = req.body
     if (!subjectId || !name || !maxSlots) {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: subjectId, name, maxSlots.' })
     }
@@ -189,7 +189,9 @@ export async function createClass(req, res) {
       schedule: schedule || '',
       room: room || '',
       semester: semester || '',
-      manager_id: finalManagerId
+      manager_id: finalManagerId,
+      start_date: startDate || null,
+      end_date: endDate || null
     })
 
     await logActivity(req, 'CREATE_CLASS', `Tạo lớp học mới: ${name} (Sĩ số tối đa: ${maxSlots}, Học kỳ: ${semester || 'N/A'})`)

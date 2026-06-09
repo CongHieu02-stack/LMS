@@ -108,7 +108,7 @@ WHERE code IN ('user_manage_senior');
 -- 2. HIEU_TRUONG (Hiệu trưởng): 
 INSERT INTO public.role_default_permissions (role, permission_id)
 SELECT 'HIEU_TRUONG'::public.user_role, id FROM public.permissions
-WHERE code IN ('subject_approve');
+WHERE code IN ('subject_approve', 'class_quantity_approve', 'class_create', 'class_quantity_propose', 'instructor_assign', 'subject_propose', 'lesson_exam_manage', 'user_manage_staff');
 
 -- 3. HR (Nhân sự):
 INSERT INTO public.role_default_permissions (role, permission_id)

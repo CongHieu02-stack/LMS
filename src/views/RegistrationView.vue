@@ -4,7 +4,7 @@ import { apiGet, apiPost } from '@/lib/api'
 
 interface ClassItem {
   id: string; code?: string; name: string; subjectName: string; subjectCode: string;
-  instructor: string; schedule: string; enrolled: number; max: number; isRegistered: boolean;
+  instructor: string; schedule: string; room: string; enrolled: number; max: number; isRegistered: boolean;
 }
 
 const availableClasses = ref<ClassItem[]>([])
@@ -31,6 +31,7 @@ async function loadData() {
       subjectCode: c.subject?.code || '',
       instructor: c.instructor?.fullName || c.instructor?.full_name || 'Chưa phân công',
       schedule: c.schedule || 'Chưa xếp lịch',
+      room: c.room || 'Chưa xếp phòng',
       enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
       max: c.maxSlots || c.max_slots || 0,
       isRegistered: myRegistrations.value.includes(c.id)
@@ -106,6 +107,7 @@ async function handleRegister(cls: ClassItem) {
           <h3 class="subject-name">{{ cls.subjectName }}</h3>
           <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
           <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
+          <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
           <div class="capacity-section">
             <div class="capacity-labels"><span class="capacity-title">Sĩ số</span><span><strong>{{ cls.enrolled }}</strong> / {{ cls.max }}</span></div>
             <div class="progress-bg"><div class="progress-fill" :class="getProgressBarClass(cls.enrolled, cls.max)" :style="{ width: getCapacityPercent(cls.enrolled, cls.max) + '%' }"></div></div>

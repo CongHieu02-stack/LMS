@@ -7,6 +7,11 @@
 import express from 'express'
 import cors from 'cors'
 import { router as apiRoutes } from './routes/index.js'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 
@@ -18,6 +23,9 @@ app.use(
   }),
 )
 app.use(express.json())
+
+// ─── Serve static files from uploads directory ───
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 // ─── Mount tất cả API routes dưới prefix /api ───
 app.use('/api', apiRoutes)
