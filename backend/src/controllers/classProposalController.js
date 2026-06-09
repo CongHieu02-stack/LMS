@@ -53,11 +53,20 @@ function validateSchedule(scheduleStr) {
           ? [m1_start, m1_end, m2_start, m2_end]
           : [m2_start, m2_end, m1_start, m1_end];
 
-        if (secondStart < firstEnd + 5) {
+        // Kiểm tra xem có trùng nhau không
+        if (secondStart < firstEnd) {
           const dayText = dayLabels[s1.day] || s1.day;
           return {
             valid: false,
-            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng khung giờ.`
+          };
+        }
+        // Kiểm tra xem có cách nhau ít nhất 10 phút không
+        if (secondStart < firstEnd + 10) {
+          const dayText = dayLabels[s1.day] || s1.day;
+          return {
+            valid: false,
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 10 phút để sinh viên kịp di chuyển giữa các phòng học.`
           };
         }
       }

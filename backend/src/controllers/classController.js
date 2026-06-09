@@ -58,11 +58,20 @@ function validateSchedule(scheduleStr) {
           ? [m1_start, m1_end, m2_start, m2_end]
           : [m2_start, m2_end, m1_start, m1_end];
 
-        if (secondStart < firstEnd + 5) {
+        // Kiểm tra xem có trùng nhau không
+        if (secondStart < firstEnd) {
           const dayText = dayLabels[s1.day] || s1.day;
           return {
             valid: false,
-            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng khung giờ.`
+          };
+        }
+        // Kiểm tra xem có cách nhau ít nhất 10 phút không
+        if (secondStart < firstEnd + 10) {
+          const dayText = dayLabels[s1.day] || s1.day;
+          return {
+            valid: false,
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 10 phút để sinh viên kịp di chuyển giữa các phòng học.`
           };
         }
       }
@@ -454,6 +463,66 @@ export async function listRooms(req, res) {
   } catch (err) {
     console.error('[ClassController.listRooms]', err.message)
     return res.status(500).json({ error: 'Không thể tải danh sách phòng học.' })
+  }
+}
+
+/**
+ * GET /api/classes/:id/students — Lấy danh sách sinh viên đã đăng ký vào lớp học.
+ */
+export async function getClassStudents(req, res) {
+  try {
+    const { id } = req.params
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    
+    console.log('[ClassController.getClassStudents] Class ID:', id)
+    
+    // First get registrations
+    const { data: registrations, error: regError } = await supabaseAdmin
+      .from('class_registrations')
+      .select('id, registered_at, student_id')
+      .eq('class_id', id)
+      .order('registered_at', { ascending: false })
+
+    console.log('[ClassController.getClassStudents] Registrations:', registrations)
+    console.log('[ClassController.getClassStudents] Reg Error:', regError)
+
+    if (regError) throw regError
+
+    if (!registrations || registrations.length === 0) {
+      return res.json({
+        success: true,
+        data: []
+      })
+    }
+
+    // Get student profiles
+    const studentIds = registrations.map(r => r.student_id)
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', studentIds)
+
+    console.log('[ClassController.getClassStudents] Profiles:', profiles)
+    console.log('[ClassController.getClassStudents] Profile Error:', profileError)
+
+    if (profileError) throw profileError
+
+    // Combine data
+    const combinedData = registrations.map(reg => ({
+      id: reg.id,
+      registered_at: reg.registered_at,
+      student: profiles?.find(p => p.id === reg.student_id) || null
+    }))
+
+    console.log('[ClassController.getClassStudents] Combined Data:', combinedData)
+
+    return res.json({
+      success: true,
+      data: combinedData
+    })
+  } catch (err) {
+    console.error('[ClassController.getClassStudents]', err.message)
+    return res.status(500).json({ error: 'Không thể tải danh sách sinh viên.' })
   }
 }
 
