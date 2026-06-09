@@ -71,11 +71,11 @@ const menuGroups = ref<MainMenuGroup[]>([
       {
         label: 'Đề xuất môn học mới',
         to: '/subjects/propose',
-        requiredPermission: 'subject_propose'
+        requiredPermission: 'subject_propose',
       },
-    
+
       {
-        label: 'Danh sách & Khóa học phần',
+        label: 'Danh sách & Khóa môn học ',
         to: '/admin/subjects/list',
         requiredPermission: 'subject_approve',
       },
@@ -124,7 +124,7 @@ const menuGroups = ref<MainMenuGroup[]>([
       {
         label: 'Tạo lớp học (Khung)',
         to: '/admin/classes',
-        requiredPermission: 'class_create'
+        requiredPermission: 'class_create',
       },
       {
         label: 'Tra cứu lớp (Bộ lọc)',
@@ -137,11 +137,40 @@ const menuGroups = ref<MainMenuGroup[]>([
 
 const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
   { label: 'Tổng quan', to: '/dashboard', icon: 'pi pi-th-large' },
-  { label: 'Thời khoá biểu', to: '/timetable', icon: 'pi pi-calendar', allowedRoles: ['SINH_VIEN', 'GIANG_VIEN'] },
-  { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register', studentOnly: true },
-  { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take', studentOnly: true },
-  { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view', studentOnly: true },
-  { label: 'Lớp học của tôi', to: '/my-classes', icon: 'pi pi-sitemap', requiredPermission: 'class_register', studentOnly: true },
+  {
+    label: 'Thời khoá biểu',
+    to: '/timetable',
+    icon: 'pi pi-calendar',
+    allowedRoles: ['SINH_VIEN', 'GIANG_VIEN'],
+  },
+  {
+    label: 'Đăng ký lớp học',
+    to: '/registration',
+    icon: 'pi pi-pencil',
+    requiredPermission: 'class_register',
+    studentOnly: true,
+  },
+  {
+    label: 'Bài thi của tôi',
+    to: '/exam',
+    icon: 'pi pi-file-edit',
+    requiredPermission: 'exam_take',
+    studentOnly: true,
+  },
+  {
+    label: 'Bảng điểm',
+    to: '/grades',
+    icon: 'pi pi-chart-bar',
+    requiredPermission: 'grade_view',
+    studentOnly: true,
+  },
+  {
+    label: 'Lớp học của tôi',
+    to: '/my-classes',
+    icon: 'pi pi-sitemap',
+    requiredPermission: 'class_register',
+    studentOnly: true,
+  },
 ])
 
 // ----------------------------------------------------------------------------
@@ -161,9 +190,10 @@ const filteredStandalone = computed(() => {
       // Nếu là chức năng sinh viên, chỉ hiển thị nếu là vai trò SINH_VIEN hoặc được gán quyền trực tiếp
       if (item.studentOnly) {
         const isStudent = authStore.profile?.role === 'SINH_VIEN'
-        const hasExplicitPermission = item.requiredPermission &&
+        const hasExplicitPermission =
+          item.requiredPermission &&
           (Array.isArray(item.requiredPermission)
-            ? item.requiredPermission.some(p => authStore.profile?.permissions?.includes(p))
+            ? item.requiredPermission.some((p) => authStore.profile?.permissions?.includes(p))
             : authStore.profile?.permissions?.includes(item.requiredPermission))
 
         if (!isStudent && !hasExplicitPermission) {
@@ -219,8 +249,8 @@ function isSubItemActive(subItem: SubMenuItem) {
   }
   if (route.path.startsWith(subItem.to + '/')) {
     // Chỉ kích hoạt prefix match nếu không có menu con nào khác trùng khớp tuyệt đối với route hiện tại
-    const hasExactSiblingMatch = menuGroups.value.some(group =>
-      group.items.some(item => route.path === item.to)
+    const hasExactSiblingMatch = menuGroups.value.some((group) =>
+      group.items.some((item) => route.path === item.to),
     )
     return !hasExactSiblingMatch
   }
