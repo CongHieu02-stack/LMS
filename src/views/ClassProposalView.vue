@@ -83,7 +83,7 @@ async function loadData() {
       apiGet<{ success: boolean; data: Subject[] }>('/subjects'),
       apiGet<{ success: boolean; data: ClassProposal[] }>('/class-proposals')
     ])
-    subjects.value = (subRes.data || []).filter((s) => s.status === 'approved')
+    subjects.value = (subRes.data || []).filter((s) => s.status === 'approved' && !s.is_locked)
     proposals.value = propRes.data || []
   } catch (err: unknown) {
     errorMsg.value = err instanceof Error ? err.message : 'Đã xảy ra lỗi.'
