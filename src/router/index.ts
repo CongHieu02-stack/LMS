@@ -123,7 +123,7 @@ const router = createRouter({
       path: '/admin/classes/search',
       name: 'class-search',
       component: () => import('@/views/admin/ClassSearchView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'class_create' },
+      meta: { requiresAuth: true, requirePermission: 'class_view' },
     },
     {
       path: '/admin/classes/assign',
