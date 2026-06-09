@@ -21,6 +21,9 @@ router.get('/my-registrations', classController.getMyRegistrations)
 // GET /api/classes/:id — Chi tiết lớp
 router.get('/:id', classController.getClassById)
 
+// GET /api/classes/:id/students — Danh sách sinh viên đã đăng ký
+router.get('/:id/students', classController.getClassStudents)
+
 // POST /api/classes — Tạo lớp mới (PĐT, rank >= 70)
 router.post('/', requirePermissionOrRank('class_create', 70), classController.createClass)
 

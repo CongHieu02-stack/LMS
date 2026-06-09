@@ -17,6 +17,11 @@ const statusFilter = ref('')
 const selectedClass = ref<any>(null)
 const showDetailModal = ref(false)
 
+// Students List Modal State
+const showStudentsModal = ref(false)
+const studentsList = ref<any[]>([])
+const loadingStudents = ref(false)
+
 async function loadData() {
   loading.value = true
   errMsg.value = null
@@ -38,7 +43,7 @@ async function loadData() {
 
 // Computed filtered list
 const filteredClasses = computed(() => {
-  return classes.value.filter((c) => {
+  return classes.value.filter((c: any) => {
     // 1. Search name/code
     const className = (c.name || '').toLowerCase()
     const subjectCode = (c.subject?.code || '').toLowerCase()
@@ -71,6 +76,31 @@ function openDetail(cls: any) {
 function closeDetail() {
   showDetailModal.value = false
   selectedClass.value = null
+}
+
+async function loadStudentsList(classId: string) {
+  loadingStudents.value = true
+  try {
+    const res = await apiGet<any>(`/classes/${classId}/students`)
+    studentsList.value = res.data || []
+  } catch (err: any) {
+    console.error('Lỗi khi tải danh sách sinh viên:', err)
+    studentsList.value = []
+  } finally {
+    loadingStudents.value = false
+  }
+}
+
+function openStudentsModal() {
+  if (selectedClass.value) {
+    showStudentsModal.value = true
+    loadStudentsList(selectedClass.value.id)
+  }
+}
+
+function closeStudentsModal() {
+  showStudentsModal.value = false
+  studentsList.value = []
 }
 
 onMounted(loadData)
@@ -248,8 +278,13 @@ onMounted(loadData)
                 <div class="info-value">{{ selectedClass.subject?.credits ?? '—' }} TC</div>
               </div>
               <div class="info-block">
-                <div class="info-label"><i class="pi pi-users"></i> Sĩ số tối đa</div>
-                <div class="info-value">{{ selectedClass.maxSlots }} học viên</div>
+                <div class="info-label"><i class="pi pi-users"></i> Sĩ số sinh viên</div>
+                <div class="info-value">
+                  {{ (selectedClass.maxSlots - (selectedClass.remainingSlots || 0)) }} / {{ selectedClass.maxSlots }}
+                  <button class="btn-view-students" @click="openStudentsModal">
+                    <i class="pi pi-list"></i> Xem danh sách
+                  </button>
+                </div>
               </div>
               <div class="info-block">
                 <div class="info-label"><i class="pi pi-check-square"></i> Còn trống</div>
@@ -280,6 +315,69 @@ onMounted(loadData)
           <!-- Modal Footer -->
           <div class="modal-footer">
             <button class="btn-secondary" @click="closeDetail">
+              <i class="pi pi-times"></i> Đóng
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ===== MODAL DANH SÁCH SINH VIÊN ===== -->
+    <Teleport to="body">
+      <div v-if="showStudentsModal" class="modal-overlay" @click.self="closeStudentsModal">
+        <div class="detail-modal students-modal">
+          <!-- Modal Header -->
+          <div class="modal-header">
+            <div>
+              <span class="modal-subject-code">{{ selectedClass?.subject?.code }}</span>
+              <h2 class="modal-title">Danh sách sinh viên - {{ selectedClass?.name }}</h2>
+            </div>
+            <button class="btn-close-modal" @click="closeStudentsModal">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="modal-body">
+            <div v-if="loadingStudents" class="loading-wrapper">
+              <i class="pi pi-spin pi-spinner spinner-icon"></i>
+              <span>Đang tải danh sách sinh viên...</span>
+            </div>
+            <div v-else-if="studentsList.length === 0" class="empty-state">
+              <i class="pi pi-inbox empty-icon"></i>
+              <h3>Chưa có sinh viên đăng ký</h3>
+              <p>Lớp học này chưa có sinh viên nào đăng ký.</p>
+            </div>
+            <div v-else class="students-list">
+              <div class="students-count">
+                Tổng số: <strong>{{ studentsList.length }}</strong> sinh viên
+              </div>
+              <div class="students-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>STT</th>
+                      <th>Họ và tên</th>
+                      <th>Email</th>
+                      <th>Ngày đăng ký</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(student, index) in studentsList" :key="student.id">
+                      <td>{{ Number(index) + 1 }}</td>
+                      <td>{{ student.student?.fullName || student.student?.full_name || '—' }}</td>
+                      <td>{{ student.student?.email || '—' }}</td>
+                      <td>{{ new Date(student.registered_at).toLocaleDateString('vi-VN') }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="modal-footer">
+            <button class="btn-secondary" @click="closeStudentsModal">
               <i class="pi pi-times"></i> Đóng
             </button>
           </div>
@@ -445,7 +543,14 @@ onMounted(loadData)
   border-radius: 10px; padding: 0.875rem 1rem;
 }
 .info-label { font-size: 0.78rem; color: #6b7280; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
-.info-value { font-size: 0.95rem; color: #111827; font-weight: 500; }
+.info-value { font-size: 0.95rem; color: #111827; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.btn-view-students {
+  padding: 0.3rem 0.6rem; background: #7c3aed; border: none;
+  border-radius: 6px; color: #fff; font-size: 0.75rem; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; gap: 0.3rem;
+  transition: all 0.2s;
+}
+.btn-view-students:hover { background: #6d28d9; }
 
 .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 9999px; }
 .chip-active { background: #dcfce7; color: #166534; }
@@ -461,6 +566,35 @@ onMounted(loadData)
   display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s;
 }
 .btn-secondary:hover { background: #f9fafb; }
+
+.btn-primary {
+  padding: 0.6rem 1.2rem; background: #7c3aed; border: none;
+  border-radius: 8px; color: #fff; font-weight: 500; cursor: pointer;
+  display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s;
+}
+.btn-primary:hover { background: #6d28d9; }
+
+/* Students Modal */
+.students-modal { max-width: 800px; }
+.students-list { display: flex; flex-direction: column; gap: 1rem; }
+.students-count { 
+  font-size: 0.9rem; color: #6b7280; padding: 0.75rem 1rem; 
+  background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;
+}
+.students-table { overflow-x: auto; }
+.students-table table {
+  width: 100%; border-collapse: collapse; font-size: 0.9rem;
+}
+.students-table th {
+  background: #f9fafb; padding: 0.75rem 1rem; text-align: left;
+  font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb;
+}
+.students-table td {
+  padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb;
+  color: #4b5563;
+}
+.students-table tr:hover { background: #f9fafb; }
+.students-table tr:last-child td { border-bottom: none; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
