@@ -102,6 +102,21 @@ export async function create(req, res) {
       return res.status(400).json({ error: 'Thiếu thông tin: subjectId, quantity, semester.' })
     }
 
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data: subj, error: subjErr } = await supabaseAdmin
+      .from('subjects')
+      .select('id, is_locked')
+      .eq('id', subjectId)
+      .single()
+
+    if (subjErr || !subj) {
+      return res.status(404).json({ error: 'Môn học không tồn tại.' })
+    }
+
+    if (subj.is_locked) {
+      return res.status(400).json({ error: 'Môn học này hiện đang bị khóa, không thể tạo đề xuất lớp học.' })
+    }
+
     if (schedule) {
       const schedValidation = validateSchedule(schedule)
       if (!schedValidation.valid) {
@@ -174,6 +189,20 @@ export async function approve(req, res) {
         .status(400)
         .json({ error: 'Status không hợp lệ. Chỉ chấp nhận: approved, rejected.' })
     }
+
+    if (status === 'approved') {
+      const { supabaseAdmin } = await import('../config/supabase.js')
+      const { data: proposal } = await supabaseAdmin
+        .from('class_proposals')
+        .select('subject_id, subject:subjects(is_locked)')
+        .eq('id', id)
+        .single()
+
+      if (proposal?.subject?.is_locked) {
+        return res.status(400).json({ error: 'Môn học thuộc đề xuất này hiện đang bị khóa, không thể phê duyệt mở lớp.' })
+      }
+    }
+
     const updated = await classProposalModel.updateStatus(id, status, req.user.id)
     return res.json({
       success: true,

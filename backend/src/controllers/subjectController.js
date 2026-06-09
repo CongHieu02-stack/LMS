@@ -145,3 +145,37 @@ export async function create(req, res) {
     return res.status(500).json({ error: 'Lỗi khi tạo đề xuất môn học.' })
   }
 }
+
+/**
+ * PUT /api/subjects/:id/unlock — Mở khóa môn học.
+ * Yêu cầu: rank >= 90 (Hiệu trưởng & Admin).
+ */
+export async function unlock(req, res) {
+  try {
+    const { id } = req.params
+    const actorRank = req.profile.rank
+
+    if (actorRank < 90) {
+      return res.status(403).json({ error: 'Bạn không có quyền mở khóa môn học.' })
+    }
+
+    const updatedSubject = await subjectModel.unlockSubject(id)
+
+    await logActivity(
+      req,
+      'UNLOCK_SUBJECT',
+      `Mở khóa môn học: ${updatedSubject.name} (${updatedSubject.code})`,
+      { targetType: 'subject', targetId: id },
+    )
+
+    return res.json({
+      success: true,
+      message: `Đã mở khóa môn học thành công.`,
+      data: updatedSubject,
+    })
+  } catch (err) {
+    console.error('[SubjectController.unlock]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi mở khóa môn học.' })
+  }
+}
+

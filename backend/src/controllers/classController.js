@@ -165,15 +165,23 @@ export async function createClass(req, res) {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: subjectId, name, maxSlots.' })
     }
 
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data: subj, error: subjErr } = await supabaseAdmin
+      .from('subjects')
+      .select('department, is_locked')
+      .eq('id', subjectId)
+      .single()
+
+    if (subjErr || !subj) {
+      return res.status(404).json({ error: 'Môn học không tồn tại.' })
+    }
+
+    if (subj.is_locked) {
+      return res.status(400).json({ error: 'Môn học này hiện đang bị khóa, không thể tạo lớp học mới.' })
+    }
+
     let finalManagerId = managerId || null
     if (!finalManagerId) {
-      const { supabaseAdmin } = await import('../config/supabase.js')
-      const { data: subj } = await supabaseAdmin
-        .from('subjects')
-        .select('department')
-        .eq('id', subjectId)
-        .single()
-      
       if (subj?.department) {
         const { data: tbm } = await supabaseAdmin
           .from('profiles')
