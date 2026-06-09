@@ -91,13 +91,13 @@ const router = createRouter({
       path: '/admin/departments/add-subject',
       name: 'department-add-subject',
       component: () => import('@/views/admin/DepartmentAddSubjectView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'department_manage' },
+      meta: { requiresAuth: true, requirePermission: 'subject_propose' },
     },
     {
       path: '/admin/departments/approve',
       name: 'department-approve',
       component: () => import('@/views/admin/DepartmentApproveView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'department_manage' },
+      meta: { requiresAuth: true, requirePermission: 'subject_approve' },
     },
 
     // ---- QUẢN LÝ LỚP HỌC ----

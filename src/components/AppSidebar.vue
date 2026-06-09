@@ -73,7 +73,6 @@ const menuGroups = ref<MainMenuGroup[]>([
         to: '/subjects/propose',
         requiredPermission: 'subject_propose',
       },
-
       {
         label: 'Danh sách & Khóa môn học ',
         to: '/admin/subjects/list',
@@ -82,12 +81,12 @@ const menuGroups = ref<MainMenuGroup[]>([
       {
         label: 'Thêm môn học',
         to: '/admin/departments/add-subject',
-        requiredPermission: 'department_manage',
+        requiredPermission: 'subject_propose',
       },
       {
         label: 'Phê duyệt môn',
         to: '/admin/departments/approve',
-        requiredPermission: 'department_manage',
+        requiredPermission: 'subject_approve',
       },
     ],
   },

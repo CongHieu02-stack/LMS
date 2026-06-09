@@ -29,7 +29,7 @@ const classLink = computed(() => {
 })
 
 const departmentLink = computed(() => {
-  if (authStore.hasPermission('department_manage')) return '/admin/departments/approve'
+  if (authStore.hasPermission('subject_approve')) return '/admin/departments/approve'
   return '/dashboard'
 })
 
