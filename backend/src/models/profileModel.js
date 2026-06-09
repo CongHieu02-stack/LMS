@@ -97,7 +97,7 @@ export async function deleteById(id) {
  * @param {string} role — Vai trò (ADMIN, HIEU_TRUONG, HR, ...)
  * @returns {object} — Profile vừa tạo
  */
-export async function createProfile(id, email, fullName, role, department = null) {
+export async function createProfile(id, email, fullName, role, department = null, mssv = null) {
   const insertData = {
     id,
     email,
@@ -106,6 +106,9 @@ export async function createProfile(id, email, fullName, role, department = null
   }
   if (department) {
     insertData.department = department
+  }
+  if (mssv) {
+    insertData.Mssv = mssv
   }
 
   const { data, error } = await supabaseAdmin
@@ -183,4 +186,20 @@ export async function updateLockStatus(id, isLocked, lockReason) {
   if (error) throw error
   return data
 }
+
+/**
+ * Tìm profile theo MSSV
+ * @param {string} mssv — Mã số sinh viên
+ * @returns {object|null} — Profile row hoặc null
+ */
+export async function findByMssv(mssv) {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('*')
+    .eq('Mssv', mssv)
+
+  if (error) throw error
+  return data && data.length > 0 ? data[0] : null
+}
+
 

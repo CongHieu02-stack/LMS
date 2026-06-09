@@ -168,7 +168,7 @@ export async function updateInfo(req, res) {
  */
 export async function createProfile(req, res) {
   try {
-    const { email, password, fullName, role, department } = req.body
+    const { email, password, fullName, role, department, mssv } = req.body
     let effectiveRank = req.profile.rank
     const perms = req.permissions || []
     if (perms.includes('user_manage_senior')) effectiveRank = Math.max(effectiveRank, 90)
@@ -238,6 +238,16 @@ export async function createProfile(req, res) {
         .json({ error: 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*...).' })
     }
 
+    if (role === 'SINH_VIEN') {
+      if (!mssv) {
+        return res.status(400).json({ error: 'Mã số sinh viên (MSSV) là bắt buộc.' })
+      }
+      const existingProfile = await profileModel.findByMssv(mssv)
+      if (existingProfile) {
+        return res.status(400).json({ error: 'Mã số sinh viên (MSSV) này đã tồn tại trong hệ thống. Vui lòng thử lại.' })
+      }
+    }
+
     // 1. Tạo tài khoản trong auth.users bằng Admin API (tự xác thực email)
     const { data, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -261,6 +271,7 @@ export async function createProfile(req, res) {
         fullName,
         role,
         role === 'TRUONG_BO_MON' ? department : null,
+        role === 'SINH_VIEN' ? mssv : null,
       )
     } catch (dbError) {
       // Rollback: Xóa user vừa tạo ở auth.users để tránh rác/email bị kẹt
