@@ -73,11 +73,7 @@ const menuGroups = ref<MainMenuGroup[]>([
         to: '/subjects/propose',
         requiredPermission: 'subject_propose'
       },
-      {
-        label: 'Phê duyệt môn học',
-        to: '/admin/subjects',
-        requiredPermission: 'subject_approve',
-      },
+    
       {
         label: 'Danh sách & Khóa học phần',
         to: '/admin/subjects/list',
@@ -165,11 +161,11 @@ const filteredStandalone = computed(() => {
       // Nếu là chức năng sinh viên, chỉ hiển thị nếu là vai trò SINH_VIEN hoặc được gán quyền trực tiếp
       if (item.studentOnly) {
         const isStudent = authStore.profile?.role === 'SINH_VIEN'
-        const hasExplicitPermission = item.requiredPermission && 
+        const hasExplicitPermission = item.requiredPermission &&
           (Array.isArray(item.requiredPermission)
             ? item.requiredPermission.some(p => authStore.profile?.permissions?.includes(p))
             : authStore.profile?.permissions?.includes(item.requiredPermission))
-        
+
         if (!isStudent && !hasExplicitPermission) {
           return false
         }
