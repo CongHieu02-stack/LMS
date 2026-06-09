@@ -141,7 +141,7 @@ const menuGroups = ref<MainMenuGroup[]>([
 
 const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
   { label: 'Tổng quan', to: '/dashboard', icon: 'pi pi-th-large' },
-  { label: 'Thời khoá biểu', to: '/timetable', icon: 'pi pi-calendar', allowedRoles: ['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON'] },
+  { label: 'Thời khoá biểu', to: '/timetable', icon: 'pi pi-calendar', allowedRoles: ['SINH_VIEN', 'GIANG_VIEN'] },
   { label: 'Đăng ký lớp học', to: '/registration', icon: 'pi pi-pencil', requiredPermission: 'class_register', studentOnly: true },
   { label: 'Bài thi của tôi', to: '/exam', icon: 'pi pi-file-edit', requiredPermission: 'exam_take', studentOnly: true },
   { label: 'Bảng điểm', to: '/grades', icon: 'pi pi-chart-bar', requiredPermission: 'grade_view', studentOnly: true },
@@ -154,29 +154,36 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
 
 // Lọc các chức năng độc lập
 const filteredStandalone = computed(() => {
-  return standaloneMenus.value.filter((item) => {
-    // Nếu là chức năng sinh viên, chỉ hiển thị nếu là vai trò SINH_VIEN hoặc được gán quyền trực tiếp
-    if (item.studentOnly) {
-      const isStudent = authStore.profile?.role === 'SINH_VIEN'
-      const hasExplicitPermission = item.requiredPermission && 
-        (Array.isArray(item.requiredPermission)
-          ? item.requiredPermission.some(p => authStore.profile?.permissions?.includes(p))
-          : authStore.profile?.permissions?.includes(item.requiredPermission))
-      
-      if (!isStudent && !hasExplicitPermission) {
+  return standaloneMenus.value
+    .map((item) => {
+      if (item.to === '/timetable' && authStore.profile?.role === 'GIANG_VIEN') {
+        return { ...item, label: 'Lịch giảng dạy' }
+      }
+      return item
+    })
+    .filter((item) => {
+      // Nếu là chức năng sinh viên, chỉ hiển thị nếu là vai trò SINH_VIEN hoặc được gán quyền trực tiếp
+      if (item.studentOnly) {
+        const isStudent = authStore.profile?.role === 'SINH_VIEN'
+        const hasExplicitPermission = item.requiredPermission && 
+          (Array.isArray(item.requiredPermission)
+            ? item.requiredPermission.some(p => authStore.profile?.permissions?.includes(p))
+            : authStore.profile?.permissions?.includes(item.requiredPermission))
+        
+        if (!isStudent && !hasExplicitPermission) {
+          return false
+        }
+      }
+      if (item.allowedRoles && !item.allowedRoles.includes(authStore.profile?.role || '')) {
         return false
       }
-    }
-    if (item.allowedRoles && !item.allowedRoles.includes(authStore.profile?.role || '')) {
-      return false
-    }
 
-    if (!item.requiredPermission) return true
-    if (Array.isArray(item.requiredPermission)) {
-      return item.requiredPermission.some((p) => authStore.hasPermission(p))
-    }
-    return authStore.hasPermission(item.requiredPermission)
-  })
+      if (!item.requiredPermission) return true
+      if (Array.isArray(item.requiredPermission)) {
+        return item.requiredPermission.some((p) => authStore.hasPermission(p))
+      }
+      return authStore.hasPermission(item.requiredPermission)
+    })
 })
 
 // Lọc các nhóm lớn và các mục con bên trong

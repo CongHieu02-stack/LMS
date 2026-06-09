@@ -334,22 +334,21 @@ const listByDay = computed(() => {
 // ─── Today highlight ───
 const today = todayDayCode()
 
-// ─── Shift and Period helpers ───
-function getClassType(subjectName: string, className: string): 'theory' | 'practice' | 'online' | 'exam' | 'suspended' {
+function getClassType(subjectName: string, className: string): 'study' | 'exam' {
   const name = (subjectName + ' ' + className).toLowerCase()
-  if (name.includes('thực hành') || name.includes('thực tập') || name.includes('lab') || name.includes('tập sự') || name.includes('đồ án')) {
-    return 'practice'
-  }
-  if (name.includes('trực tuyến') || name.includes('online') || name.includes('zoom') || name.includes('teams')) {
-    return 'online'
-  }
-  if (name.includes('thi') || name.includes('kiểm tra') || name.includes('exam') || name.includes('test') || name.includes('tiểu luận') || name.includes('vấn đáp')) {
+  const words = name.split(/[\s,.\-\/()]+/)
+  
+  // Phân loại là lịch thi nếu chứa từ đứng độc lập "thi" hoặc các từ khóa thi cử cụ thể
+  if (
+    words.includes('thi') || 
+    name.includes('kiểm tra giữa kỳ') || 
+    name.includes('kiểm tra cuối kỳ') || 
+    name.includes('final exam') || 
+    name.includes('midterm exam')
+  ) {
     return 'exam'
   }
-  if (name.includes('tạm ngưng') || name.includes('hoãn') || name.includes('nghỉ')) {
-    return 'suspended'
-  }
-  return 'theory'
+  return 'study'
 }
 
 function getSessionShift(startTime: string): 'Sáng' | 'Chiều' | 'Tối' {
@@ -484,10 +483,10 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
     <!-- Header -->
     <div class="tt-header">
       <div>
-        <div class="breadcrumb">Học tập / <span>Thời khoá biểu</span></div>
-        <h1 class="tt-title">Thời Khoá Biểu</h1>
+        <div class="breadcrumb">Học tập / <span>{{ role === 'GIANG_VIEN' ? 'Lịch giảng dạy' : 'Thời khoá biểu' }}</span></div>
+        <h1 class="tt-title">{{ role === 'GIANG_VIEN' ? 'Lịch Giảng Dạy' : 'Thời Khoá Biểu' }}</h1>
         <p class="tt-subtitle" v-if="role === 'SINH_VIEN'">Lịch học cá nhân của bạn dựa trên các lớp đã đăng ký.</p>
-        <p class="tt-subtitle" v-else-if="isAdminView">Tổng quan thời khoá biểu toàn bộ lớp học trong hệ thống.</p>
+        <p class="tt-subtitle" v-else-if="isAdminView">Tổng quan lịch giảng dạy & học tập toàn bộ lớp học trong hệ thống.</p>
         <p class="tt-subtitle" v-else>Lịch giảng dạy của bạn dựa trên các lớp được phân công.</p>
       </div>
       <div class="tt-actions" v-if="!loading">
@@ -553,7 +552,7 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
     <!-- Loading -->
     <div v-if="loading" class="tt-loading">
       <i class="pi pi-spin pi-spinner"></i>
-      <span>Đang tải thời khoá biểu...</span>
+      <span>{{ role === 'GIANG_VIEN' ? 'Đang tải lịch giảng dạy...' : 'Đang tải thời khoá biểu...' }}</span>
     </div>
 
     <!-- Error -->
@@ -564,7 +563,7 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
     <!-- Empty state -->
     <div v-else-if="classes.length === 0" class="tt-empty">
       <i class="pi pi-calendar-times"></i>
-      <h3>Chưa có lịch học</h3>
+      <h3>{{ role === 'GIANG_VIEN' ? 'Chưa có lịch dạy' : 'Chưa có lịch học' }}</h3>
       <p v-if="role === 'SINH_VIEN'">Bạn chưa đăng ký lớp học nào hoặc chưa có lớp nào có lịch.</p>
       <p v-else-if="isAdminView">Chưa có lớp học nào trong hệ thống có lịch học cụ thể.</p>
       <p v-else>Bạn chưa được phân công giảng dạy lớp nào.</p>
@@ -605,9 +604,14 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                     <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
                     <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
                     <div class="card-meta">
-                      GV: 
-                      <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
-                      <span v-else class="no-instructor">Chưa phân công</span>
+                      <template v-if="role === 'GIANG_VIEN'">
+                        Sĩ số: <strong>{{ block.cls.enrolledCount ?? 0 }} sinh viên</strong>
+                      </template>
+                      <template v-else>
+                        GV: 
+                        <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
+                        <span v-else class="no-instructor">Chưa phân công</span>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -631,9 +635,14 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                     <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
                     <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
                     <div class="card-meta">
-                      GV: 
-                      <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
-                      <span v-else class="no-instructor">Chưa phân công</span>
+                      <template v-if="role === 'GIANG_VIEN'">
+                        Sĩ số: <strong>{{ block.cls.enrolledCount ?? 0 }} sinh viên</strong>
+                      </template>
+                      <template v-else>
+                        GV: 
+                        <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
+                        <span v-else class="no-instructor">Chưa phân công</span>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -657,9 +666,14 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                     <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
                     <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
                     <div class="card-meta">
-                      GV: 
-                      <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
-                      <span v-else class="no-instructor">Chưa phân công</span>
+                      <template v-if="role === 'GIANG_VIEN'">
+                        Sĩ số: <strong>{{ block.cls.enrolledCount ?? 0 }} sinh viên</strong>
+                      </template>
+                      <template v-else>
+                        GV: 
+                        <span v-if="block.cls.instructor" class="teacher-link">{{ block.cls.instructor.fullName }}</span>
+                        <span v-else class="no-instructor">Chưa phân công</span>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -673,7 +687,7 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
       <div v-else class="list-container">
         <div v-if="listByDay.length === 0" class="list-empty-week">
           <i class="pi pi-calendar-times"></i>
-          <p>Không có lịch học trong tuần này.</p>
+          <p>{{ role === 'GIANG_VIEN' ? 'Không có lịch giảng dạy trong tuần này.' : 'Không có lịch học trong tuần này.' }}</p>
         </div>
         <div v-else v-for="group in listByDay" :key="group.day" class="list-day-group">
           <div class="list-day-header" :class="{ 'is-today': group.day === today }">
@@ -699,10 +713,16 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                   <span>{{ item.periods }}</span>
                   <span v-if="item.cls.room"><i class="pi pi-map-marker"></i> Phòng: {{ item.cls.room }}</span>
                   <span>
-                    <i class="pi pi-user"></i>
-                    GV: 
-                    <span v-if="item.cls.instructor" class="teacher-link">{{ item.cls.instructor.fullName }}</span>
-                    <span v-else class="no-instructor">Chưa phân công</span>
+                    <template v-if="role === 'GIANG_VIEN'">
+                      <i class="pi pi-users"></i>
+                      Sĩ số: <strong>{{ item.cls.enrolledCount ?? 0 }} sinh viên</strong>
+                    </template>
+                    <template v-else>
+                      <i class="pi pi-user"></i>
+                      GV: 
+                      <span v-if="item.cls.instructor" class="teacher-link">{{ item.cls.instructor.fullName }}</span>
+                      <span v-else class="no-instructor">Chưa phân công</span>
+                    </template>
                   </span>
                 </div>
               </div>
@@ -713,11 +733,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 
       <!-- Shift Legend -->
       <div class="shift-legend-bar">
-        <div class="legend-item"><span class="legend-color-box theory"></span> Lịch học lý thuyết</div>
-        <div class="legend-item"><span class="legend-color-box practice"></span> Lịch học thực hành</div>
-        <div class="legend-item"><span class="legend-color-box online"></span> Lịch học trực tuyến</div>
+        <div class="legend-item"><span class="legend-color-box study"></span> Lịch học</div>
         <div class="legend-item"><span class="legend-color-box exam"></span> Lịch thi</div>
-        <div class="legend-item"><span class="legend-color-box suspended"></span> Lịch tạm ngưng</div>
       </div>
     </div>
   </div>
@@ -778,27 +795,28 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 }
 
 .shift-grid-table th {
-  background-color: #f7fafc;
+  background-color: #f8fafc;
   padding: 0.75rem 0.5rem;
   text-align: center;
   font-weight: bold;
   font-size: 0.88rem;
-  color: #2b6cb0; /* blue */
+  color: #334155;
   width: calc(100% / 8);
 }
 
 .shift-grid-table th.col-shift {
   width: 60px;
-  color: #4b5563;
-  background-color: #f3f4f6;
+  color: #475569;
+  background-color: #f1f5f9;
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
 }
 
 .shift-grid-table th.is-today {
-  background-color: #ebf8ff;
-  border-bottom: 3px solid #3182ce;
+  background-color: #f5f3ff;
+  border-bottom: 3px solid #7c3aed;
+  color: #7c3aed;
 }
 
 .th-day-label {
@@ -810,13 +828,13 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 .th-day-date {
   font-size: 0.78rem;
   font-weight: 500;
-  color: #4b5563;
+  color: #64748b;
 }
 
 .row-shift {
-  background-color: #fffdf0;
+  background-color: #f8fafc;
   font-weight: bold;
-  color: #2b6cb0;
+  color: #475569;
   text-align: center;
   vertical-align: middle;
   font-size: 0.95rem;
@@ -897,60 +915,30 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 }
 
 /* Themes colors matching Vietnamese schedule system */
-.class-card.theory {
-  background-color: #e8ecf4;
-  border-left-color: #1e3a8a;
+.class-card.study {
+  background-color: #eff6ff;
+  border-left-color: #2563eb;
+  color: #1e40af;
+}
+.class-card.study .card-title {
   color: #1e3a8a;
 }
-.class-card.theory .card-title {
-  color: #1e3a8a;
-}
-
-.class-card.practice {
-  background-color: #73cf36;
-  border-left-color: #1e5a07;
-  color: #103d02;
-}
-.class-card.practice .card-title {
-  color: #103d02;
-}
-.class-card.practice .card-code,
-.class-card.practice .card-meta {
-  color: #1d5508;
-}
-.class-card.practice .teacher-link {
-  color: #103d02;
-}
-
-.class-card.online {
-  background-color: #cbe8ff;
-  border-left-color: #0ea5e9;
-  color: #0369a1;
-}
-.class-card.online .card-title {
-  color: #0369a1;
+.class-card.study .card-code,
+.class-card.study .card-meta {
+  color: #475569;
 }
 
 .class-card.exam {
-  background-color: #fff67a;
-  border-left-color: #b7791f;
-  color: #744210;
+  background-color: #fffbeb;
+  border-left-color: #d97706;
+  color: #b45309;
 }
 .class-card.exam .card-title {
-  color: #744210;
+  color: #78350f;
 }
 .class-card.exam .card-code,
 .class-card.exam .card-meta {
-  color: #85531d;
-}
-
-.class-card.suspended {
-  background-color: #feb2b2;
-  border-left-color: #c53030;
-  color: #742a2a;
-}
-.class-card.suspended .card-title {
-  color: #742a2a;
+  color: #475569;
 }
 
 /* ─── LIST VIEW ─── */
@@ -978,11 +966,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
   box-shadow: 0 4px 6px rgba(0,0,0,0.08); 
 }
 
-.list-item.theory { background-color: #e8ecf4; border-left-color: #1e3a8a; color: #1e3a8a; }
-.list-item.practice { background-color: #73cf36; border-left-color: #1e5a07; color: #103d02; }
-.list-item.online { background-color: #cbe8ff; border-left-color: #0ea5e9; color: #0369a1; }
-.list-item.exam { background-color: #fff67a; border-left-color: #b7791f; color: #744210; }
-.list-item.suspended { background-color: #feb2b2; border-left-color: #c53030; color: #742a2a; }
+.list-item.study { background-color: #eff6ff; border-left-color: #2563eb; color: #1e40af; }
+.list-item.exam { background-color: #fffbeb; border-left-color: #d97706; color: #b45309; }
 
 .li-time { font-size: 0.85rem; font-weight: 700; white-space: nowrap; min-width: 110px; padding-top: 2px; }
 .li-info { flex: 1; min-width: 0; }
@@ -1022,11 +1007,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
   display: inline-block;
 }
 
-.legend-color-box.theory { background-color: #e8ecf4; border-left: 3px solid #1e3a8a; }
-.legend-color-box.practice { background-color: #73cf36; border-left: 3px solid #1e5a07; }
-.legend-color-box.online { background-color: #cbe8ff; border-left: 3px solid #0ea5e9; }
-.legend-color-box.exam { background-color: #fff67a; border-left: 3px solid #b7791f; }
-.legend-color-box.suspended { background-color: #feb2b2; border-left: 3px solid #c53030; }
+.legend-color-box.study { background-color: #eff6ff; border-left: 3px solid #2563eb; }
+.legend-color-box.exam { background-color: #fffbeb; border-left: 3px solid #d97706; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
