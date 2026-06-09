@@ -169,7 +169,7 @@ const router = createRouter({
       path: '/timetable',
       name: 'timetable',
       component: () => import('@/views/TimetableView.vue'),
-      meta: { requiresAuth: true, allowedRoles: ['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON'] },
+      meta: { requiresAuth: true, allowedRoles: ['SINH_VIEN', 'GIANG_VIEN'] },
     },
   ],
 })

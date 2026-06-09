@@ -79,14 +79,15 @@ export async function getMyTimetable(req, res) {
               : null
           }
         })
-    } else if (['GIANG_VIEN', 'TRUONG_BO_MON'].includes(userRole)) {
-      // ─── GIẢNG VIÊN / TRƯỞNG BỘ MÔN: Lấy lớp đang dạy ───
+    } else if (userRole === 'GIANG_VIEN') {
+      // ─── GIẢNG VIÊN: Lấy lớp đang dạy ───
       const { data, error } = await supabaseAdmin
         .from('classes')
         .select(`
           id, name, code, schedule, room, semester,
           start_date, end_date, status,
           subject:subjects(id, code, name, credits),
+          instructor:profiles!instructor_id(id, full_name, email),
           registrations:class_registrations(count)
         `)
         .eq('instructor_id', userId)
@@ -106,6 +107,9 @@ export async function getMyTimetable(req, res) {
         semester: c.semester || '',
         startDate: c.start_date || null,
         endDate: c.end_date || null,
+        instructor: c.instructor
+          ? { id: c.instructor.id, fullName: c.instructor.full_name, email: c.instructor.email }
+          : null,
         enrolledCount: c.registrations?.[0]?.count || 0
       }))
     } else {
