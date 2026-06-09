@@ -540,39 +540,38 @@ onMounted(() => {
                 </span>
               </td>
               <td class="text-center font-black rank-cell">{{ user.rank }}</td>
-              <td
-                class="text-right"
-                style="display: flex; gap: 8px; justify-content: flex-end; align-items: center"
-              >
-                <!-- Khóa/Mở khóa (Use Case Khóa người dùng kèm lý do) -->
-                <button
-                  v-if="!user.isLocked"
-                  class="btn-icon btn-lock"
-                  :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  title="Khóa tài khoản nhân sự"
-                  @click="openReasonModal(user.id, 'user', 'KHOA')"
-                >
-                  <i class="pi pi-lock"></i>
-                </button>
-                <button
-                  v-else
-                  class="btn-icon btn-unlock"
-                  :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  title="Mở khóa tài khoản nhân sự"
-                  @click="handleUnlockUser(user)"
-                >
-                  <i class="pi pi-lock-open"></i>
-                </button>
+              <td class="text-right">
+                <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                  <!-- Khóa/Mở khóa (Use Case Khóa người dùng kèm lý do) -->
+                  <button
+                    v-if="!user.isLocked"
+                    class="btn-icon btn-lock"
+                    :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
+                    title="Khóa tài khoản nhân sự"
+                    @click="openReasonModal(user.id, 'user', 'KHOA')"
+                  >
+                    <i class="pi pi-lock"></i>
+                  </button>
+                  <button
+                    v-else
+                    class="btn-icon btn-unlock"
+                    :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
+                    title="Mở khóa tài khoản nhân sự"
+                    @click="handleUnlockUser(user)"
+                  >
+                    <i class="pi pi-lock-open"></i>
+                  </button>
 
-                <!-- Reset mật khẩu (Gửi email đặt lại) -->
-                <button
-                  class="btn-icon btn-reset"
-                  :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
-                  title="Gửi email đặt lại mật khẩu"
-                  @click="handleSendResetPasswordEmail(user)"
-                >
-                  <i class="pi pi-key"></i>
-                </button>
+                  <!-- Reset mật khẩu (Gửi email đặt lại) -->
+                  <button
+                    class="btn-icon btn-reset"
+                    :disabled="user.rank >= effectiveRank || user.id === authStore.profile?.id"
+                    title="Gửi email đặt lại mật khẩu"
+                    @click="handleSendResetPasswordEmail(user)"
+                  >
+                    <i class="pi pi-key"></i>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
