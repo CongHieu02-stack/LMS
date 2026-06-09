@@ -16,6 +16,7 @@ const showDetails = ref(false)
 const showLockModal = ref(false)
 const lockReason = ref('')
 const submittingLock = ref(false)
+const submittingUnlock = ref(false)
 const modalError = ref<string | null>(null)
 
 // Lọc hiển thị (Tất cả / Đang hoạt động / Bị khóa)
@@ -100,6 +101,29 @@ async function submitLock() {
     modalError.value = (err as Error).message || `Gặp lỗi khi khóa môn học.`
   } finally {
     submittingLock.value = false
+  }
+}
+
+async function handleUnlock(subject: any) {
+  submittingUnlock.value = true
+  errorMessage.value = null
+  successMessage.value = null
+
+  try {
+    const res = await apiPut<any>(`/subjects/${subject.id}/unlock`, {})
+    if (res.success) {
+      successMessage.value = `Đã mở khóa môn học "${subject.name}".`
+      
+      // Cập nhật lại state cục bộ
+      subject.is_locked = false
+      subject.lock_reason = null
+
+      await fetchSubjects()
+    }
+  } catch (err) {
+    errorMessage.value = (err as Error).message || `Gặp lỗi khi mở khóa môn học.`
+  } finally {
+    submittingUnlock.value = false
   }
 }
 
@@ -280,12 +304,23 @@ onMounted(() => {
 
         <div
           class="details-footer"
-          v-if="
-            selectedSubject && !selectedSubject.is_locked && selectedSubject.status === 'approved'
-          "
+          v-if="selectedSubject && selectedSubject.status === 'approved'"
         >
-          <button class="btn-danger w-full" @click="openLockModal(selectedSubject)">
+          <button
+            v-if="!selectedSubject.is_locked"
+            class="btn-danger w-full"
+            @click="openLockModal(selectedSubject)"
+          >
             <i class="pi pi-lock"></i> Khóa môn học
+          </button>
+          <button
+            v-else
+            class="btn-success w-full"
+            @click="handleUnlock(selectedSubject)"
+            :disabled="submittingUnlock"
+          >
+            <i class="pi pi-spin pi-spinner mr-1" v-if="submittingUnlock"></i>
+            <i class="pi pi-lock-open" v-else></i> Mở khóa môn học
           </button>
         </div>
       </div>
@@ -863,7 +898,26 @@ onMounted(() => {
   background: #dc2626;
   border-color: #dc2626;
 }
+.btn-success {
+  padding: 0.5rem 1.25rem;
+  background: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+.btn-success:hover:not(:disabled) {
+  background: #059669;
+  border-color: #059669;
+}
 .btn-danger:disabled,
+.btn-success:disabled,
 .btn-cancel:disabled {
   opacity: 0.6;
   cursor: not-allowed;

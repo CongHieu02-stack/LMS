@@ -22,4 +22,7 @@ router.put('/:id/status', requirePermissionOrRank('subject_approve', 90), subjec
 // PUT /api/subjects/:id/lock — Khóa môn học (Hiệu trưởng trở lên)
 router.put('/:id/lock', requirePermissionOrRank('subject_approve', 90), subjectController.lock)
 
+// PUT /api/subjects/:id/unlock — Mở khóa môn học (Hiệu trưởng trở lên)
+router.put('/:id/unlock', requirePermissionOrRank('subject_approve', 90), subjectController.unlock)
+
 export { router }

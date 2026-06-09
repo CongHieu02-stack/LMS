@@ -80,3 +80,25 @@ export async function lockSubject(id, lock_reason) {
   if (error) throw error
   return data
 }
+
+/**
+ * Mở khóa môn học
+ * @param {string} id — UUID môn học
+ * @returns {object} — Subject sau khi cập nhật
+ */
+export async function unlockSubject(id) {
+  const { data, error } = await supabaseAdmin
+    .from('subjects')
+    .update({
+      is_locked: false,
+      lock_reason: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
