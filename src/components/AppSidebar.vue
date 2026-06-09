@@ -74,7 +74,7 @@ const menuGroups = ref<MainMenuGroup[]>([
         requiredPermission: 'subject_propose'
       },
       {
-        label: 'Phê duyệt học phần (Duyệt/Từ chối)',
+        label: 'Phê duyệt môn học',
         to: '/admin/subjects',
         requiredPermission: 'subject_approve',
       },

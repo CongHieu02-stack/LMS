@@ -12,6 +12,7 @@ const errMsg = ref<string | null>(null)
 const searchQuery = ref('')
 const selectedSubjectId = ref('')
 const statusFilter = ref('')
+const classStatusFilter = ref('')
 
 // Detail Modal State
 const selectedClass = ref<any>(null)
@@ -59,7 +60,10 @@ const filteredClasses = computed(() => {
       (statusFilter.value === 'assigned' && isAssigned) ||
       (statusFilter.value === 'unassigned' && !isAssigned)
 
-    return matchesSearch && matchesSubject && matchesStatus
+    // 4. Filter by class status
+    const matchesClassStatus = !classStatusFilter.value || c.status === classStatusFilter.value
+
+    return matchesSearch && matchesSubject && matchesStatus && matchesClassStatus
   })
 })
 
@@ -131,6 +135,16 @@ onMounted(loadData)
             <option value="unassigned">Chưa gán giảng viên</option>
           </select>
         </div>
+
+        <div class="fg">
+          <label>Trạng thái lớp học</label>
+          <select v-model="classStatusFilter" class="mono-input">
+            <option value="">-- Tất cả trạng thái --</option>
+            <option value="open">Mở đăng ký</option>
+            <option value="ongoing">Đang diễn ra</option>
+            <option value="completed">Đã diễn ra</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -191,6 +205,15 @@ onMounted(loadData)
               <div class="detail-item">
                 <i class="pi pi-bookmark icon-detail"></i>
                 <span>Học kỳ: {{ c.semester }}</span>
+              </div>
+              <div class="detail-item">
+                <i class="pi pi-info-circle icon-detail"></i>
+                <span>Trạng thái: 
+                  <strong v-if="c.status === 'open'" style="color: #2563eb;">Mở đăng ký</strong>
+                  <strong v-else-if="c.status === 'ongoing'" style="color: #16a34a;">Đang diễn ra</strong>
+                  <strong v-else-if="c.status === 'completed'" style="color: #4b5563;">Đã diễn ra</strong>
+                  <strong v-else style="color: #6b7280;">Không xác định</strong>
+                </span>
               </div>
               <div class="detail-item" v-if="c.instructor">
                 <i class="pi pi-user icon-detail" style="color:#166534"></i>
@@ -270,8 +293,10 @@ onMounted(loadData)
               <div class="info-block">
                 <div class="info-label"><i class="pi pi-circle"></i> Trạng thái</div>
                 <div class="info-value">
-                  <span v-if="selectedClass.isActive !== false" class="chip chip-active">Đang hoạt động</span>
-                  <span v-else class="chip chip-inactive">Không hoạt động</span>
+                  <span v-if="selectedClass.status === 'open'" class="chip" style="background: #dbeafe; color: #1e40af;">Mở đăng ký</span>
+                  <span v-else-if="selectedClass.status === 'ongoing'" class="chip chip-active">Đang diễn ra</span>
+                  <span v-else-if="selectedClass.status === 'completed'" class="chip chip-inactive">Đã diễn ra</span>
+                  <span v-else class="chip chip-inactive">Không xác định</span>
                 </div>
               </div>
             </div>
@@ -332,7 +357,7 @@ onMounted(loadData)
   background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
   padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 2rem;
 }
-.filter-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 1.5rem; }
+.filter-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 1.5rem; }
 .fg { display: flex; flex-direction: column; gap: 0.5rem; }
 .fg label { font-size: 0.85rem; font-weight: 600; color: #374151; }
 .mono-input {
