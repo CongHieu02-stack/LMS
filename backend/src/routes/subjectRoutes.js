@@ -10,8 +10,8 @@ const router = Router()
 
 router.use(authMiddleware)
 
-// GET /api/subjects — Danh sách (Giảng viên trở lên)
-router.get('/', requirePermissionOrRank('lesson_exam_manage', 50), subjectController.getAll)
+// GET /api/subjects — Danh sách (Giảng viên/Nhân sự/Phòng Đào Tạo/Trưởng bộ môn trở lên)
+router.get('/', requireRank(50), subjectController.getAll)
 
 // POST /api/subjects — Tạo đề xuất môn học mới (PĐT & TBM trở lên, rank >= 60)
 router.post('/', requirePermissionOrRank('subject_propose', 60), subjectController.create)

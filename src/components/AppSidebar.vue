@@ -129,7 +129,7 @@ const menuGroups = ref<MainMenuGroup[]>([
       {
         label: 'Tra cứu lớp (Bộ lọc)',
         to: '/admin/classes/search',
-        requiredPermission: 'class_create',
+        requiredPermission: 'class_view',
       },
     ],
   },

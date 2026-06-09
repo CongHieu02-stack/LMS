@@ -82,7 +82,8 @@ INSERT INTO public.permissions (code, name, group_name) VALUES
   ('subject_approve', 'Phê duyệt môn học', '3. Chức năng Hiệu trưởng'),
   
   ('class_quantity_approve', 'Duyệt đề xuất số lượng lớp', '4. Chức năng Phòng Đào Tạo'),
-  ('class_create', 'Tạo lớp học và gán quản lý', '4. Chức năng Phòng Đào Tạo'),
+  ('class_create', 'Tạo lớp học', '4. Chức năng Phòng Đào Tạo'),
+  ('class_view', 'Tra cứu lớp', '4. Chức năng Phòng Đào Tạo'),
   
   ('class_quantity_propose', 'Đề xuất số lượng lớp', '5. Chức năng Trưởng Bộ Môn'),
   ('instructor_assign', 'Phân công giảng viên vào lớp', '5. Chức năng Trưởng Bộ Môn'),
@@ -108,7 +109,7 @@ WHERE code IN ('user_manage_senior');
 -- 2. HIEU_TRUONG (Hiệu trưởng): 
 INSERT INTO public.role_default_permissions (role, permission_id)
 SELECT 'HIEU_TRUONG'::public.user_role, id FROM public.permissions
-WHERE code IN ('subject_approve', 'class_quantity_approve', 'class_create', 'class_quantity_propose', 'instructor_assign', 'subject_propose', 'lesson_exam_manage', 'user_manage_staff');
+WHERE code IN ('subject_approve', 'class_quantity_approve', 'class_create', 'class_view', 'class_quantity_propose', 'instructor_assign', 'subject_propose', 'lesson_exam_manage', 'user_manage_staff');
 
 -- 3. HR (Nhân sự):
 INSERT INTO public.role_default_permissions (role, permission_id)
@@ -118,7 +119,7 @@ WHERE code IN ('user_manage_staff');
 -- 4. PHONG_DAO_TAO (Phòng đào tạo):
 INSERT INTO public.role_default_permissions (role, permission_id)
 SELECT 'PHONG_DAO_TAO'::public.user_role, id FROM public.permissions
-WHERE code IN ('subject_propose', 'class_quantity_approve', 'class_create');
+WHERE code IN ('subject_propose', 'class_quantity_approve', 'class_create', 'class_view');
 
 -- 5. TRUONG_BO_MON (Trưởng bộ môn):
 INSERT INTO public.role_default_permissions (role, permission_id)
