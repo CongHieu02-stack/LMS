@@ -5,7 +5,7 @@
 import { ref } from 'vue'
 import { apiPost, apiPut } from '@/lib/api'
 
-export function useAdminActions(onSuccess?: () => void) {
+export function useAdminActions(onSuccess?: (action: string | null) => void) {
   const showModal = ref(false)
   const targetId = ref<string | null>(null)
   const entity = ref<'subject' | 'class' | 'department' | 'user' | null>(null)
@@ -74,8 +74,9 @@ export function useAdminActions(onSuccess?: () => void) {
 
       if (res && res.success) {
         successMsg.value = res.message || 'Thao tác thành công.'
+        const completedAction = actionType.value
         closeReasonModal()
-        if (onSuccess) onSuccess()
+        if (onSuccess) onSuccess(completedAction)
       } else {
         errorMsg.value = res?.error || 'Lỗi khi thực hiện hành động.'
       }

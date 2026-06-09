@@ -33,8 +33,8 @@ const {
   openReasonModal,
   closeReasonModal,
   submitAction
-} = useAdminActions(async () => {
-  successMessage.value = actionType.value === 'TU_CHOI' 
+} = useAdminActions(async (action) => {
+  successMessage.value = action === 'TU_CHOI' 
     ? 'Đã từ chối môn học thành công.' 
     : 'Đã khóa môn học thành công.'
   await fetchSubjects()

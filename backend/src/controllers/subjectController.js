@@ -53,7 +53,7 @@ export async function updateApproval(req, res) {
       status === 'approved'
         ? `Phê duyệt môn học: ${updatedSubject.name} (${updatedSubject.code})`
         : `Từ chối môn học: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${rejection_reason}`,
-      { targetType: 'subject', targetId: id }
+      { targetType: 'subject', targetId: id },
     )
 
     return res.json({
@@ -91,7 +91,7 @@ export async function lock(req, res) {
       req,
       'LOCK_SUBJECT',
       `Khóa môn học: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${lock_reason}`,
-      { targetType: 'subject', targetId: id }
+      { targetType: 'subject', targetId: id },
     )
 
     return res.json({
@@ -129,7 +129,7 @@ export async function create(req, res) {
       req,
       'PROPOSE_SUBJECT',
       `Đề xuất môn học mới: ${name} (${code.toUpperCase()})`,
-      { targetType: 'subject', targetId: subject.id }
+      { targetType: 'subject', targetId: subject.id },
     )
 
     return res.status(201).json({
