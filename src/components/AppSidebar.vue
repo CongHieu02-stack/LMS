@@ -74,7 +74,7 @@ const menuGroups = ref<MainMenuGroup[]>([
         requiredPermission: 'subject_propose'
       },
       {
-        label: 'Phê duyệt học phần (Duyệt/Từ chối)',
+        label: 'Phê duyệt môn học',
         to: '/admin/subjects',
         requiredPermission: 'subject_approve',
       },
@@ -158,11 +158,11 @@ const filteredStandalone = computed(() => {
     // Nếu là chức năng sinh viên, chỉ hiển thị nếu là vai trò SINH_VIEN hoặc được gán quyền trực tiếp
     if (item.studentOnly) {
       const isStudent = authStore.profile?.role === 'SINH_VIEN'
-      const hasExplicitPermission = item.requiredPermission && 
+      const hasExplicitPermission = item.requiredPermission &&
         (Array.isArray(item.requiredPermission)
           ? item.requiredPermission.some(p => authStore.profile?.permissions?.includes(p))
           : authStore.profile?.permissions?.includes(item.requiredPermission))
-      
+
       if (!isStudent && !hasExplicitPermission) {
         return false
       }

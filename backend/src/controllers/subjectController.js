@@ -46,13 +46,13 @@ export async function updateApproval(req, res) {
     }
 
     const updatedSubject = await subjectModel.updateApproval(id, status, rejection_reason)
-    
+
     await logActivity(
-      req, 
+      req,
       status === 'approved' ? 'APPROVE_SUBJECT' : 'REJECT_SUBJECT',
-      status === 'approved' 
-        ? `Phê duyệt học phần: ${updatedSubject.name} (${updatedSubject.code})` 
-        : `Từ chối học phần: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${rejection_reason}`,
+      status === 'approved'
+        ? `Phê duyệt môn học: ${updatedSubject.name} (${updatedSubject.code})`
+        : `Từ chối môn học: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${rejection_reason}`,
       { targetType: 'subject', targetId: id }
     )
 
@@ -86,11 +86,11 @@ export async function lock(req, res) {
     }
 
     const updatedSubject = await subjectModel.lockSubject(id, lock_reason)
-    
+
     await logActivity(
       req,
       'LOCK_SUBJECT',
-      `Khóa học phần: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${lock_reason}`,
+      `Khóa môn học: ${updatedSubject.name} (${updatedSubject.code}). Lý do: ${lock_reason}`,
       { targetType: 'subject', targetId: id }
     )
 
@@ -128,7 +128,7 @@ export async function create(req, res) {
     await logActivity(
       req,
       'PROPOSE_SUBJECT',
-      `Đề xuất học phần mới: ${name} (${code.toUpperCase()})`,
+      `Đề xuất môn học mới: ${name} (${code.toUpperCase()})`,
       { targetType: 'subject', targetId: subject.id }
     )
 

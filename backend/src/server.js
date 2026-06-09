@@ -23,4 +23,4 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('[LMS Unhandled Rejection] Tại:', promise, 'Lý do:', reason)
 })
 
-// Watch reload trigger
+// Watch reload trigger - syntax fixed
