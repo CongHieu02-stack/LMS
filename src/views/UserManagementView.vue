@@ -30,8 +30,25 @@ const formConfirmPassword = ref('')
 const formFullName = ref('')
 const formRole = ref('HR')
 const formDepartment = ref('Khoa Công nghệ thông tin')
+const formMssv = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+
+function generateMssv() {
+  const year = new Date().getFullYear().toString().slice(-2)
+  const randomDigits = Math.floor(10000 + Math.random() * 90000)
+  return `SV${year}${randomDigits}`
+}
+
+watch(formRole, (newRole) => {
+  if (newRole === 'SINH_VIEN') {
+    if (!formMssv.value) {
+      formMssv.value = generateMssv()
+    }
+  } else {
+    formMssv.value = ''
+  }
+})
 
 const departments = [
   'Khoa Công nghệ thông tin',
@@ -168,6 +185,11 @@ async function handleCreateUser() {
   errorMessage.value = null
   successMessage.value = null
 
+  if (formRole.value === 'SINH_VIEN' && !formMssv.value) {
+    errorMessage.value = 'Vui lòng nhập Mã số sinh viên (MSSV).'
+    return
+  }
+
   try {
     const res = await apiPost<any>('/profiles', {
       email: formEmail.value,
@@ -175,6 +197,7 @@ async function handleCreateUser() {
       fullName: formFullName.value,
       role: formRole.value,
       department: formRole.value === 'TRUONG_BO_MON' ? formDepartment.value : undefined,
+      mssv: formRole.value === 'SINH_VIEN' ? formMssv.value : undefined,
     })
 
     if (res.success) {
@@ -185,6 +208,7 @@ async function handleCreateUser() {
       formConfirmPassword.value = ''
       formFullName.value = ''
       formRole.value = 'HR'
+      formMssv.value = ''
       await fetchProfiles()
     }
   } catch (err) {
@@ -300,6 +324,12 @@ function openCreateModal() {
     formRole.value = availableRoles.value[0].value
   } else {
     formRole.value = 'SINH_VIEN'
+  }
+
+  if (formRole.value === 'SINH_VIEN') {
+    formMssv.value = generateMssv()
+  } else {
+    formMssv.value = ''
   }
 }
 
@@ -483,6 +513,7 @@ onMounted(() => {
                 >
                   {{ user.fullName }}
                 </div>
+                <div v-if="user.mssv" class="mssv-tag">MSSV: {{ user.mssv }}</div>
                 <div v-if="user.id === authStore.profile?.id" class="self-tag">(Bạn hiện tại)</div>
               </td>
               <td class="email-cell">{{ user.email }}</td>
@@ -676,6 +707,20 @@ onMounted(() => {
                     </option>
                   </select>
                 </div>
+              </div>
+
+              <!-- Chỉ hiện ra khi chọn Sinh viên -->
+              <div v-if="formRole === 'SINH_VIEN'" class="form-group">
+                <label class="form-label">Mã số sinh viên (MSSV)</label>
+                <input
+                  v-model="formMssv"
+                  type="text"
+                  class="mono-input"
+                  placeholder="MSSV tự động"
+                  readonly
+                  style="background-color: #f3f4f6; cursor: not-allowed;"
+                  required
+                />
               </div>
             </div>
           </div>
@@ -890,6 +935,12 @@ onMounted(() => {
   font-size: 0.75rem;
   color: #9333ea;
   font-weight: 500;
+  margin-top: 0.25rem;
+}
+.mssv-tag {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
   margin-top: 0.25rem;
 }
 .email-cell {

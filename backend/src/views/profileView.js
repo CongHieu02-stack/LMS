@@ -36,6 +36,7 @@ export function formatProfile(raw, permissions = []) {
     isLocked: raw.is_locked || false,
     lockReason: raw.lock_reason || null,
     department: raw.department || null,
+    mssv: raw.Mssv || null,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
     permissions: permissions,
