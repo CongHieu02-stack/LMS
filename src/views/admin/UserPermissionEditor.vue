@@ -106,6 +106,24 @@ onMounted(async () => {
   await fetchPermissions()
   await fetchProfiles()
 })
+
+function getAvatarBgColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return `hsl(${h}, 60%, 90%)`
+}
+
+function getAvatarTextColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return `hsl(${h}, 70%, 35%)`
+}
 </script>
 
 <template>
@@ -145,8 +163,13 @@ onMounted(async () => {
           >
             <div class="active-indicator"></div>
 
-            <div class="avatar" :class="{ active: selectedUserId === profile.id }">
-              {{ profile.full_name.charAt(0).toUpperCase() }}
+            <div 
+              class="avatar" 
+              :class="{ active: selectedUserId === profile.id }"
+              :style="!profile.avatar_url ? { '--avatar-bg': getAvatarBgColor(profile.full_name), '--avatar-color': getAvatarTextColor(profile.full_name) } : {}"
+            >
+              <img v-if="profile.avatar_url" :src="profile.avatar_url" class="editor-avatar-img" alt="avatar" />
+              <span v-else>{{ profile.full_name.charAt(0).toUpperCase() }}</span>
             </div>
 
             <div class="user-info">
@@ -423,8 +446,8 @@ onMounted(async () => {
   height: 40px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: var(--avatar-bg, #f9fafb);
+  color: var(--avatar-color, #111827);
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
   display: flex;
@@ -434,6 +457,13 @@ onMounted(async () => {
   font-size: 1.125rem;
   flex-shrink: 0;
   transition: all 0.2s;
+  overflow: hidden;
+}
+
+.editor-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .user-item:hover .avatar {
   background-color: #a855f7;

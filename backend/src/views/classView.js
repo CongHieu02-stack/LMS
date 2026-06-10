@@ -41,6 +41,7 @@ export function formatClass(raw) {
           id: raw.instructor.id,
           fullName: raw.instructor.full_name,
           email: raw.instructor.email,
+          avatarUrl: raw.instructor.avatar_url,
         }
       : null,
     manager: raw.manager

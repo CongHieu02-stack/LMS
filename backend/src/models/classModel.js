@@ -17,7 +17,7 @@ export async function findAll() {
       `
       *,
       subject:subjects(id, code, name, credits, department, is_locked),
-      instructor:profiles!instructor_id(id, full_name, email),
+      instructor:profiles!instructor_id(id, full_name, email, avatar_url),
       manager:profiles!manager_id(id, full_name, email, is_locked)
     `,
     )
@@ -39,7 +39,7 @@ export async function findById(id) {
       `
       *,
       subject:subjects(id, code, name, credits, department, is_locked),
-      instructor:profiles!instructor_id(id, full_name, email),
+      instructor:profiles!instructor_id(id, full_name, email, avatar_url),
       manager:profiles!manager_id(id, full_name, email, is_locked)
     `,
     )
@@ -80,7 +80,7 @@ export async function findRegistrationsByStudent(studentId) {
       registered_at,
       class:classes(id, name, remaining_slots, max_slots,
         subject:subjects(code, name),
-        instructor:profiles!instructor_id(id, full_name, email)
+        instructor:profiles!instructor_id(id, full_name, email, avatar_url)
       )
     `,
     )
@@ -113,7 +113,7 @@ export async function assignInstructor(classId, instructorId) {
     .update({ instructor_id: instructorId })
     .eq('id', classId)
     .select(
-      `*, subject:subjects(id, code, name, department, is_locked), instructor:profiles!instructor_id(id, full_name, email)`,
+      `*, subject:subjects(id, code, name, department, is_locked), instructor:profiles!instructor_id(id, full_name, email, avatar_url)`,
     )
     .single()
   if (error) throw error

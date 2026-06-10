@@ -129,6 +129,26 @@ function closeStudentsModal() {
 }
 
 onMounted(loadData)
+
+function getInitials(name: string): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+function getAvatarBgStyle(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return {
+    backgroundColor: `hsl(${h}, 60%, 90%)`,
+    color: `hsl(${h}, 70%, 35%)`,
+  }
+}
 </script>
 
 <template>
@@ -266,8 +286,11 @@ onMounted(loadData)
                   <strong v-else style="color: #6b7280;">Không xác định</strong>
                 </span>
               </div>
-              <div class="detail-item" v-if="c.instructor">
-                <i class="pi pi-user icon-detail" style="color:#166534"></i>
+              <div class="detail-item" v-if="c.instructor" style="display: flex; align-items: center; gap: 8px;">
+                <img v-if="c.instructor.avatarUrl" :src="c.instructor.avatarUrl" class="instructor-avatar-card" alt="avatar" />
+                <div v-else class="instructor-avatar-card-placeholder" :style="getAvatarBgStyle(c.instructor.fullName)">
+                  {{ getInitials(c.instructor.fullName) }}
+                </div>
                 <span style="color:#166534; font-weight:600;">GV: {{ c.instructor.fullName }}</span>
               </div>
             </div>
@@ -299,15 +322,24 @@ onMounted(loadData)
           <div
             class="instructor-banner"
             :class="(selectedClass.instructorId || selectedClass.instructor?.id) ? 'banner-assigned' : 'banner-unassigned'"
+            style="display: flex; align-items: center; gap: 12px;"
           >
-            <i :class="(selectedClass.instructorId || selectedClass.instructor?.id) ? 'pi pi-user-edit' : 'pi pi-user-minus'"></i>
-            <span v-if="selectedClass.instructor">
-              Giảng viên phụ trách: <strong>{{ selectedClass.instructor.fullName }}</strong>
-              <span v-if="selectedClass.instructor.email" class="instructor-email">
-                ({{ selectedClass.instructor.email }})
+            <template v-if="selectedClass.instructor">
+              <img v-if="selectedClass.instructor.avatarUrl" :src="selectedClass.instructor.avatarUrl" class="instructor-banner-avatar" alt="avatar" />
+              <div v-else class="instructor-banner-avatar-placeholder" :style="getAvatarBgStyle(selectedClass.instructor.fullName)">
+                {{ getInitials(selectedClass.instructor.fullName) }}
+              </div>
+              <span>
+                Giảng viên phụ trách: <strong>{{ selectedClass.instructor.fullName }}</strong>
+                <span v-if="selectedClass.instructor.email" class="instructor-email">
+                  ({{ selectedClass.instructor.email }})
+                </span>
               </span>
-            </span>
-            <span v-else>Lớp học chưa được phân công giảng viên</span>
+            </template>
+            <template v-else>
+              <i class="pi pi-user-minus"></i>
+              <span>Lớp học chưa được phân công giảng viên</span>
+            </template>
           </div>
 
           <!-- Modal Body: info grid -->
@@ -648,5 +680,50 @@ onMounted(loadData)
 @media (max-width: 768px) {
   .filter-grid { grid-template-columns: 1fr; gap: 1rem; }
   .info-grid { grid-template-columns: 1fr; }
+}
+
+/* Instructor Avatars */
+.instructor-avatar-card {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.instructor-avatar-card-placeholder {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.instructor-banner-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.instructor-banner-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 </style>

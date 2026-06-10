@@ -21,6 +21,7 @@ export interface UserProfile {
   full_name: string
   role: string
   rank: number
+  avatar_url?: string | null
 }
 
 export function useUserPermissions() {
@@ -76,7 +77,7 @@ export function useUserPermissions() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, role, rank')
+        .select('id, email, full_name, role, rank, avatar_url')
         .order('rank', { ascending: false })
 
       if (error) throw error

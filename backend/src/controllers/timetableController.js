@@ -51,7 +51,7 @@ export async function getMyTimetable(req, res) {
             id, name, code, schedule, room, semester,
             start_date, end_date, status,
             subject:subjects(id, code, name, credits),
-            instructor:profiles!instructor_id(id, full_name, email)
+            instructor:profiles!instructor_id(id, full_name, email, avatar_url)
           )
         `)
         .eq('student_id', userId)
@@ -75,7 +75,7 @@ export async function getMyTimetable(req, res) {
             startDate: c.start_date || null,
             endDate: c.end_date || null,
             instructor: c.instructor
-              ? { id: c.instructor.id, fullName: c.instructor.full_name, email: c.instructor.email }
+              ? { id: c.instructor.id, fullName: c.instructor.full_name, email: c.instructor.email, avatarUrl: c.instructor.avatar_url }
               : null
           }
         })
@@ -87,7 +87,7 @@ export async function getMyTimetable(req, res) {
           id, name, code, schedule, room, semester,
           start_date, end_date, status,
           subject:subjects(id, code, name, credits),
-          instructor:profiles!instructor_id(id, full_name, email),
+          instructor:profiles!instructor_id(id, full_name, email, avatar_url),
           registrations:class_registrations(count)
         `)
         .eq('instructor_id', userId)
@@ -108,7 +108,7 @@ export async function getMyTimetable(req, res) {
         startDate: c.start_date || null,
         endDate: c.end_date || null,
         instructor: c.instructor
-          ? { id: c.instructor.id, fullName: c.instructor.full_name, email: c.instructor.email }
+          ? { id: c.instructor.id, fullName: c.instructor.full_name, email: c.instructor.email, avatarUrl: c.instructor.avatar_url }
           : null,
         enrolledCount: c.registrations?.[0]?.count || 0
       }))

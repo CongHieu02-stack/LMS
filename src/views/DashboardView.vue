@@ -308,16 +308,21 @@ onMounted(() => {
     <!-- Breadcrumb -->
     <div class="breadcrumb">Tổng quan / <span>Bảng điều khiển</span></div>
 
-    <!-- Header -->
-    <div class="page-header">
-      <h1 class="page-title">Chào mừng trở lại, {{ authStore.profile?.fullName }}</h1>
-      <div class="page-subtitle">
-        {{
-          isStudent
-            ? 'Dưới đây là các thông tin tổng quan về học tập của bạn.'
-            : 'Xem thông tin hồ sơ và các truy cập nhanh bên dưới.'
-        }}
+    <!-- Header Banner -->
+    <div class="welcome-banner mb-xl">
+      <div class="welcome-banner-content">
+        <h1 class="welcome-title">Chào mừng trở lại, {{ authStore.profile?.fullName }} 👋</h1>
+        <div class="welcome-subtitle">
+          {{
+            isStudent
+              ? 'Dưới đây là các thông tin tổng quan về học tập của bạn. Chúc bạn học tập tốt!'
+              : 'Xem thông tin hồ sơ, quản lý nghiệp vụ và các truy cập nhanh bên dưới.'
+          }}
+        </div>
       </div>
+      <!-- Decorative background circles -->
+      <div class="banner-circle banner-circle-1"></div>
+      <div class="banner-circle banner-circle-2"></div>
     </div>
 
     <!-- ============================================== -->
@@ -551,29 +556,32 @@ onMounted(() => {
         <div v-if="subjectLink !== '/dashboard' || classLink !== '/dashboard' || authStore.hasPermission('user_manage_staff') || departmentLink !== '/dashboard'" class="actions-section mt-xl">
           <h3 class="section-title">Khám phá tính năng</h3>
           <div class="actions-grid">
-            <div v-if="authStore.hasPermission('user_manage_staff')" class="lms-card action-card">
+            <RouterLink v-if="authStore.hasPermission('user_manage_staff')" to="/admin/users" class="lms-card action-card">
               <div class="action-icon-wrapper green"><i class="pi pi-users"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý người dùng</span>
                 <span class="action-desc">Tạo mới, phân quyền và khóa/mở khóa tài khoản nhân sự</span>
               </div>
-            </div>
+              <i class="pi pi-chevron-right action-arrow"></i>
+            </RouterLink>
 
-            <div v-if="subjectLink !== '/dashboard' || departmentLink !== '/dashboard'" class="lms-card action-card">
+            <RouterLink v-if="subjectLink !== '/dashboard' || departmentLink !== '/dashboard'" :to="subjectLink" class="lms-card action-card">
               <div class="action-icon-wrapper blue"><i class="pi pi-book"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý môn học</span>
                 <span class="action-desc">Đề xuất môn học, phê duyệt học phần và phân công môn học bộ môn</span>
               </div>
-            </div>
+              <i class="pi pi-chevron-right action-arrow"></i>
+            </RouterLink>
 
-            <div v-if="classLink !== '/dashboard'" class="lms-card action-card">
+            <RouterLink v-if="classLink !== '/dashboard'" :to="classLink" class="lms-card action-card">
               <div class="action-icon-wrapper purple"><i class="pi pi-sitemap"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý lớp học</span>
                 <span class="action-desc">Quản lý và phân công lớp học</span>
               </div>
-            </div>
+              <i class="pi pi-chevron-right action-arrow"></i>
+            </RouterLink>
           </div>
         </div>
       </div>
@@ -1163,7 +1171,15 @@ onMounted(() => {
   gap: 1rem;
   text-decoration: none;
   padding: 1.25rem;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+}
+
+.action-card:hover {
+  transform: translateY(-4px);
+  border-color: #a78bfa;
+  box-shadow: 0 10px 15px -3px rgba(124, 58, 237, 0.1), 0 4px 6px -4px rgba(124, 58, 237, 0.1);
 }
 
 .action-icon-wrapper {
@@ -1750,6 +1766,83 @@ onMounted(() => {
   }
   .actions-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Welcome Banner */
+.welcome-banner {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border-radius: 16px;
+  padding: 2.25rem 2rem;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.25), 0 8px 10px -6px rgba(124, 58, 237, 0.25);
+  margin-bottom: 2rem;
+}
+
+.welcome-banner-content {
+  position: relative;
+  z-index: 2;
+  max-width: 80%;
+}
+
+.welcome-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.025em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-subtitle {
+  font-size: 1rem;
+  opacity: 0.9;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.banner-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.banner-circle-1 {
+  width: 300px;
+  height: 300px;
+  right: -50px;
+  top: -100px;
+}
+
+.banner-circle-2 {
+  width: 200px;
+  height: 200px;
+  right: 150px;
+  bottom: -80px;
+}
+
+/* Stats Hover Effect */
+.stat-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 768px) {
+  .welcome-banner {
+    padding: 1.75rem 1.5rem;
+  }
+  .welcome-title {
+    font-size: 1.5rem;
+  }
+  .welcome-banner-content {
+    max-width: 100%;
   }
 }
 </style>

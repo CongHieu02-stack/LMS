@@ -61,6 +61,26 @@ async function handleAssign(classId: string) {
   } catch (err: any) { msg.value = err.message }
   saving.value = null
 }
+
+function getInitials(name: string): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+function getAvatarBgStyle(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return {
+    backgroundColor: `hsl(${h}, 60%, 90%)`,
+    color: `hsl(${h}, 70%, 35%)`,
+  }
+}
 </script>
 
 <template>
@@ -111,7 +131,16 @@ async function handleAssign(classId: string) {
             <td>
               <span class="dep-badge">{{ c.subject?.department || '—' }}</span>
             </td>
-            <td>{{ c.instructor?.fullName || c.instructor?.full_name || '—' }}</td>
+            <td>
+              <div v-if="c.instructor" style="display: flex; align-items: center; gap: 8px;">
+                <img v-if="c.instructor.avatarUrl || c.instructor.avatar_url" :src="c.instructor.avatarUrl || c.instructor.avatar_url" class="instructor-assign-avatar" alt="avatar" />
+                <div v-else class="instructor-assign-avatar-placeholder" :style="getAvatarBgStyle(c.instructor.fullName || c.instructor.full_name)">
+                  {{ getInitials(c.instructor.fullName || c.instructor.full_name) }}
+                </div>
+                <span>{{ c.instructor.fullName || c.instructor.full_name }}</span>
+              </div>
+              <span v-else>—</span>
+            </td>
             <td>
               <select v-model="selectedInstructor[c.id]" class="si" :disabled="!!c.instructorId || !!c.instructor">
                 <option value="">-- Chọn --</option>
@@ -186,5 +215,27 @@ async function handleAssign(classId: string) {
 }
 .mb-6 {
   margin-bottom: 1.5rem;
+}
+
+.instructor-assign-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.instructor-assign-avatar-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 </style>

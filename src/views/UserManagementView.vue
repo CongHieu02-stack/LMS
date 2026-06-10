@@ -40,6 +40,26 @@ function generateMssv() {
   return `SV${year}${randomDigits}`
 }
 
+function getInitials(name: string): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+function getAvatarBgStyle(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return {
+    backgroundColor: `hsl(${h}, 60%, 90%)`,
+    color: `hsl(${h}, 70%, 35%)`,
+  }
+}
+
 watch(formRole, (newRole) => {
   if (newRole === 'SINH_VIEN') {
     if (!formMssv.value) {
@@ -507,14 +527,22 @@ onMounted(() => {
               :class="{ 'row-self': user.id === authStore.profile?.id }"
             >
               <td>
-                <div
-                  class="user-name"
-                  :style="user.isLocked ? 'text-decoration: line-through; color: #9ca3af;' : ''"
-                >
-                  {{ user.fullName }}
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <img v-if="user.avatarUrl" :src="user.avatarUrl" class="user-avatar-img" alt="avatar" />
+                  <div v-else class="user-avatar-placeholder" :style="getAvatarBgStyle(user.fullName)">
+                    {{ getInitials(user.fullName) }}
+                  </div>
+                  <div>
+                    <div
+                      class="user-name"
+                      :style="user.isLocked ? 'text-decoration: line-through; color: #9ca3af;' : ''"
+                    >
+                      {{ user.fullName }}
+                    </div>
+                    <div v-if="user.mssv" class="mssv-tag">MSSV: {{ user.mssv }}</div>
+                    <div v-if="user.id === authStore.profile?.id" class="self-tag">(Bạn hiện tại)</div>
+                  </div>
                 </div>
-                <div v-if="user.mssv" class="mssv-tag">MSSV: {{ user.mssv }}</div>
-                <div v-if="user.id === authStore.profile?.id" class="self-tag">(Bạn hiện tại)</div>
               </td>
               <td class="email-cell">{{ user.email }}</td>
               <td>
@@ -1331,5 +1359,29 @@ select.mono-input {
   align-items: center;
   gap: 0.35rem;
   margin-top: 0.25rem;
+}
+
+/* User Avatars */
+.user-avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1.5px solid var(--lms-gray-200);
+}
+
+.user-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  user-select: none;
+  border: 1.5px solid rgba(0, 0, 0, 0.05);
 }
 </style>

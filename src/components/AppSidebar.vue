@@ -273,21 +273,46 @@ function toggleGroup(targetGroup: MainMenuGroup) {
 function toggleSidebar() {
   isCollapsed.value = !isCollapsed.value
 }
+
+function getInitials(name: string): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+function getAvatarBgStyle(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return {
+    backgroundColor: `hsl(${h}, 60%, 90%)`,
+    color: `hsl(${h}, 70%, 35%)`,
+  }
+}
 </script>
 
 <template>
   <aside class="sidebar" :class="{ collapsed: isCollapsed }">
     <!-- Brand / User Info -->
     <div class="sidebar-header">
-      <div class="brand-icon-wrapper" @click="router.push('/dashboard')">
+      <div class="brand-icon-wrapper" @click="router.push('/dashboard')" style="cursor: pointer;" title="Đi tới trang tổng quan">
         <i class="pi pi-graduation-cap brand-icon"></i>
       </div>
       <div class="user-info" v-if="!isCollapsed">
         <div class="brand-name">Hệ thống LMS</div>
-        <div class="user-name">{{ authStore.profile?.fullName || 'Người dùng' }}</div>
+        <div class="user-name-wrapper" style="display: flex; align-items: center; gap: 8px; margin-top: 4px; overflow: hidden; width: 100%;">
+          <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile?.avatarUrl" class="sidebar-avatar-img-small" alt="avatar" />
+          <div v-else class="sidebar-avatar-placeholder-small" :style="getAvatarBgStyle(authStore.profile?.fullName || 'User')">
+            {{ getInitials(authStore.profile?.fullName || 'User') }}
+          </div>
+          <div class="user-name" style="margin: 0; flex: 1;">{{ authStore.profile?.fullName || 'Người dùng' }}</div>
+        </div>
         <div class="user-role">{{ authStore.displayRole }}</div>
       </div>
-      <i v-if="!isCollapsed" class="pi pi-chevron-down header-chevron"></i>
     </div>
 
     <!-- Navigation Menu -->
@@ -390,12 +415,8 @@ function toggleSidebar() {
   gap: 12px;
   border-bottom: 1px solid transparent;
   margin-bottom: 8px;
-  cursor: pointer;
+  cursor: default;
   border-radius: var(--lms-radius-lg);
-}
-
-.sidebar-header:hover {
-  background-color: var(--lms-gray-100);
 }
 
 .brand-icon-wrapper {
@@ -584,5 +605,58 @@ function toggleSidebar() {
 
 .collapse-btn:hover {
   color: var(--lms-gray-800);
+}
+
+/* Sidebar Avatars */
+.avatar-container-collapsed {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-avatar-img-small {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-avatar-placeholder-small {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 </style>
