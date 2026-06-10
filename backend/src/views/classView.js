@@ -33,6 +33,7 @@ export function formatClass(raw) {
           name: raw.subject.name,
           credits: raw.subject.credits,
           department: raw.subject.department,
+          isLocked: raw.subject.is_locked || false,
         }
       : null,
     instructor: raw.instructor

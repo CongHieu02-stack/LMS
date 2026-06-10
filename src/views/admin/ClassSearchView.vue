@@ -33,8 +33,29 @@ async function loadData() {
     ])
     
     const classData = classRes.data || classRes
-    classes.value = Array.isArray(classData) ? classData : []
-    subjects.value = (subRes.data || []).filter((s: any) => s.status === 'approved')
+    const rawClasses = Array.isArray(classData) ? classData : []
+    
+    // Lọc bỏ các lớp có môn học đã bị khóa, và chuẩn hóa trạng thái của lớp
+    classes.value = rawClasses
+      .filter((c: any) => c.subject && !c.subject.isLocked)
+      .map((c: any) => {
+        let normalizedStatus = c.status
+        // Chuẩn hóa: 'open_for_reg'/'approved'/'APPROVED' -> 'open'
+        if (c.status === 'open_for_reg' || c.status === 'approved' || c.status === 'APPROVED') {
+          normalizedStatus = 'open'
+        }
+        // Chuẩn hóa: 'in_progress' -> 'ongoing'
+        else if (c.status === 'in_progress') {
+          normalizedStatus = 'ongoing'
+        }
+        return {
+          ...c,
+          status: normalizedStatus
+        }
+      })
+
+    // Lọc bỏ các môn học đã bị khóa khỏi bộ lọc
+    subjects.value = (subRes.data || []).filter((s: any) => s.status === 'approved' && !s.is_locked)
   } catch (err: any) {
     errMsg.value = err.message || 'Không thể tải dữ liệu lớp học.'
   } finally {

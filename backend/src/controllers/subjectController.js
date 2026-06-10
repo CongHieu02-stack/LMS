@@ -4,6 +4,7 @@
 // ============================================================================
 
 import * as subjectModel from '../models/subjectModel.js'
+import * as classModel from '../models/classModel.js'
 import { logActivity } from '../utils/activityLogger.js'
 
 /**
@@ -86,6 +87,9 @@ export async function lock(req, res) {
     }
 
     const updatedSubject = await subjectModel.lockSubject(id, lock_reason)
+
+    // Tự động hủy (xóa) toàn bộ lớp học của môn học này chưa hoàn thành
+    await classModel.deleteActiveBySubjectId(id)
 
     await logActivity(
       req,

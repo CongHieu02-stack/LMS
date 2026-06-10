@@ -16,7 +16,7 @@ export async function findAll() {
     .select(
       `
       *,
-      subject:subjects(id, code, name, credits, department),
+      subject:subjects(id, code, name, credits, department, is_locked),
       instructor:profiles!instructor_id(id, full_name, email),
       manager:profiles!manager_id(id, full_name, email, is_locked)
     `,
@@ -38,7 +38,7 @@ export async function findById(id) {
     .select(
       `
       *,
-      subject:subjects(id, code, name, credits, department),
+      subject:subjects(id, code, name, credits, department, is_locked),
       instructor:profiles!instructor_id(id, full_name, email),
       manager:profiles!manager_id(id, full_name, email, is_locked)
     `,
@@ -113,7 +113,7 @@ export async function assignInstructor(classId, instructorId) {
     .update({ instructor_id: instructorId })
     .eq('id', classId)
     .select(
-      `*, subject:subjects(id, code, name, department), instructor:profiles!instructor_id(id, full_name, email)`,
+      `*, subject:subjects(id, code, name, department, is_locked), instructor:profiles!instructor_id(id, full_name, email)`,
     )
     .single()
   if (error) throw error
@@ -131,6 +131,21 @@ export async function approveClassAndRandomRoom(classId, maxStudents) {
     p_class_id: classId,
     p_max_students: maxStudents,
   })
+  if (error) throw error
+  return data
+}
+
+/**
+ * Xóa toàn bộ lớp học chưa hoàn thành theo ID môn học
+ * @param {string} subjectId - UUID môn học
+ */
+export async function deleteActiveBySubjectId(subjectId) {
+  const { data, error } = await supabaseAdmin
+    .from('classes')
+    .delete()
+    .eq('subject_id', subjectId)
+    .neq('status', 'completed')
+
   if (error) throw error
   return data
 }
