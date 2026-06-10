@@ -117,7 +117,7 @@ const router = createRouter({
       path: '/admin/classes',
       name: 'class-management',
       component: () => import('@/views/admin/ClassManagementView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'class_create' },
+      meta: { requiresAuth: true, requirePermission: ['class_create', 'class_quantity_approve'] },
     },
     {
       path: '/admin/classes/search',
@@ -195,7 +195,9 @@ router.beforeEach(async (to, _from) => {
     return { name: 'dashboard' }
   } else if (
     to.meta.requirePermission &&
-    !authStore.hasPermission(to.meta.requirePermission as string) &&
+    !(Array.isArray(to.meta.requirePermission)
+      ? to.meta.requirePermission.some((p) => authStore.hasPermission(p))
+      : authStore.hasPermission(to.meta.requirePermission as string)) &&
     !authStore.hasPermission('user_manage_senior')
   ) {
     return { name: 'dashboard' }

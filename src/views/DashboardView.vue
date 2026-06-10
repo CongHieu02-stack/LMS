@@ -19,7 +19,7 @@ const subjectLink = computed(() => {
 })
 
 const classLink = computed(() => {
-  if (authStore.hasPermission('class_create')) return '/admin/classes'
+  if (authStore.hasPermission('class_create') || authStore.hasPermission('class_quantity_approve')) return '/admin/classes'
   if (authStore.hasPermission('class_view')) return '/admin/classes/search'
   if (authStore.hasPermission('class_quantity_approve')) return '/admin/classes/approve'
   if (authStore.hasPermission('instructor_assign')) return '/admin/classes/assign'

@@ -98,12 +98,12 @@ export function requirePermissionOrRank(permissionCode, minRank = 100) {
       )
       req.permissions = permissions // Gắn vào request để controller dùng
 
-      // 1. ADMIN (rank 100) luôn được thông qua làm chốt chặn bảo vệ
-      if (req.profile.rank === 100) {
+      // 1. Cho phép nếu rank của người dùng lớn hơn hoặc bằng rank tối thiểu yêu cầu (hoặc là Admin rank 100)
+      if (req.profile.rank >= minRank) {
         return next()
       }
 
-      // 2. Tất cả các vai trò khác bắt buộc phải có quyền cụ thể trong permissions
+      // 2. Tất cả các trường hợp khác bắt buộc phải có quyền cụ thể trong permissions
       if (permissions.includes(permissionCode)) {
         return next()
       }

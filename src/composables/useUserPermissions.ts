@@ -48,10 +48,19 @@ export function useUserPermissions() {
   const groupedPermissions = computed(() => {
     const groups: Record<string, Permission[]> = {}
     permissions.value.forEach(perm => {
-      if (!groups[perm.group_name]) {
-        groups[perm.group_name] = []
+      let key = perm.group_name ? perm.group_name.trim() : ''
+      // Chuẩn hóa tên nhóm "Phòng đào tạo" để tránh chia làm 2 card do khác biệt chữ hoa/thường
+      if (key.toLowerCase() === '4. chức năng phòng đào tạo') {
+        key = '4. Chức năng Phòng Đào Tạo'
       }
-      groups[perm.group_name].push(perm)
+      
+      if (!groups[key]) {
+        groups[key] = []
+      }
+      groups[key].push({
+        ...perm,
+        group_name: key
+      })
     })
     return groups
   })

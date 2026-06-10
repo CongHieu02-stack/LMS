@@ -123,7 +123,7 @@ const menuGroups = ref<MainMenuGroup[]>([
       {
         label: 'Tạo lớp học (Khung)',
         to: '/admin/classes',
-        requiredPermission: 'class_create',
+        requiredPermission: ['class_create', 'class_quantity_approve'],
       },
       {
         label: 'Tra cứu lớp (Bộ lọc)',
