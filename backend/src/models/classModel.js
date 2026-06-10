@@ -18,7 +18,7 @@ export async function findAll() {
       *,
       subject:subjects(id, code, name, credits, department),
       instructor:profiles!instructor_id(id, full_name, email),
-      manager:profiles!manager_id(id, full_name, email)
+      manager:profiles!manager_id(id, full_name, email, is_locked)
     `,
     )
     .order('created_at', { ascending: false })
@@ -40,7 +40,7 @@ export async function findById(id) {
       *,
       subject:subjects(id, code, name, credits, department),
       instructor:profiles!instructor_id(id, full_name, email),
-      manager:profiles!manager_id(id, full_name, email)
+      manager:profiles!manager_id(id, full_name, email, is_locked)
     `,
     )
     .eq('id', id)
