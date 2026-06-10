@@ -1,6 +1,6 @@
 <!-- ClassApprovalView.vue — Phê duyệt lớp học -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { apiGet, apiPut } from '@/lib/api'
 import { useClassApproval } from '@/composables/useClassApproval'
 import { useToast } from 'primevue/usetoast'
@@ -16,6 +16,36 @@ const loading = ref(true)
 const processing = ref<string | null>(null)
 const msg = ref<string | null>(null)
 const minStartDateStr = ref('')
+const searchQuery = ref('')
+
+const filteredProposals = computed(() => {
+  if (!searchQuery.value) return proposals.value
+  const q = searchQuery.value.toLowerCase()
+  return proposals.value.filter(p => {
+    return (
+      (p.subject?.code && p.subject.code.toLowerCase().includes(q)) ||
+      (p.subject?.name && p.subject.name.toLowerCase().includes(q)) ||
+      (p.semester && p.semester.toLowerCase().includes(q)) ||
+      (p.proposer?.full_name && p.proposer.full_name.toLowerCase().includes(q)) ||
+      (p.reason && p.reason.toLowerCase().includes(q))
+    )
+  })
+})
+
+const filteredClasses = computed(() => {
+  if (!searchQuery.value) return classes.value
+  const q = searchQuery.value.toLowerCase()
+  return classes.value.filter(c => {
+    return (
+      (c.subject?.code && c.subject.code.toLowerCase().includes(q)) ||
+      (c.subject?.name && c.subject.name.toLowerCase().includes(q)) ||
+      (c.code && c.code.toLowerCase().includes(q)) ||
+      (c.semester && c.semester.toLowerCase().includes(q)) ||
+      (c.room && c.room.toLowerCase().includes(q)) ||
+      (c.manager?.fullName && c.manager.fullName.toLowerCase().includes(q))
+    )
+  })
+})
 
 // Custom Confirm Modal State
 const isConfirmModalOpen = ref(false)
@@ -269,6 +299,19 @@ onMounted(async () => {
       </button>
     </div>
 
+    <!-- Search Bar -->
+    <div class="search-container mb-6" v-if="!loading && (proposals.length > 0 || classes.length > 0)">
+      <div class="search-box">
+        <i class="pi pi-search search-icon"></i>
+        <input
+          type="text"
+          v-model="searchQuery"
+          placeholder="Tìm kiếm môn học, mã lớp, học kỳ, người quản lý/đề xuất..."
+          class="search-input"
+        />
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="loading-state">
       <i class="pi pi-spin pi-spinner spinner"></i>
@@ -282,6 +325,11 @@ onMounted(async () => {
           <i class="pi pi-check-circle empty-icon"></i>
           <h3>Không có đề xuất số lượng lớp nào chờ duyệt</h3>
           <p>Tất cả đề xuất mở lớp học từ Trưởng bộ môn đã được xử lý.</p>
+        </div>
+        <div v-else-if="filteredProposals.length === 0" class="empty-state">
+          <i class="pi pi-search empty-icon"></i>
+          <h3>Không tìm thấy đề xuất phù hợp</h3>
+          <p>Hãy thử tìm kiếm với từ khóa khác.</p>
         </div>
         <div v-else class="mono-card">
           <div class="card-header">
@@ -302,7 +350,7 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="p in proposals" :key="p.id" class="table-row">
+                <tr v-for="p in filteredProposals" :key="p.id" class="table-row">
                   <td>
                     <span class="code-cell">{{ p.subject?.code }}</span>
                     <span class="subject-name"> — {{ p.subject?.name }}</span>
@@ -338,6 +386,11 @@ onMounted(async () => {
           <h3>Không có lớp học nào đang chờ xếp phòng</h3>
           <p>Hãy duyệt các đề xuất lớp học ở Tab 1 để tạo khung lớp mới trước.</p>
         </div>
+        <div v-else-if="filteredClasses.length === 0" class="empty-state">
+          <i class="pi pi-search empty-icon"></i>
+          <h3>Không tìm thấy lớp học phù hợp</h3>
+          <p>Hãy thử tìm kiếm với từ khóa khác.</p>
+        </div>
         <div v-else class="mono-card">
           <div class="card-header">
             <span>Danh sách lớp học và phòng học</span>
@@ -356,7 +409,7 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="c in classes" :key="c.id" class="table-row">
+                <tr v-for="c in filteredClasses" :key="c.id" class="table-row">
                   <td>
                     <span class="code-cell">{{ c.subject?.code }}</span>
                     <span class="subject-name"> — {{ c.subject?.name }}</span>
@@ -805,5 +858,39 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-remove-session:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.search-container {
+  width: 100%;
+}
+.search-box {
+  position: relative;
+  width: 100%;
+}
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+.search-input {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  font-size: 0.875rem;
+  outline: none;
+  background-color: #fff;
+  font-weight: 500;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.search-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+}
+.mb-6 {
+  margin-bottom: 1.5rem;
 }
 </style>

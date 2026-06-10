@@ -13,6 +13,7 @@ const errorMessage = ref<string | null>(null)
 // Filters
 const selectedDepartment = ref('')
 const selectedStatus = ref('pending') // default to show pending first
+const searchQuery = ref('')
 
 const departments = [
   'Khoa Công nghệ thông tin',
@@ -60,7 +61,18 @@ const filteredSubjects = computed(() => {
   return subjects.value.filter((s) => {
     const matchesDept = !selectedDepartment.value || s.department === selectedDepartment.value
     const matchesStatus = !selectedStatus.value || s.status === selectedStatus.value
-    return matchesDept && matchesStatus
+    
+    let matchesSearch = true
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase()
+      matchesSearch = (
+        (s.code && s.code.toLowerCase().includes(q)) ||
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.description && s.description.toLowerCase().includes(q))
+      )
+    }
+    
+    return matchesDept && matchesStatus && matchesSearch
   })
 })
 
@@ -162,6 +174,18 @@ function getStatusBadge(s: any) {
     <!-- Filter Card -->
     <div class="filter-card mb-6">
       <div class="filter-row">
+        <div class="fg">
+          <label>Tìm kiếm môn học</label>
+          <div class="search-box">
+            <i class="pi pi-search search-icon"></i>
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Tìm mã môn, tên môn..."
+              class="search-input"
+            />
+          </div>
+        </div>
         <div class="fg">
           <label>Khoa / Bộ môn</label>
           <select v-model="selectedDepartment" class="mono-input">
@@ -305,7 +329,7 @@ function getStatusBadge(s: any) {
 .mb-6 { margin-bottom: 1.5rem; }
 
 .filter-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
-.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
 .fg { display: flex; flex-direction: column; gap: 0.4rem; }
 .fg label { font-size: 0.85rem; font-weight: 600; color: #374151; }
 
@@ -370,4 +394,32 @@ function getStatusBadge(s: any) {
 .btn-save { padding: 0.5rem 1.25rem; background: #7c3aed; border: 1px solid #7c3aed; border-radius: 6px; font-weight: 500; color: #fff; cursor: pointer; transition: all 0.2s; }
 .btn-save:hover:not(:disabled) { background: #6d28d9; border-color: #6d28d9; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.search-box {
+  position: relative;
+  width: 100%;
+}
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+.search-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  font-size: 0.95rem;
+  outline: none;
+  background-color: #fff;
+  color: #1f2937;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.search-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
 </style>

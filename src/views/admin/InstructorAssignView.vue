@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { apiGet, apiPut } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -10,6 +10,21 @@ const loading = ref(true)
 const saving = ref<string | null>(null)
 const msg = ref<string | null>(null)
 const selectedInstructor = ref<Record<string, string>>({})
+const searchQuery = ref('')
+
+const filteredClasses = computed(() => {
+  if (!searchQuery.value) return classes.value
+  const q = searchQuery.value.toLowerCase()
+  return classes.value.filter(c => {
+    return (
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.subject?.name && c.subject.name.toLowerCase().includes(q)) ||
+      (c.subject?.department && c.subject.department.toLowerCase().includes(q)) ||
+      (c.instructor?.fullName && c.instructor.fullName.toLowerCase().includes(q)) ||
+      (c.instructor?.full_name && c.instructor.full_name.toLowerCase().includes(q))
+    )
+  })
+})
 
 async function loadData() {
   loading.value = true
@@ -61,8 +76,22 @@ async function handleAssign(classId: string) {
         </span>
       </div></div>
     <div v-if="msg" class="al"><i class="pi pi-info-circle"></i> {{ msg }}</div>
+    
+    <!-- Search Bar -->
+    <div class="search-container mb-6" v-if="!loading && classes.length > 0">
+      <div class="search-box">
+        <i class="pi pi-search search-icon"></i>
+        <input
+          type="text"
+          v-model="searchQuery"
+          placeholder="Tìm tên lớp, tên môn học, giảng viên..."
+          class="search-input"
+        />
+      </div>
+    </div>
+
     <div v-if="loading" class="ld"><i class="pi pi-spin pi-spinner"></i></div>
-    <div v-else-if="classes.length===0" class="emp"><i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af"></i><h3>Chưa có lớp nào</h3></div>
+    <div v-else-if="filteredClasses.length===0" class="emp"><i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af"></i><h3>Chưa có lớp nào</h3></div>
     <div v-else class="tc">
       <table class="mt">
         <thead>
@@ -76,7 +105,7 @@ async function handleAssign(classId: string) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="c in classes" :key="c.id">
+          <tr v-for="c in filteredClasses" :key="c.id">
             <td class="fw">{{ c.name }}</td>
             <td>{{ c.subject?.name || '' }}</td>
             <td>
@@ -124,4 +153,38 @@ async function handleAssign(classId: string) {
 .btn:hover:not(:disabled){background:#374151} .btn:disabled{opacity:.5;cursor:not-allowed}
 .dep-badge { font-size: 0.72rem; font-weight: 600; color: #7c3aed; background-color: #f5f3ff; padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-block; }
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.search-container {
+  width: 100%;
+}
+.search-box {
+  position: relative;
+  width: 100%;
+}
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+.search-input {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  font-size: 0.875rem;
+  outline: none;
+  background-color: #fff;
+  font-weight: 500;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.search-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+}
+.mb-6 {
+  margin-bottom: 1.5rem;
+}
 </style>

@@ -22,11 +22,26 @@ const modalError = ref<string | null>(null)
 // Lọc hiển thị (Tất cả / Đang hoạt động / Bị khóa / Từ chối)
 const currentFilter = ref('all') // all, active, locked, rejected
 
+const searchQuery = ref('')
+
 const filteredSubjects = computed(() => {
   return subjects.value.filter((sub: any) => {
-    if (currentFilter.value === 'active') return !sub.is_locked && sub.status === 'approved'
-    if (currentFilter.value === 'locked') return sub.is_locked
-    if (currentFilter.value === 'rejected') return sub.status === 'rejected'
+    if (currentFilter.value === 'active') {
+      if (sub.is_locked || sub.status !== 'approved') return false
+    } else if (currentFilter.value === 'locked') {
+      if (!sub.is_locked) return false
+    } else if (currentFilter.value === 'rejected') {
+      if (sub.status !== 'rejected') return false
+    }
+
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase()
+      const codeMatch = sub.code && sub.code.toLowerCase().includes(q)
+      const nameMatch = sub.name && sub.name.toLowerCase().includes(q)
+      const descMatch = sub.description && sub.description.toLowerCase().includes(q)
+      if (!codeMatch && !nameMatch && !descMatch) return false
+    }
+
     return true
   })
 })
@@ -152,6 +167,19 @@ onMounted(() => {
     <div v-if="successMessage" class="mono-alert alert-success">
       <i class="pi pi-check"></i>
       <div><strong>THÀNH CÔNG:</strong> {{ successMessage }}</div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-container mb-6" v-if="!loading && subjects.length > 0">
+      <div class="search-box">
+        <i class="pi pi-search search-icon"></i>
+        <input
+          type="text"
+          v-model="searchQuery"
+          placeholder="Tìm mã môn, tên môn học..."
+          class="search-input"
+        />
+      </div>
     </div>
 
     <!-- Main Content Split Layout -->
@@ -958,5 +986,40 @@ onMounted(() => {
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+.search-container {
+  width: 100%;
+  flex-shrink: 0;
+}
+.search-box {
+  position: relative;
+  width: 100%;
+}
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+.search-input {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  font-size: 0.875rem;
+  outline: none;
+  background-color: #fff;
+  font-weight: 500;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.search-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+}
+.mb-6 {
+  margin-bottom: 1.5rem;
 }
 </style>
