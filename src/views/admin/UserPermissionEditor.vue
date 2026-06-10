@@ -438,10 +438,13 @@ onMounted(async () => {
 .user-item:hover .avatar {
   background-color: #a855f7;
   border-color: #a855f7;
+  color: #fff;
 }
-.avatar.active {
+.avatar.active,
+.user-item:hover .avatar.active {
   background-color: #7c3aed;
   border-color: #7c3aed;
+  color: #fff;
 }
 
 .user-info {
@@ -487,7 +490,8 @@ onMounted(async () => {
   border-color: #a855f7;
   color: #9333ea;
 }
-.role-badge.active {
+.role-badge.active,
+.user-item:hover .role-badge.active {
   background-color: #7c3aed;
   color: #fff;
   border-color: #7c3aed;
