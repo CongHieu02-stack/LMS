@@ -84,7 +84,7 @@ export async function api<T = unknown>(
       }
     }
 
-    throw new Error(data.error || `Lỗi HTTP ${response.status}`)
+    throw new Error(data.error || data.message || `Lỗi HTTP ${response.status}`)
   }
 
   return data as T

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { apiGet, apiPost } from '@/lib/api'
+import { useToast } from 'primevue/usetoast'
 
 interface ClassItem {
   id: string; code?: string; name: string; subjectName: string; subjectCode: string;
@@ -13,6 +14,8 @@ const loading = ref(true)
 const loadingId = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
+
+const toast = useToast()
 
 async function loadData() {
   loading.value = true
@@ -55,20 +58,32 @@ function getProgressBarClass(enrolled: number, max: number) {
 async function handleRegister(cls: ClassItem) {
   if (cls.enrolled >= cls.max) return
   loadingId.value = cls.id
-  successMessage.value = null
-  errorMessage.value = null
   try {
     const res = await apiPost<{ success: boolean; message?: string; error?: string }>('/classes/register', { classId: cls.id })
     if (res.success) {
       cls.enrolled += 1
       cls.isRegistered = true
-      successMessage.value = `Đăng ký thành công lớp ${cls.subjectCode} - ${cls.subjectName}!`
-      setTimeout(() => { successMessage.value = null }, 3000)
+      toast.add({
+        severity: 'success',
+        summary: 'Đăng ký thành công',
+        detail: `Đăng ký thành công lớp ${cls.subjectCode} - ${cls.subjectName}!`,
+        life: 4000
+      })
     } else {
-      errorMessage.value = res.error || 'Không thể đăng ký.'
+      toast.add({
+        severity: 'error',
+        summary: 'Lỗi đăng ký',
+        detail: res.error || 'Không thể đăng ký.',
+        life: 5000
+      })
     }
   } catch (err: any) {
-    errorMessage.value = err.message
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi đăng ký',
+      detail: err.message || 'Đã xảy ra lỗi khi đăng ký.',
+      life: 5000
+    })
   }
   loadingId.value = null
 }

@@ -203,17 +203,19 @@ export async function createProfile(req, res) {
       })
     }
 
-    if (role === 'TRUONG_BO_MON') {
+    if (['TRUONG_BO_MON', 'GIANG_VIEN', 'SINH_VIEN'].includes(role)) {
       if (!department) {
         return res
           .status(400)
-          .json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách cho vai trò Trưởng bộ môn.` })
+          .json({ error: `Vui lòng chọn Khoa / Bộ môn phụ trách.` })
       }
-      const activeHead = await profileModel.findActiveDepartmentHead(department)
-      if (activeHead) {
-        return res.status(400).json({
-          error: `Khoa/Bộ môn "${department}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Vui lòng khóa tài khoản cũ trước khi thêm Trưởng bộ môn mới.`,
-        })
+      if (role === 'TRUONG_BO_MON') {
+        const activeHead = await profileModel.findActiveDepartmentHead(department)
+        if (activeHead) {
+          return res.status(400).json({
+            error: `Khoa/Bộ môn "${department}" đã có Trưởng bộ môn đang hoạt động (${activeHead.full_name}). Vui lòng khóa tài khoản cũ trước khi thêm Trưởng bộ môn mới.`,
+          })
+        }
       }
     }
 
@@ -270,7 +272,7 @@ export async function createProfile(req, res) {
         email,
         fullName,
         role,
-        role === 'TRUONG_BO_MON' ? department : null,
+        ['TRUONG_BO_MON', 'GIANG_VIEN', 'SINH_VIEN'].includes(role) ? department : null,
         role === 'SINH_VIEN' ? mssv : null,
       )
     } catch (dbError) {

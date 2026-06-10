@@ -196,7 +196,7 @@ async function handleCreateUser() {
       password: formPassword.value,
       fullName: formFullName.value,
       role: formRole.value,
-      department: formRole.value === 'TRUONG_BO_MON' ? formDepartment.value : undefined,
+      department: ['TRUONG_BO_MON', 'GIANG_VIEN', 'SINH_VIEN'].includes(formRole.value) ? formDepartment.value : undefined,
       mssv: formRole.value === 'SINH_VIEN' ? formMssv.value : undefined,
     })
 
@@ -696,9 +696,9 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Chỉ hiện ra khi chọn Trưởng bộ môn -->
-              <div v-if="formRole === 'TRUONG_BO_MON'" class="form-group">
-                <label class="form-label">Khoa / Bộ môn phụ trách</label>
+              <!-- Chỉ hiện ra khi chọn Trưởng bộ môn, Giảng viên, Sinh viên -->
+              <div v-if="['TRUONG_BO_MON', 'GIANG_VIEN', 'SINH_VIEN'].includes(formRole)" class="form-group">
+                <label class="form-label">Khoa</label>
                 <div class="select-wrapper">
                   <select v-model="formDepartment" class="mono-input">
                     <option v-for="dept in departments" :key="dept" :value="dept">
