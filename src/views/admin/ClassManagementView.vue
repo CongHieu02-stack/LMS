@@ -60,7 +60,7 @@ async function loadData() {
       apiGet<{ success: boolean; data: any[] }>('/classes/rooms'),
     ])
     subjects.value = (subRes.data || []).filter((s: any) => s.status === 'approved' && !s.is_locked)
-    managers.value = (profRes.data || []).filter((p: any) => p.role === 'TRUONG_BO_MON')
+    managers.value = (profRes.data || []).filter((p: any) => p.role === 'TRUONG_BO_MON' && !p.isLocked)
     rooms.value = roomRes.data || []
   } catch (err: any) {
     errMsg.value = err.message

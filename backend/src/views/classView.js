@@ -47,6 +47,7 @@ export function formatClass(raw) {
           id: raw.manager.id,
           fullName: raw.manager.full_name,
           email: raw.manager.email,
+          isLocked: raw.manager.is_locked || false,
         }
       : null,
     createdAt: raw.created_at,

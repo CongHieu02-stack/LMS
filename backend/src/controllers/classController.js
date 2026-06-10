@@ -86,7 +86,15 @@ function validateSchedule(scheduleStr) {
 export async function listClasses(req, res) {
   try {
     const classes = await classModel.findAll()
-    return res.json(classView.formatClassList(classes))
+    const formattedClasses = classView.formatClassList(classes)
+    formattedClasses.data = formattedClasses.data.map(c => {
+      if (c.manager?.isLocked) {
+        c.manager = null
+      }
+      return c
+    })
+
+    return res.json(formattedClasses)
   } catch (err) {
     console.error('[ClassController.listClasses]', err.message)
     return res.status(500).json({ error: 'Lỗi khi lấy danh sách lớp.' })
@@ -102,7 +110,11 @@ export async function getClassById(req, res) {
     if (!classData) {
       return res.status(404).json({ error: 'Không tìm thấy lớp học.' })
     }
-    return res.json({ success: true, class: classView.formatClass(classData) })
+    const formatted = classView.formatClass(classData)
+    if (formatted.manager?.isLocked) {
+      formatted.manager = null
+    }
+    return res.json({ success: true, class: formatted })
   } catch (err) {
     console.error('[ClassController.getClassById]', err.message)
     return res.status(500).json({ error: 'Lỗi khi lấy thông tin lớp.' })
