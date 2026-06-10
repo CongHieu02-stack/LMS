@@ -491,6 +491,7 @@ onMounted(() => {
               </div>
               <input type="file" accept="image/*" ref="fileInput" hidden @change="handleAvatarChange" />
               <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
+              <div v-if="authStore.profile?.mssv" class="profile-mssv">{{ authStore.profile?.mssv }}</div>
               <span class="lms-tag lms-tag-primary profile-role">{{ authStore.displayRole }}</span>
               <div class="profile-divider"></div>
               <div class="profile-detail">
@@ -590,6 +591,7 @@ onMounted(() => {
           </div>
           <input type="file" accept="image/*" ref="fileInput" hidden @change="handleAvatarChange" />
           <h3 class="profile-name">{{ authStore.profile?.fullName }}</h3>
+          <div v-if="authStore.profile?.mssv" class="profile-mssv">{{ authStore.profile?.mssv }}</div>
           <span class="lms-tag lms-tag-primary profile-role" :style="{ marginBottom: authStore.profile?.department ? '0.5rem' : '1.5rem' }">
             {{ authStore.displayRole }}
           </span>
@@ -1093,6 +1095,12 @@ onMounted(() => {
   font-weight: 600;
   margin-bottom: 0.25rem;
   color: #111827;
+}
+.profile-mssv {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
 }
 .profile-role {
   margin-bottom: 1.5rem;

@@ -21,6 +21,7 @@ export interface UserProfile {
   displayRole: string
   avatarUrl: string | null
   department?: string | null
+  mssv?: string | null
   createdAt: string
   updatedAt: string
   permissions: string[]
