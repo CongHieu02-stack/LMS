@@ -289,11 +289,17 @@ onMounted(() => {
             <div class="hero-code">{{ selectedSubject.code }}</div>
             <h2 class="hero-name">{{ selectedSubject.name }}</h2>
             <div class="hero-tags">
-              <span
-                class="mono-badge"
-                :class="selectedSubject.is_locked ? 'badge-locked' : 'badge-approved'"
-              >
-                {{ selectedSubject.is_locked ? 'Đã khóa' : 'Đang hoạt động' }}
+              <span v-if="selectedSubject.is_locked" class="mono-badge badge-locked">
+                <i class="pi pi-lock"></i> Đã khóa
+              </span>
+              <span v-else-if="selectedSubject.status === 'approved'" class="mono-badge badge-approved">
+                Đang hoạt động
+              </span>
+              <span v-else-if="selectedSubject.status === 'rejected'" class="mono-badge badge-rejected">
+                Từ chối
+              </span>
+              <span v-else class="mono-badge badge-pending">
+                Chờ duyệt
               </span>
               <span class="tc-badge">{{ selectedSubject.credits }} Tín chỉ</span>
             </div>
