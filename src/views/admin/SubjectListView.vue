@@ -19,13 +19,14 @@ const submittingLock = ref(false)
 const submittingUnlock = ref(false)
 const modalError = ref<string | null>(null)
 
-// Lọc hiển thị (Tất cả / Đang hoạt động / Bị khóa)
-const currentFilter = ref('all') // all, active, locked
+// Lọc hiển thị (Tất cả / Đang hoạt động / Bị khóa / Từ chối)
+const currentFilter = ref('all') // all, active, locked, rejected
 
 const filteredSubjects = computed(() => {
-  return subjects.value.filter((sub) => {
+  return subjects.value.filter((sub: any) => {
     if (currentFilter.value === 'active') return !sub.is_locked && sub.status === 'approved'
     if (currentFilter.value === 'locked') return sub.is_locked
+    if (currentFilter.value === 'rejected') return sub.status === 'rejected'
     return true
   })
 })
@@ -183,6 +184,13 @@ onMounted(() => {
               @click="currentFilter = 'locked'"
             >
               Đã Khóa
+            </button>
+            <button
+              class="filter-btn"
+              :class="{ active: currentFilter === 'rejected' }"
+              @click="currentFilter = 'rejected'"
+            >
+              Từ chối
             </button>
           </div>
         </div>
