@@ -16,7 +16,17 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('error', (err, _req, res: any) => {
+            console.warn('[Vite Proxy Error]', err.message)
+            if (res && !res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'Proxy error: Mất kết nối tới server backend.' }))
+            }
+          })
+        }
       }
     }
   }
