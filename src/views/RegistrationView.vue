@@ -17,6 +17,10 @@ const loadingId = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 
+const searchQuery = ref('')
+const selectedSemester = ref('')
+const hideConflicting = ref(false)
+
 const toast = useToast()
 
 async function loadData() {
@@ -130,13 +134,13 @@ function schedulesOverlap(s1: string, s2: string) {
 
 const totalRegisteredCredits = computed(() => {
   return availableClasses.value
-    .filter(c => c.isRegistered)
-    .reduce((sum, c) => sum + (c.credits || 0), 0)
+    .filter((c: ClassItem) => c.isRegistered)
+    .reduce((sum: number, c: ClassItem) => sum + (c.credits || 0), 0)
 })
 
 function isConflicting(cls: ClassItem) {
   if (cls.isRegistered) return false;
-  const registeredClasses = availableClasses.value.filter(c => c.isRegistered);
+  const registeredClasses = availableClasses.value.filter((c: ClassItem) => c.isRegistered);
   for (const reg of registeredClasses) {
     if (schedulesOverlap(cls.schedule, reg.schedule)) {
       return true;
@@ -144,6 +148,31 @@ function isConflicting(cls: ClassItem) {
   }
   return false;
 }
+
+const availableSemesters = computed(() => {
+  const semesters = new Set(availableClasses.value.map((c: ClassItem) => c.semester).filter(Boolean))
+  return Array.from(semesters).sort()
+})
+
+const filteredClasses = computed(() => {
+  return availableClasses.value.filter((cls: ClassItem) => {
+    // 1. Tìm kiếm theo từ khóa
+    const query = searchQuery.value.trim().toLowerCase()
+    const matchesQuery = !query || 
+      cls.name.toLowerCase().includes(query) || 
+      cls.subjectCode.toLowerCase().includes(query) || 
+      cls.instructor.toLowerCase().includes(query)
+    
+    // 2. Lọc theo học kỳ
+    const matchesSemester = !selectedSemester.value || cls.semester === selectedSemester.value
+    
+    // 3. Lọc trùng lịch học
+    const matchesConflict = !hideConflicting.value || !isConflicting(cls)
+    
+    return matchesQuery && matchesSemester && matchesConflict
+  })
+})
+
 
 function getCapacityPercent(enrolled: number, max: number) { return max > 0 ? (enrolled / max) * 100 : 0 }
 function getProgressBarClass(enrolled: number, max: number) {
@@ -216,53 +245,86 @@ async function handleRegister(cls: ClassItem) {
 
     <div v-if="loading" class="loading-center"><i class="pi pi-spin pi-spinner" style="font-size:2rem;color:#6b7280"></i><div>Đang tải danh sách lớp...</div></div>
 
-    <div v-else-if="availableClasses.length === 0" class="empty-state">
-      <i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af"></i>
-      <h3>Chưa có lớp nào mở đăng ký</h3>
-      <p>Vui lòng quay lại sau khi Phòng đào tạo mở lớp.</p>
-    </div>
-
-    <div v-else class="class-grid">
-      <div v-for="cls in availableClasses" :key="cls.id" class="mono-card class-card" :class="{ 'card-registered': cls.isRegistered }">
-        <div class="card-header">
-          <span class="class-code">{{ cls.subjectCode }}</span>
-          <span v-if="cls.isRegistered" class="status-badge badge-registered">Đã đăng ký</span>
-          <span v-else-if="cls.enrolled >= cls.max" class="status-badge badge-full">Đã đầy</span>
-          <span v-else-if="isConflicting(cls)" class="status-badge badge-conflict">Trùng lịch</span>
-          <span v-else class="status-badge badge-open">Mở đăng ký</span>
+    <template v-else>
+      <!-- Thanh Bộ lọc & Tìm kiếm -->
+      <div v-if="availableClasses.length > 0" class="filter-bar-card">
+        <div class="search-input-wrapper">
+          <i class="pi pi-search search-icon"></i>
+          <input v-model="searchQuery" type="text" placeholder="Tìm tên môn học, mã môn học, giảng viên..." class="filter-input search-input" />
         </div>
-        <div class="card-body">
-          <h3 class="subject-name">{{ cls.name }}</h3>
-          <div class="info-row"><i class="pi pi-book"></i><span>Số tín chỉ: <strong>{{ cls.credits }}</strong></span></div>
-          <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
-          <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
-          <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
-          <div class="info-row"><i class="pi pi-bookmark"></i><span>Học kỳ: {{ cls.semester }}</span></div>
-          <div class="capacity-section">
-            <div class="capacity-labels"><span class="capacity-title">Sĩ số</span><span><strong>{{ cls.enrolled }}</strong> / {{ cls.max }}</span></div>
-            <div class="progress-bg"><div class="progress-fill" :class="getProgressBarClass(cls.enrolled, cls.max)" :style="{ width: getCapacityPercent(cls.enrolled, cls.max) + '%' }"></div></div>
+        
+        <div class="filter-controls">
+          <div class="select-wrapper">
+            <i class="pi pi-calendar filter-select-icon"></i>
+            <select v-model="selectedSemester" class="filter-select">
+              <option value="">Tất cả học kỳ</option>
+              <option v-for="sem in availableSemesters" :key="sem" :value="sem">{{ sem }}</option>
+            </select>
           </div>
-        </div>
-        <div class="card-footer">
-          <button v-if="!cls.isRegistered" 
-                  class="btn-submit w-full" 
-                  :disabled="cls.enrolled >= cls.max || isConflicting(cls) || totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT || loadingId === cls.id" 
-                  @click="handleRegister(cls)">
-            <i v-if="loadingId === cls.id" class="pi pi-spin pi-spinner"></i>
-            <i v-else-if="cls.enrolled >= cls.max" class="pi pi-ban"></i>
-            <i v-else-if="isConflicting(cls)" class="pi pi-exclamation-triangle"></i>
-            <i v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT" class="pi pi-ban"></i>
-            <i v-else class="pi pi-bolt"></i>
-            
-            <span v-if="cls.enrolled >= cls.max">Hết chỗ</span>
-            <span v-else-if="isConflicting(cls)">Trùng lịch học</span>
-            <span v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT">Vượt giới hạn TC</span>
-            <span v-else>Đăng ký ngay</span>
-          </button>
-          <div v-else class="registered-label"><i class="pi pi-check"></i> Đã đăng ký thành công</div>
+          
+          <label class="toggle-container">
+            <input v-model="hideConflicting" type="checkbox" class="toggle-checkbox" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Ẩn lớp trùng lịch</span>
+          </label>
         </div>
       </div>
-    </div>
+
+      <!-- Hiển thị danh sách lớp -->
+      <div v-if="availableClasses.length === 0" class="empty-state">
+        <i class="pi pi-inbox" style="font-size:3rem;color:#9ca3af"></i>
+        <h3>Chưa có lớp nào mở đăng ký</h3>
+        <p>Vui lòng quay lại sau khi Phòng đào tạo mở lớp.</p>
+      </div>
+
+      <div v-else-if="filteredClasses.length === 0" class="empty-state">
+        <i class="pi pi-search" style="font-size:3rem;color:#9ca3af"></i>
+        <h3>Không tìm thấy lớp học phù hợp</h3>
+        <p>Thử thay đổi từ khóa tìm kiếm hoặc tắt tùy chọn lọc trùng lịch học.</p>
+      </div>
+
+      <div v-else class="class-grid">
+        <div v-for="cls in filteredClasses" :key="cls.id" class="mono-card class-card" :class="{ 'card-registered': cls.isRegistered }">
+          <div class="card-header">
+            <span class="class-code">{{ cls.subjectCode }}</span>
+            <span v-if="cls.isRegistered" class="status-badge badge-registered">Đã đăng ký</span>
+            <span v-else-if="cls.enrolled >= cls.max" class="status-badge badge-full">Đã đầy</span>
+            <span v-else-if="isConflicting(cls)" class="status-badge badge-conflict">Trùng lịch</span>
+            <span v-else class="status-badge badge-open">Mở đăng ký</span>
+          </div>
+          <div class="card-body">
+            <h3 class="subject-name">{{ cls.name }}</h3>
+            <div class="info-row"><i class="pi pi-book"></i><span>Số tín chỉ: <strong>{{ cls.credits }}</strong></span></div>
+            <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
+            <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
+            <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
+            <div class="info-row"><i class="pi pi-bookmark"></i><span>Học kỳ: {{ cls.semester }}</span></div>
+            <div class="capacity-section">
+              <div class="capacity-labels"><span class="capacity-title">Sĩ số</span><span><strong>{{ cls.enrolled }}</strong> / {{ cls.max }}</span></div>
+              <div class="progress-bg"><div class="progress-fill" :class="getProgressBarClass(cls.enrolled, cls.max)" :style="{ width: getCapacityPercent(cls.enrolled, cls.max) + '%' }"></div></div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button v-if="!cls.isRegistered" 
+                    class="btn-submit w-full" 
+                    :disabled="cls.enrolled >= cls.max || isConflicting(cls) || totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT || loadingId === cls.id" 
+                    @click="handleRegister(cls)">
+              <i v-if="loadingId === cls.id" class="pi pi-spin pi-spinner"></i>
+              <i v-else-if="cls.enrolled >= cls.max" class="pi pi-ban"></i>
+              <i v-else-if="isConflicting(cls)" class="pi pi-exclamation-triangle"></i>
+              <i v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT" class="pi pi-ban"></i>
+              <i v-else class="pi pi-bolt"></i>
+              
+              <span v-if="cls.enrolled >= cls.max">Hết chỗ</span>
+              <span v-else-if="isConflicting(cls)">Trùng lịch học</span>
+              <span v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT">Vượt giới hạn TC</span>
+              <span v-else>Đăng ký ngay</span>
+            </button>
+            <div v-else class="registered-label"><i class="pi pi-check"></i> Đã đăng ký thành công</div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -318,4 +380,22 @@ async function handleRegister(cls: ClassItem) {
 .stats-progress-fill.progress-warning { background: #f59e0b; }
 .stats-progress-fill.progress-full { background: #ef4444; }
 .badge-conflict { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
+
+.filter-bar-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+.search-input-wrapper { position: relative; flex: 1; min-width: 280px; }
+.search-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+.filter-input { width: 100%; padding: 0.625rem 0.75rem 0.625rem 2.25rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; outline: none; transition: all 0.2s; }
+.filter-input:focus { border-color: #111827; box-shadow: 0 0 0 2px rgba(17,24,39,0.05); }
+.filter-controls { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.select-wrapper { position: relative; }
+.filter-select-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; }
+.filter-select { padding: 0.625rem 2rem 0.625rem 2.25rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; outline: none; background: #fff; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.filter-select:focus { border-color: #111827; }
+.toggle-container { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none; }
+.toggle-checkbox { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: relative; display: inline-block; width: 36px; height: 20px; background-color: #e5e7eb; border-radius: 9999px; transition: background-color 0.2s; }
+.toggle-slider::before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; border-radius: 50%; transition: transform 0.2s; }
+.toggle-checkbox:checked + .toggle-slider { background-color: #111827; }
+.toggle-checkbox:checked + .toggle-slider::before { transform: translateX(16px); }
+.toggle-label { font-size: 0.875rem; font-weight: 500; color: #374151; }
 </style>
