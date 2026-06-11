@@ -14,6 +14,7 @@ export function formatClass(raw) {
   return {
     id: raw.id,
     name: raw.name,
+    code: raw.code || '',
     maxSlots: raw.max_slots,
     remainingSlots: raw.remaining_slots,
     schedule: raw.schedule,
