@@ -275,6 +275,15 @@ async function handleRegister(cls: ClassItem) {
         <div class="filter-controls">
           <div class="status-pills">
             <button 
+              type="button"
+              class="status-pill"
+              :class="{ 'pill-active': selectedStatuses.length === 0 }"
+              @click="selectedStatuses = []"
+            >
+              <i class="pi pi-th-large"></i>
+              <span>Tất cả</span>
+            </button>
+            <button 
               v-for="opt in statusOptions" 
               :key="opt.value" 
               type="button"
