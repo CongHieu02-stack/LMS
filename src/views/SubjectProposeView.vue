@@ -47,10 +47,15 @@ async function loadProposals() {
 loadProposals()
 
 async function handleSubmit() {
-  isSubmitting.value = true
   successMessage.value = null
   errorMessage.value = null
 
+  if (!formCode.value.trim() || !formName.value.trim()) {
+    errorMessage.value = 'Thiếu mã môn hoặc tên'
+    return
+  }
+
+  isSubmitting.value = true
   try {
     const res = await apiPost<{ success: boolean; message: string }>('/subjects', {
       code: formCode.value,
@@ -101,7 +106,7 @@ function getStatusBadge(status: string) {
     <div class="split-layout">
       <div class="mono-card flex-grow">
         <div class="card-header"><span>Thông tin môn học</span><i class="pi pi-book text-gray-400"></i></div>
-        <form @submit.prevent="handleSubmit" class="card-body">
+        <form @submit.prevent="handleSubmit" novalidate class="card-body">
           <div class="grid-2">
             <div class="form-group">
               <label class="form-label">Mã môn học</label>
