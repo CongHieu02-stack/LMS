@@ -199,21 +199,10 @@ async function handleCreate() {
             </div>
           </div>
 
-          <!-- Học kỳ + TBM -->
-          <div class="row-2">
-            <div class="fg">
-              <label>Học kỳ <span class="required">*</span></label>
-              <input v-model="form.semester" class="mono-input" placeholder="VD: HK1-2026" required />
-            </div>
-            <div class="fg">
-              <label>Trưởng bộ môn quản lý</label>
-              <select v-model="form.managerId" class="mono-input">
-                <option value="">-- Không chỉ định --</option>
-                <option v-for="m in managers" :key="m.id" :value="m.id">
-                  {{ m.fullName }}
-                </option>
-              </select>
-            </div>
+          <!-- Học kỳ -->
+          <div class="fg">
+            <label>Học kỳ <span class="required">*</span></label>
+            <input v-model="form.semester" class="mono-input" placeholder="VD: HK1-2026" required />
           </div>
 
           <!-- Ngày bắt đầu + Ngày kết thúc -->
