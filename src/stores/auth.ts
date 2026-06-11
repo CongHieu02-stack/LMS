@@ -106,7 +106,11 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (authError) {
-        error.value = authError.message
+        if (authError.message === 'Invalid login credentials' || authError.status === 400) {
+          error.value = 'Đăng nhập thất bại do email hoặc mật khẩu không đúng'
+        } else {
+          error.value = authError.message
+        }
         return false
       }
 
