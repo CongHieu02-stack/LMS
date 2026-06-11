@@ -177,7 +177,7 @@ function getAvatarBgStyle(name: string) {
             <td>
               <select v-model="selectedInstructor[c.id]" class="si" :disabled="!!c.instructorId || !!c.instructor">
                 <option value="">-- Chọn --</option>
-                <option v-for="i in instructors" :key="i.id" :value="i.id">
+                <option v-for="i in instructors.filter(ins => !c.subject?.department || ins.department === c.subject.department)" :key="i.id" :value="i.id">
                   {{ i.fullName || i.full_name }}
                 </option>
               </select>
