@@ -48,8 +48,37 @@ async function loadData() {
         else if (c.status === 'in_progress') {
           normalizedStatus = 'ongoing'
         }
+        
+        const subjectName = c.subject?.name || ''
+        const subjectCode = c.subject?.code || ''
+        const className = c.name || ''
+        
+        let displayName = className
+        if (className && subjectName) {
+          if (className.toLowerCase().includes(subjectName.toLowerCase())) {
+            displayName = className
+          } else {
+            const parts = className.split(' - ')
+            if (parts.length > 1) {
+              const suffix = parts[parts.length - 1]
+              if (suffix.toLowerCase().includes('lớp')) {
+                displayName = `${subjectName} - ${suffix}`
+              } else {
+                displayName = `${subjectName} - ${className}`
+              }
+            } else {
+              if (className.toUpperCase() === subjectCode.toUpperCase()) {
+                displayName = subjectName
+              } else {
+                displayName = `${subjectName} - ${className}`
+              }
+            }
+          }
+        }
+
         return {
           ...c,
+          name: displayName,
           status: normalizedStatus
         }
       })

@@ -36,13 +36,46 @@ async function loadData() {
     const cd = cRes.data || cRes
     const cdList = Array.isArray(cd) ? cd : []
     const allInstructors = pRes.data || []
+    
+    const cdListFormatted = cdList.map((c: any) => {
+      const subjectName = c.subject?.name || ''
+      const subjectCode = c.subject?.code || ''
+      const className = c.name || ''
+      
+      let displayName = className
+      if (className && subjectName) {
+        if (className.toLowerCase().includes(subjectName.toLowerCase())) {
+          displayName = className
+        } else {
+          const parts = className.split(' - ')
+          if (parts.length > 1) {
+            const suffix = parts[parts.length - 1]
+            if (suffix.toLowerCase().includes('lớp')) {
+              displayName = `${subjectName} - ${suffix}`
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          } else {
+            if (className.toUpperCase() === subjectCode.toUpperCase()) {
+              displayName = subjectName
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          }
+        }
+      }
+      return {
+        ...c,
+        name: displayName
+      }
+    })
 
     if (authStore.profile?.role === 'TRUONG_BO_MON' && authStore.profile?.department) {
       const userDept = authStore.profile.department
-      classes.value = cdList.filter((c: any) => c.subject?.department === userDept)
+      classes.value = cdListFormatted.filter((c: any) => c.subject?.department === userDept)
       instructors.value = allInstructors.filter((p: any) => p.role === 'GIANG_VIEN')
     } else {
-      classes.value = cdList
+      classes.value = cdListFormatted
       instructors.value = allInstructors.filter((p: any) => p.role === 'GIANG_VIEN')
     }
   } catch {}
