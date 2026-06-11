@@ -28,19 +28,48 @@ async function loadData() {
     // Lấy tất cả lớp mở
     const classRes = await apiGet<{ success: boolean; data: any[] }>('/classes')
     const classes = classRes.data || []
-    availableClasses.value = (Array.isArray(classes) ? classes : []).map((c: any) => ({
-      id: c.id,
-      name: c.name || '',
-      subjectName: c.subject?.name || 'N/A',
-      subjectCode: c.subject?.code || '',
-      instructor: c.instructor?.fullName || c.instructor?.full_name || 'Chưa phân công',
-      schedule: c.schedule || 'Chưa xếp lịch',
-      room: c.room || 'Chưa xếp phòng',
-      enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
-      max: c.maxSlots || c.max_slots || 0,
-      isRegistered: myRegistrations.value.includes(c.id),
-      semester: c.semester || 'N/A'
-    }))
+    availableClasses.value = (Array.isArray(classes) ? classes : []).map((c: any) => {
+      const subjectName = c.subject?.name || 'N/A'
+      const subjectCode = c.subject?.code || ''
+      const className = c.name || ''
+      
+      let displayName = className
+      if (className && subjectName) {
+        if (className.toLowerCase().includes(subjectName.toLowerCase())) {
+          displayName = className
+        } else {
+          const parts = className.split(' - ')
+          if (parts.length > 1) {
+            const suffix = parts[parts.length - 1]
+            if (suffix.toLowerCase().includes('lớp')) {
+              displayName = `${subjectName} - ${suffix}`
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          } else {
+            if (className.toUpperCase() === subjectCode.toUpperCase()) {
+              displayName = subjectName
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          }
+        }
+      }
+
+      return {
+        id: c.id,
+        name: displayName,
+        subjectName,
+        subjectCode,
+        instructor: c.instructor?.fullName || c.instructor?.full_name || 'Chưa phân công',
+        schedule: c.schedule || 'Chưa xếp lịch',
+        room: c.room || 'Chưa xếp phòng',
+        enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
+        max: c.maxSlots || c.max_slots || 0,
+        isRegistered: myRegistrations.value.includes(c.id),
+        semester: c.semester || 'N/A'
+      }
+    })
   } catch (err: any) {
     errorMessage.value = err.message
   }

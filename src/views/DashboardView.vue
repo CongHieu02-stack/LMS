@@ -233,10 +233,45 @@ async function loadStudentData() {
       apiGet<{ success: boolean; data: any[] }>('/grades/me'),
     ])
 
+    // Helper to format class name
+    const formatClassDisplayName = (c: any) => {
+      if (!c) return c
+      const subjectName = c.subject?.name || ''
+      const subjectCode = c.subject?.code || ''
+      const className = c.name || ''
+      
+      let displayName = className
+      if (className && subjectName) {
+        if (className.toLowerCase().includes(subjectName.toLowerCase())) {
+          displayName = className
+        } else {
+          const parts = className.split(' - ')
+          if (parts.length > 1) {
+            const suffix = parts[parts.length - 1]
+            if (suffix.toLowerCase().includes('lớp')) {
+              displayName = `${subjectName} - ${suffix}`
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          } else {
+            if (className.toUpperCase() === subjectCode.toUpperCase()) {
+              displayName = subjectName
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          }
+        }
+      }
+      return {
+        ...c,
+        name: displayName
+      }
+    }
+
     // 1. Lớp đã đăng ký
     const regs = regRes.data || []
     registeredCount.value = regs.length
-    myRegisteredClasses.value = regs.map((r) => r.class).filter(Boolean)
+    myRegisteredClasses.value = regs.map((r) => formatClassDisplayName(r.class)).filter(Boolean)
     const myClassIds = regs.map((r) => r.class?.id || r.class_id)
 
     // Helper to convert to scale 4
@@ -270,6 +305,7 @@ async function loadStudentData() {
     const allClasses = classRes.data || classRes
     if (Array.isArray(allClasses)) {
       availableClasses.value = allClasses
+        .map(formatClassDisplayName)
         .filter(
           (c) => !myClassIds.includes(c.id) && (c.remainingSlots || c.remaining_slots || 0) > 0,
         )

@@ -56,19 +56,48 @@ async function loadGrades() {
   try {
     const res = await apiGet<{ success: boolean; data: RawGrade[] }>('/grades/me')
 
-    grades.value = (res.data || []).map((g: RawGrade): GradeItem => ({
-      subjectCode: g.subjectCode,
-      subjectName: g.subjectName,
-      credits: g.credits,
-      regular1: g.regular1,
-      regular2: g.regular2,
-      midtermScore: g.midtermScore,
-      finalScore: g.finalScore,
-      averageScore: g.averageScore,
-      pass: g.pass,
-      semester: g.semester,
-      className: g.className
-    }))
+    grades.value = (res.data || []).map((g: RawGrade): GradeItem => {
+      const subjectName = g.subjectName || ''
+      const subjectCode = g.subjectCode || ''
+      const className = g.className || ''
+      
+      let displayName = className
+      if (className && subjectName) {
+        if (className.toLowerCase().includes(subjectName.toLowerCase())) {
+          displayName = className
+        } else {
+          const parts = className.split(' - ')
+          if (parts.length > 1) {
+            const suffix = parts[parts.length - 1]
+            if (suffix.toLowerCase().includes('lớp')) {
+              displayName = `${subjectName} - ${suffix}`
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          } else {
+            if (className.toUpperCase() === subjectCode.toUpperCase()) {
+              displayName = subjectName
+            } else {
+              displayName = `${subjectName} - ${className}`
+            }
+          }
+        }
+      }
+
+      return {
+        subjectCode: g.subjectCode,
+        subjectName: g.subjectName,
+        credits: g.credits,
+        regular1: g.regular1,
+        regular2: g.regular2,
+        midtermScore: g.midtermScore,
+        finalScore: g.finalScore,
+        averageScore: g.averageScore,
+        pass: g.pass,
+        semester: g.semester,
+        className: displayName
+      }
+    })
   } catch (err) {
     console.log(err)
   }
