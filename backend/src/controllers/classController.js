@@ -63,15 +63,15 @@ function validateSchedule(scheduleStr) {
           const dayText = dayLabels[s1.day] || s1.day;
           return {
             valid: false,
-            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng khung giờ.`
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng lịch (chồng chéo thời gian).`
           };
         }
-        // Kiểm tra xem có cách nhau ít nhất 10 phút không
-        if (secondStart < firstEnd + 10) {
+        // Kiểm tra xem có cách nhau ít nhất 5 phút không
+        if (secondStart < firstEnd + 5) {
           const dayText = dayLabels[s1.day] || s1.day;
           return {
             valid: false,
-            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 10 phút để sinh viên kịp di chuyển giữa các phòng học.`
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`
           };
         }
       }

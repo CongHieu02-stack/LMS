@@ -49,6 +49,13 @@ function validateSchedule(scheduleStr) {
           ? [m1_start, m1_end, m2_start, m2_end]
           : [m2_start, m2_end, m1_start, m1_end];
 
+        if (secondStart < firstEnd) {
+          const dayText = dayLabels[s1.day] || s1.day;
+          return {
+            valid: false,
+            error: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng lịch (chồng chéo thời gian).`
+          };
+        }
         if (secondStart < firstEnd + 5) {
           const dayText = dayLabels[s1.day] || s1.day;
           return {
@@ -70,27 +77,27 @@ const testCases = [
   },
   {
     input: "T2(07:30-10:00), T2(10:00-12:00)",
-    expectedValid: false, // Now invalid because gap is 0 minutes (< 10)
-    expectedError: "Lịch học vào Thứ 2 (07:30-10:00 và 10:00-12:00) phải cách nhau ít nhất 10 phút để sinh viên kịp di chuyển giữa các phòng học."
+    expectedValid: false,
+    expectedError: "Lịch học vào Thứ 2 (07:30-10:00 và 10:00-12:00) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học."
   },
   {
-    input: "T2(07:30-10:00), T2(10:09-12:00)",
-    expectedValid: false, // Invalid because gap is 9 minutes (< 10)
-    expectedError: "Lịch học vào Thứ 2 (07:30-10:00 và 10:09-12:00) phải cách nhau ít nhất 10 phút để sinh viên kịp di chuyển giữa các phòng học."
+    input: "T2(07:30-10:00), T2(10:04-12:00)",
+    expectedValid: false,
+    expectedError: "Lịch học vào Thứ 2 (07:30-10:00 và 10:04-12:00) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học."
   },
   {
-    input: "T2(07:30-10:00), T2(10:10-12:00)",
-    expectedValid: true // Valid because gap is exactly 10 minutes
+    input: "T2(07:30-10:00), T2(10:05-12:00)",
+    expectedValid: true
   },
   {
     input: "T2(07:30-10:00), T2(08:30-11:00)",
     expectedValid: false,
-    expectedError: "Lịch học vào Thứ 2 (07:30-10:00 và 08:30-11:00) bị trùng khung giờ."
+    expectedError: "Lịch học vào Thứ 2 (07:30-10:00 và 08:30-11:00) bị trùng lịch (chồng chéo thời gian)."
   },
   {
     input: "T3(13:00-15:00), T3(12:00-14:00)",
     expectedValid: false,
-    expectedError: "Lịch học vào Thứ 3 (13:00-15:00 và 12:00-14:00) phải cách nhau ít nhất 10 phút để sinh viên kịp di chuyển giữa các phòng học."
+    expectedError: "Lịch học vào Thứ 3 (13:00-15:00 và 12:00-14:00) bị trùng lịch (chồng chéo thời gian)."
   },
   {
     input: "T4(14:00-13:00)",

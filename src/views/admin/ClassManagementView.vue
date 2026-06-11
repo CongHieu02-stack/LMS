@@ -110,7 +110,7 @@ async function handleCreate() {
     if (s.startTime >= s.endTime) { errMsg.value = `Giờ bắt đầu (${s.startTime}) phải nhỏ hơn giờ kết thúc (${s.endTime}).`; return }
   }
 
-  // Kiểm tra trùng lịch (cách nhau ít nhất 5 phút)
+  // Kiểm tra trùng lịch và khoảng cách (cách nhau ít nhất 5 phút)
   for (let i = 0; i < sessions.value.length; i++) {
     for (let j = i + 1; j < sessions.value.length; j++) {
       const s1 = sessions.value[i], s2 = sessions.value[j]
@@ -118,7 +118,10 @@ async function handleCreate() {
         const m1s = timeToMinutes(s1.startTime), m1e = timeToMinutes(s1.endTime)
         const m2s = timeToMinutes(s2.startTime), m2e = timeToMinutes(s2.endTime)
         const [, firstEnd, secondStart] = m1s <= m2s ? [m1s, m1e, m2s, m2e] : [m2s, m2e, m1s, m1e]
-        if (secondStart < firstEnd + 5) {
+        if (secondStart < firstEnd) {
+          errMsg.value = `Lịch học vào ${dayLabels[s1.day] || s1.day} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng lịch (chồng chéo thời gian).`
+          return
+        } else if (secondStart < firstEnd + 5) {
           errMsg.value = `Lịch học vào ${dayLabels[s1.day] || s1.day} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút.`
           return
         }

@@ -222,9 +222,13 @@ async function handleApproveSubmit() {
           ? [m1_start, m1_end, m2_start, m2_end]
           : [m2_start, m2_end, m1_start, m1_end]
 
-        if (secondStart < firstEnd + 5) {
+        if (secondStart < firstEnd) {
           const dayText = dayLabels[s1.day] || s1.day
-          toast.add({ severity: 'error', summary: 'Trùng lịch học', detail: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`, life: 5000 })
+          toast.add({ severity: 'error', summary: 'Trùng lịch học', detail: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng lịch (chồng chéo thời gian).`, life: 5000 })
+          return
+        } else if (secondStart < firstEnd + 5) {
+          const dayText = dayLabels[s1.day] || s1.day
+          toast.add({ severity: 'error', summary: 'Khoảng cách lịch học quá ngắn', detail: `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`, life: 5000 })
           return
         }
       }

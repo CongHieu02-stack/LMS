@@ -230,7 +230,6 @@ async function handleSubmit() {
     }
   }
 
-  // Kiểm tra trùng hoặc chồng chéo thời gian giữa các buổi học trong cùng lịch đề xuất (yêu cầu cách nhau ít nhất 5 phút)
   for (let i = 0; i < formSessions.value.length; i++) {
     for (let j = i + 1; j < formSessions.value.length; j++) {
       const s1 = formSessions.value[i]
@@ -245,11 +244,18 @@ async function handleSubmit() {
           ? [m1_start, m1_end, m2_start, m2_end]
           : [m2_start, m2_end, m1_start, m1_end]
 
-        if (secondStart < firstEnd + 5) {
+        if (secondStart < firstEnd) {
+          const dayText = dayLabels[s1.day] || s1.day
+          const msg = `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) bị trùng lịch (chồng chéo thời gian).`
+          errorMsg.value = msg
+          toast.add({ severity: 'error', summary: 'Trùng lịch học', detail: msg, life: 5000 })
+          submitting.value = false
+          return
+        } else if (secondStart < firstEnd + 5) {
           const dayText = dayLabels[s1.day] || s1.day
           const msg = `Lịch học vào ${dayText} (${s1.startTime}-${s1.endTime} và ${s2.startTime}-${s2.endTime}) phải cách nhau ít nhất 5 phút để sinh viên kịp di chuyển giữa các phòng học.`
           errorMsg.value = msg
-          toast.add({ severity: 'error', summary: 'Trùng lịch học', detail: msg, life: 5000 })
+          toast.add({ severity: 'error', summary: 'Khoảng cách lịch học quá ngắn', detail: msg, life: 5000 })
           submitting.value = false
           return
         }
