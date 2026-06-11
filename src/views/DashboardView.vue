@@ -391,7 +391,7 @@ onMounted(() => {
                 >
                   <div class="my-class-info">
                     <span class="my-class-code">{{ cls.subject?.code }}</span>
-                    <strong class="my-class-name">{{ cls.name }} - {{ cls.subject?.name }}</strong>
+                    <strong class="my-class-name">{{ cls.name }}</strong>
                     <span class="my-class-teacher"
                       >GV:
                       {{
@@ -428,7 +428,7 @@ onMounted(() => {
               >
                 <div class="notif-content">
                   <div class="notif-title">
-                    {{ cls.name || cls.subject?.code }} - {{ cls.subject?.name }}
+                    {{ cls.name || cls.subject?.name || cls.subject?.code }}
                   </div>
                   <div class="notif-desc">
                     <i class="pi pi-calendar mr-1"></i> {{ cls.schedule || 'Chưa xếp lịch' }} &nbsp;

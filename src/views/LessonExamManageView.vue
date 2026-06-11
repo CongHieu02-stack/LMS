@@ -583,7 +583,7 @@ async function saveEditExam() {
       <div class="sel-card">
         <label>Chọn lớp học:</label>
         <select v-model="selectedClass" @change="loadClassContent" class="si">
-          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }} - {{ c.subject?.name }}</option>
+          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
       </div>
 

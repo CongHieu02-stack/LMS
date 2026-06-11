@@ -68,7 +68,7 @@ async function handleRegister(cls: ClassItem) {
       toast.add({
         severity: 'success',
         summary: 'Đăng ký thành công',
-        detail: `Đăng ký thành công lớp ${cls.subjectCode} - ${cls.subjectName}!`,
+        detail: `Đăng ký thành công lớp ${cls.subjectCode} - ${cls.name}!`,
         life: 4000
       })
     } else {
@@ -121,7 +121,7 @@ async function handleRegister(cls: ClassItem) {
           <span v-else class="status-badge badge-open">Mở đăng ký</span>
         </div>
         <div class="card-body">
-          <h3 class="subject-name">{{ cls.subjectName }}</h3>
+          <h3 class="subject-name">{{ cls.name }}</h3>
           <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
           <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
           <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>

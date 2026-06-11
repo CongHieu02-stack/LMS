@@ -13,7 +13,7 @@ const errMsg = ref<string | null>(null)
 
 const form = ref({
   subjectId: '',
-  name: '',
+  quantity: 1,
   maxSlots: 50,
   room: 'auto',
   semester: 'HK1-2026',
@@ -94,7 +94,7 @@ async function handleCreate() {
   errMsg.value = null
 
   if (!form.value.subjectId) { errMsg.value = 'Vui lòng chọn học phần gốc.'; return }
-  if (!form.value.name.trim()) { errMsg.value = 'Vui lòng nhập tên lớp.'; return }
+  if (!form.value.quantity || form.value.quantity < 1) { errMsg.value = 'Số lượng lớp phải tối thiểu là 1.'; return }
   if (!form.value.semester.trim()) { errMsg.value = 'Vui lòng nhập học kỳ.'; return }
 
   const semMatch = form.value.semester.trim().match(/^HK([1-3])-(\d{4})$/i)
@@ -136,12 +136,12 @@ async function handleCreate() {
     const res = await apiPost<{ success: boolean; message: string }>('/classes', {
       ...form.value,
       schedule: compiledSchedule,
-      room: form.value.room === 'auto' ? '' : form.value.room,
+      room: form.value.room,
       startDate: form.value.startDate,
       endDate: form.value.endDate,
     })
     msg.value = res.message
-    form.value = { subjectId: '', name: '', maxSlots: 50, room: 'auto', semester: 'HK1-2026', managerId: '', startDate: '', endDate: '' }
+    form.value = { subjectId: '', quantity: 1, maxSlots: 50, room: 'auto', semester: 'HK1-2026', managerId: '', startDate: '', endDate: '' }
     sessions.value = [{ day: 'T2', startTime: '07:30', endTime: '10:00' }]
   } catch (err: any) {
     errMsg.value = err.message
@@ -190,11 +190,11 @@ async function handleCreate() {
             </select>
           </div>
 
-          <!-- Tên lớp + Sĩ số -->
+          <!-- Số lượng lớp + Sĩ số -->
           <div class="row-2">
             <div class="fg">
-              <label>Tên lớp <span class="required">*</span></label>
-              <input v-model="form.name" class="mono-input" placeholder="VD: INT101-01" required />
+              <label>Số lượng lớp <span class="required">*</span></label>
+              <input v-model="form.quantity" type="number" min="1" max="20" class="mono-input" required />
             </div>
             <div class="fg">
               <label>Sĩ số tối đa <span class="required">*</span></label>
@@ -249,9 +249,9 @@ async function handleCreate() {
 
           <!-- Phòng học -->
           <div class="fg">
-            <label>Phòng học</label>
-            <select v-model="form.room" class="mono-input">
-              <option value="auto">-- Chưa chỉ định phòng --</option>
+            <label>Phòng học <span class="required">*</span></label>
+            <select v-model="form.room" class="mono-input" required>
+              <option value="auto">-- Tự động chọn phòng học --</option>
               <option v-for="r in rooms" :key="r.id" :value="r.name">
                 Phòng {{ r.name }} (Sức chứa: {{ r.capacity }} chỗ)
               </option>

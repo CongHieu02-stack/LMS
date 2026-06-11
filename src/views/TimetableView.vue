@@ -598,8 +598,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                     class="class-card"
                     :class="block.type"
                   >
-                    <div class="card-title">{{ block.cls.subjectName || block.cls.className }}</div>
-                    <div class="card-code">{{ block.cls.subjectCode }} - {{ block.cls.className }}</div>
+                    <div class="card-title">{{ block.cls.className }}</div>
+                    <div class="card-code">{{ block.cls.subjectCode }}</div>
                     <div class="card-meta">{{ block.periods }}</div>
                     <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
                     <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
@@ -629,8 +629,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                     class="class-card"
                     :class="block.type"
                   >
-                    <div class="card-title">{{ block.cls.subjectName || block.cls.className }}</div>
-                    <div class="card-code">{{ block.cls.subjectCode }} - {{ block.cls.className }}</div>
+                    <div class="card-title">{{ block.cls.className }}</div>
+                    <div class="card-code">{{ block.cls.subjectCode }}</div>
                     <div class="card-meta">{{ block.periods }}</div>
                     <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
                     <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
@@ -660,8 +660,8 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
                     class="class-card"
                     :class="block.type"
                   >
-                    <div class="card-title">{{ block.cls.subjectName || block.cls.className }}</div>
-                    <div class="card-code">{{ block.cls.subjectCode }} - {{ block.cls.className }}</div>
+                    <div class="card-title">{{ block.cls.className }}</div>
+                    <div class="card-code">{{ block.cls.subjectCode }}</div>
                     <div class="card-meta">{{ block.periods }}</div>
                     <div class="card-meta">Giờ: {{ block.session.startTime }} - {{ block.session.endTime }}</div>
                     <div class="card-meta">Phòng: {{ block.cls.room || 'Chưa xếp' }}</div>
@@ -706,10 +706,10 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
               </div>
               <div class="li-info">
                 <div class="li-subject">
-                  {{ item.cls.subjectName || item.cls.className }}
+                  {{ item.cls.className }}
                 </div>
                 <div class="li-meta">
-                  <span>Mã lớp: {{ item.cls.subjectCode }} - {{ item.cls.className }}</span>
+                  <span>Mã môn: {{ item.cls.subjectCode }}</span>
                   <span>{{ item.periods }}</span>
                   <span v-if="item.cls.room"><i class="pi pi-map-marker"></i> Phòng: {{ item.cls.room }}</span>
                   <span>

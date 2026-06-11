@@ -106,10 +106,12 @@ export async function updateStatus(id, status, reviewerId) {
     for (let i = 0; i < qty; i++) {
       const idx = startIdx + i + 1
       const padIdx = idx < 10 ? `0${idx}` : `${idx}`
+      const className = `${data.subject?.name || 'Lớp học'} - Lớp ${padIdx}`
+
       classesToInsert.push({
         subject_id: subjectId,
         code: `${subjectCode}-${semester}-${padIdx}`,
-        name: `${subjectCode} - Lớp ${padIdx}`,
+        name: className,
         semester: semester,
         status: 'draft',
         manager_id: managerId,

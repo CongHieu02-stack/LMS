@@ -24,6 +24,47 @@ function timeToMinutes(timeStr) {
   return hh * 60 + mm;
 }
 
+function parseSchedule(scheduleStr) {
+  if (!scheduleStr) return [];
+  const parts = scheduleStr.split(',').map(p => p.trim());
+  const sessions = [];
+  for (const part of parts) {
+    if (!part) continue;
+    const match = part.match(/^([A-Z0-9]+)\((\d{2}:\d{2})-(\d{2}:\d{2})\)$/i);
+    if (!match) continue;
+    const day = match[1].toUpperCase();
+    const startTime = match[2];
+    const endTime = match[3];
+    sessions.push({ day, startTime, endTime });
+  }
+  return sessions;
+}
+
+function schedulesOverlap(s1, s2) {
+  if (!s1 || !s2) return false;
+  const sessions1 = parseSchedule(s1);
+  const sessions2 = parseSchedule(s2);
+  for (const sess1 of sessions1) {
+    for (const sess2 of sessions2) {
+      if (sess1.day === sess2.day) {
+        const m1_start = timeToMinutes(sess1.startTime);
+        const m1_end = timeToMinutes(sess1.endTime);
+        const m2_start = timeToMinutes(sess2.startTime);
+        const m2_end = timeToMinutes(sess2.endTime);
+
+        const [firstStart, firstEnd, secondStart, secondEnd] = m1_start <= m2_start
+          ? [m1_start, m1_end, m2_start, m2_end]
+          : [m2_start, m2_end, m1_start, m1_end];
+
+        if (secondStart < firstEnd) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 function validateSchedule(scheduleStr) {
   if (!scheduleStr) return { valid: true };
   const parts = scheduleStr.split(',').map(p => p.trim());
@@ -172,15 +213,17 @@ export async function getMyRegistrations(req, res) {
  */
 export async function createClass(req, res) {
   try {
-    const { subjectId, name, maxSlots, schedule, room, semester, managerId, startDate, endDate } = req.body
-    if (!subjectId || !name || !maxSlots) {
-      return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: subjectId, name, maxSlots.' })
+    const { subjectId, quantity, maxSlots, schedule, room, semester, managerId, startDate, endDate } = req.body
+    const qty = parseInt(quantity) || 1
+
+    if (!subjectId || !maxSlots) {
+      return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: subjectId, maxSlots.' })
     }
 
     const { supabaseAdmin } = await import('../config/supabase.js')
     const { data: subj, error: subjErr } = await supabaseAdmin
       .from('subjects')
-      .select('department, is_locked')
+      .select('code, name, department, is_locked')
       .eq('id', subjectId)
       .single()
 
@@ -192,6 +235,60 @@ export async function createClass(req, res) {
       return res.status(400).json({ error: 'Môn học này hiện đang bị khóa, không thể tạo lớp học mới.' })
     }
 
+    // --- LOGIC XẾP PHÒNG ---
+    let assignedRooms = []
+    if (room === 'auto' || !room) {
+      // Tải tất cả phòng và lọc phòng trống bằng JS
+      const { data: allRooms } = await supabaseAdmin
+        .from('rooms')
+        .select('id, name, capacity')
+        .gte('capacity', parseInt(maxSlots))
+        .order('name', { ascending: true })
+
+      const { data: activeClasses } = await supabaseAdmin
+        .from('classes')
+        .select('room_id, room, schedule')
+        .is('room_id', 'not.null')
+
+      const availableRooms = (allRooms || []).filter(r => {
+        const hasConflict = (activeClasses || []).some(c => c.room_id === r.id && schedulesOverlap(c.schedule, schedule))
+        return !hasConflict
+      })
+
+      if (availableRooms.length < qty) {
+        return res.status(400).json({ 
+          error: `Không đủ phòng học trống phù hợp với sĩ số và lịch học này (Cần ${qty} phòng, hiện chỉ còn ${availableRooms.length} phòng trống).` 
+        })
+      }
+      assignedRooms = availableRooms.slice(0, qty)
+    } else {
+      if (qty > 1) {
+        return res.status(400).json({ error: 'Khi tạo từ 2 lớp học trở lên, vui lòng chọn chế độ Tự động chọn phòng học.' })
+      }
+      
+      const { data: roomObj } = await supabaseAdmin
+        .from('rooms')
+        .select('id, name')
+        .eq('name', room)
+        .maybeSingle()
+
+      if (!roomObj) {
+        return res.status(400).json({ error: `Phòng học ${room} không tồn tại.` })
+      }
+
+      const { data: activeClasses } = await supabaseAdmin
+        .from('classes')
+        .select('schedule')
+        .eq('room_id', roomObj.id)
+
+      const hasConflict = (activeClasses || []).some(c => schedulesOverlap(c.schedule, schedule))
+      if (hasConflict) {
+        return res.status(400).json({ error: `Phòng học ${room} đã bị trùng lịch với lớp học khác.` })
+      }
+      assignedRooms = [roomObj]
+    }
+
+    // --- LOGIC XÁC ĐỊNH NGƯỜI QUẢN LÝ ---
     let finalManagerId = managerId || null
     if (!finalManagerId) {
       if (subj?.department) {
@@ -208,24 +305,44 @@ export async function createClass(req, res) {
       }
     }
 
-    const newClass = await classModel.create({
-      subject_id: subjectId,
-      code: name,
-      name,
-      max_slots: parseInt(maxSlots),
-      max_students: parseInt(maxSlots),
-      remaining_slots: parseInt(maxSlots),
-      schedule: schedule || '',
-      room: room || '',
-      semester: semester || '',
-      manager_id: finalManagerId,
-      start_date: startDate || null,
-      end_date: endDate || null
-    })
+    // --- LOGIC ĐẾM LỚP & ĐẶT TÊN ---
+    const { count, error: countError } = await supabaseAdmin
+      .from('classes')
+      .select('id', { count: 'exact', head: true })
+      .eq('subject_id', subjectId)
+      .eq('semester', semester)
+    
+    const startIdx = countError ? 0 : (count || 0)
 
-    await logActivity(req, 'CREATE_CLASS', `Tạo lớp học mới: ${name} (Sĩ số tối đa: ${maxSlots}, Học kỳ: ${semester || 'N/A'})`)
+    const createdClasses = []
+    for (let i = 0; i < qty; i++) {
+      const idx = startIdx + i + 1
+      const padIdx = idx < 10 ? `0${idx}` : `${idx}`
+      const className = `${subj.name} - Lớp ${padIdx}`
 
-    return res.status(201).json({ success: true, message: 'Tạo lớp học thành công.', data: newClass })
+      const assignedRoom = assignedRooms[i]
+      const newClass = await classModel.create({
+        subject_id: subjectId,
+        code: `${subj.code}-${semester}-${padIdx}`,
+        name: className,
+        max_slots: parseInt(maxSlots),
+        max_students: parseInt(maxSlots),
+        remaining_slots: parseInt(maxSlots),
+        schedule: schedule || '',
+        room: assignedRoom.name,
+        room_id: assignedRoom.id,
+        semester: semester || '',
+        manager_id: finalManagerId,
+        start_date: startDate || null,
+        end_date: endDate || null,
+        status: 'approved'
+      })
+      createdClasses.push(newClass)
+    }
+
+    await logActivity(req, 'CREATE_CLASS', `Tạo ${qty} lớp học mới cho môn ${subj.name} (Học kỳ: ${semester || 'N/A'})`)
+
+    return res.status(201).json({ success: true, message: 'Tạo lớp học thành công.', data: createdClasses })
   } catch (err) {
     console.error('[ClassController.createClass]', err.message)
     return res.status(500).json({ error: 'Lỗi khi tạo lớp học.' })

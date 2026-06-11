@@ -345,7 +345,7 @@ onMounted(loadGrades)
                 <tbody>
                   <tr v-for="g in semesterData.items" :key="g.subjectCode">
                     <td class="font-mono">{{ g.subjectCode }}</td>
-                    <td class="fw-600">{{ g.subjectName }}</td>
+                    <td class="fw-600">{{ g.className || g.subjectName }}</td>
                     <td class="tc">{{ g.credits }}</td>
                     <td class="tc">{{ g.regular1 !== null ? g.regular1.toFixed(1) : '-' }}</td>
                     <td class="tc">{{ g.regular2 !== null ? g.regular2.toFixed(1) : '-' }}</td>
