@@ -31,10 +31,10 @@ async function loadData() {
       apiGet<any>('/classes'),
       apiGet<{ success: boolean; data: any[] }>('/subjects'),
     ])
-    
+
     const classData = classRes.data || classRes
     const rawClasses = Array.isArray(classData) ? classData : []
-    
+
     // Lọc bỏ các lớp có môn học đã bị khóa, và chuẩn hóa trạng thái của lớp
     classes.value = rawClasses
       .filter((c: any) => c.subject && !c.subject.isLocked)
@@ -48,11 +48,11 @@ async function loadData() {
         else if (c.status === 'in_progress') {
           normalizedStatus = 'ongoing'
         }
-        
+
         const subjectName = c.subject?.name || ''
         const subjectCode = c.subject?.code || ''
         const className = c.name || ''
-        
+
         let displayName = className
         if (className && subjectName) {
           if (className.toLowerCase().includes(subjectName.toLowerCase())) {
@@ -308,7 +308,7 @@ function getAvatarBgStyle(name: string) {
               </div>
               <div class="detail-item">
                 <i class="pi pi-info-circle icon-detail"></i>
-                <span>Trạng thái: 
+                <span>Trạng thái:
                   <strong v-if="c.status === 'open'" style="color: #2563eb;">Mở đăng ký</strong>
                   <strong v-else-if="c.status === 'ongoing'" style="color: #16a34a;">Đang diễn ra</strong>
                   <strong v-else-if="c.status === 'completed'" style="color: #4b5563;">Đã diễn ra</strong>
@@ -419,7 +419,7 @@ function getAvatarBgStyle(name: string) {
           <!-- Modal Footer -->
           <div class="modal-footer">
             <button class="btn-primary" @click="openStudentsModal">
-              <i class="pi pi-list"></i> Xem danh sách
+              <i class="pi pi-list"></i> Xem danh sách sinh viên
             </button>
             <button class="btn-secondary" @click="closeDetail">
               <i class="pi pi-times"></i> Đóng
@@ -685,8 +685,8 @@ function getAvatarBgStyle(name: string) {
 /* Students Modal */
 .students-modal { max-width: 800px; }
 .students-list { display: flex; flex-direction: column; gap: 1rem; }
-.students-count { 
-  font-size: 0.9rem; color: #6b7280; padding: 0.75rem 1rem; 
+.students-count {
+  font-size: 0.9rem; color: #6b7280; padding: 0.75rem 1rem;
   background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;
 }
 .students-table { overflow-x: auto; }
