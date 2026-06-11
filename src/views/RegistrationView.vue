@@ -18,8 +18,24 @@ const successMessage = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 
 const searchQuery = ref('')
-const selectedSemester = ref('')
+const selectedStatuses = ref<string[]>([])
 const hideConflicting = ref(false)
+
+const statusOptions = [
+  { value: 'open', label: 'Mở đăng ký', icon: 'pi pi-bolt' },
+  { value: 'registered', label: 'Đã đăng ký', icon: 'pi pi-check-circle' },
+  { value: 'full', label: 'Đã đầy', icon: 'pi pi-ban' },
+  { value: 'conflicting', label: 'Trùng lịch', icon: 'pi pi-exclamation-triangle' },
+]
+
+function toggleStatus(value: string) {
+  const idx = selectedStatuses.value.indexOf(value)
+  if (idx > -1) {
+    selectedStatuses.value.splice(idx, 1)
+  } else {
+    selectedStatuses.value.push(value)
+  }
+}
 
 const toast = useToast()
 
@@ -149,10 +165,12 @@ function isConflicting(cls: ClassItem) {
   return false;
 }
 
-const availableSemesters = computed(() => {
-  const semesters = new Set(availableClasses.value.map((c: ClassItem) => c.semester).filter(Boolean))
-  return Array.from(semesters).sort()
-})
+function getClassStatus(cls: ClassItem): string {
+  if (cls.isRegistered) return 'registered'
+  if (cls.enrolled >= cls.max) return 'full'
+  if (isConflicting(cls)) return 'conflicting'
+  return 'open'
+}
 
 const filteredClasses = computed(() => {
   return availableClasses.value.filter((cls: ClassItem) => {
@@ -163,13 +181,14 @@ const filteredClasses = computed(() => {
       cls.subjectCode.toLowerCase().includes(query) || 
       cls.instructor.toLowerCase().includes(query)
     
-    // 2. Lọc theo học kỳ
-    const matchesSemester = !selectedSemester.value || cls.semester === selectedSemester.value
+    // 2. Lọc theo nhiều trạng thái cùng lúc
+    const status = getClassStatus(cls)
+    const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.includes(status)
     
     // 3. Lọc trùng lịch học
     const matchesConflict = !hideConflicting.value || !isConflicting(cls)
     
-    return matchesQuery && matchesSemester && matchesConflict
+    return matchesQuery && matchesStatus && matchesConflict
   })
 })
 
@@ -254,12 +273,18 @@ async function handleRegister(cls: ClassItem) {
         </div>
         
         <div class="filter-controls">
-          <div class="select-wrapper">
-            <i class="pi pi-calendar filter-select-icon"></i>
-            <select v-model="selectedSemester" class="filter-select">
-              <option value="">Tất cả học kỳ</option>
-              <option v-for="sem in availableSemesters" :key="sem" :value="sem">{{ sem }}</option>
-            </select>
+          <div class="status-pills">
+            <button 
+              v-for="opt in statusOptions" 
+              :key="opt.value" 
+              type="button"
+              class="status-pill"
+              :class="{ 'pill-active': selectedStatuses.includes(opt.value) }"
+              @click="toggleStatus(opt.value)"
+            >
+              <i :class="opt.icon"></i>
+              <span>{{ opt.label }}</span>
+            </button>
           </div>
           
           <label class="toggle-container">
@@ -387,10 +412,10 @@ async function handleRegister(cls: ClassItem) {
 .filter-input { width: 100%; padding: 0.625rem 0.75rem 0.625rem 2.25rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; outline: none; transition: all 0.2s; }
 .filter-input:focus { border-color: #111827; box-shadow: 0 0 0 2px rgba(17,24,39,0.05); }
 .filter-controls { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
-.select-wrapper { position: relative; }
-.filter-select-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; }
-.filter-select { padding: 0.625rem 2rem 0.625rem 2.25rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; outline: none; background: #fff; cursor: pointer; appearance: none; -webkit-appearance: none; }
-.filter-select:focus { border-color: #111827; }
+.status-pills { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.status-pill { padding: 0.5rem 0.875rem; border-radius: 9999px; border: 1px solid #e5e7eb; background: #fff; color: #4b5563; font-size: 0.825rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 0.375rem; transition: all 0.15s ease; user-select: none; outline: none; }
+.status-pill:hover { background: #f9fafb; border-color: #d1d5db; color: #111827; }
+.status-pill.pill-active { background: #111827; border-color: #111827; color: #fff; }
 .toggle-container { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none; }
 .toggle-checkbox { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle-slider { position: relative; display: inline-block; width: 36px; height: 20px; background-color: #e5e7eb; border-radius: 9999px; transition: background-color 0.2s; }
