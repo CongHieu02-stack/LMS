@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { apiGet, apiPost } from '@/lib/api'
 import { useToast } from 'primevue/usetoast'
 
@@ -7,6 +7,7 @@ interface ClassItem {
   id: string; code?: string; name: string; subjectName: string; subjectCode: string;
   instructor: string; schedule: string; room: string; enrolled: number; max: number; isRegistered: boolean;
   semester: string;
+  credits: number;
 }
 
 const availableClasses = ref<ClassItem[]>([])
@@ -67,7 +68,8 @@ async function loadData() {
         enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
         max: c.maxSlots || c.max_slots || 0,
         isRegistered: myRegistrations.value.includes(c.id),
-        semester: c.semester || 'N/A'
+        semester: c.semester || 'N/A',
+        credits: c.subject?.credits || 0
       }
     })
   } catch (err: any) {
@@ -77,6 +79,71 @@ async function loadData() {
 }
 
 onMounted(loadData)
+
+const MAX_CREDITS_LIMIT = 24
+
+function timeToMinutes(timeStr: string) {
+  const [hh, mm] = timeStr.split(':').map(Number);
+  return hh * 60 + mm;
+}
+
+function parseSchedule(scheduleStr: string) {
+  if (!scheduleStr) return [];
+  const parts = scheduleStr.split(',').map(p => p.trim());
+  const sessions = [];
+  for (const part of parts) {
+    if (!part) continue;
+    const match = part.match(/^([A-Z0-9]+)\((\d{2}:\d{2})-(\d{2}:\d{2})\)$/i);
+    if (!match) continue;
+    const day = match[1].toUpperCase();
+    const startTime = match[2];
+    const endTime = match[3];
+    sessions.push({ day, startTime, endTime });
+  }
+  return sessions;
+}
+
+function schedulesOverlap(s1: string, s2: string) {
+  if (!s1 || !s2) return false;
+  const sessions1 = parseSchedule(s1);
+  const sessions2 = parseSchedule(s2);
+  for (const sess1 of sessions1) {
+    for (const sess2 of sessions2) {
+      if (sess1.day === sess2.day) {
+        const m1_start = timeToMinutes(sess1.startTime);
+        const m1_end = timeToMinutes(sess1.endTime);
+        const m2_start = timeToMinutes(sess2.startTime);
+        const m2_end = timeToMinutes(sess2.endTime);
+
+        const [firstStart, firstEnd, secondStart, secondEnd] = m1_start <= m2_start
+          ? [m1_start, m1_end, m2_start, m2_end]
+          : [m2_start, m2_end, m1_start, m1_end];
+
+        if (secondStart < firstEnd) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+const totalRegisteredCredits = computed(() => {
+  return availableClasses.value
+    .filter(c => c.isRegistered)
+    .reduce((sum, c) => sum + (c.credits || 0), 0)
+})
+
+function isConflicting(cls: ClassItem) {
+  if (cls.isRegistered) return false;
+  const registeredClasses = availableClasses.value.filter(c => c.isRegistered);
+  for (const reg of registeredClasses) {
+    if (schedulesOverlap(cls.schedule, reg.schedule)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function getCapacityPercent(enrolled: number, max: number) { return max > 0 ? (enrolled / max) * 100 : 0 }
 function getProgressBarClass(enrolled: number, max: number) {
@@ -128,6 +195,20 @@ async function handleRegister(cls: ClassItem) {
         <h1 class="page-title">Đăng ký Lớp học</h1>
         <div class="page-subtitle">Chọn lớp và đăng ký nhanh để giữ chỗ trong học kỳ này.</div>
       </div>
+      <!-- Widget Thống kê Tín chỉ Học kỳ -->
+      <div class="credit-stats-card">
+        <div class="stats-label">Tín chỉ học kỳ này</div>
+        <div class="stats-value">
+          <span class="current-credits">{{ totalRegisteredCredits }}</span>
+          <span class="max-credits">/ {{ MAX_CREDITS_LIMIT }} TC</span>
+        </div>
+        <div class="stats-progress-bg">
+          <div class="stats-progress-fill" 
+               :style="{ width: Math.min((totalRegisteredCredits / MAX_CREDITS_LIMIT) * 100, 100) + '%' }" 
+               :class="{ 'progress-full': totalRegisteredCredits >= MAX_CREDITS_LIMIT, 'progress-warning': totalRegisteredCredits >= 18 && totalRegisteredCredits < MAX_CREDITS_LIMIT }">
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="successMessage" class="mono-alert alert-success"><i class="pi pi-check-circle"></i><div><strong>THÀNH CÔNG:</strong> {{ successMessage }}</div></div>
@@ -147,10 +228,12 @@ async function handleRegister(cls: ClassItem) {
           <span class="class-code">{{ cls.subjectCode }}</span>
           <span v-if="cls.isRegistered" class="status-badge badge-registered">Đã đăng ký</span>
           <span v-else-if="cls.enrolled >= cls.max" class="status-badge badge-full">Đã đầy</span>
+          <span v-else-if="isConflicting(cls)" class="status-badge badge-conflict">Trùng lịch</span>
           <span v-else class="status-badge badge-open">Mở đăng ký</span>
         </div>
         <div class="card-body">
           <h3 class="subject-name">{{ cls.name }}</h3>
+          <div class="info-row"><i class="pi pi-book"></i><span>Số tín chỉ: <strong>{{ cls.credits }}</strong></span></div>
           <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
           <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
           <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
@@ -161,11 +244,20 @@ async function handleRegister(cls: ClassItem) {
           </div>
         </div>
         <div class="card-footer">
-          <button v-if="!cls.isRegistered" class="btn-submit w-full" :disabled="cls.enrolled >= cls.max || loadingId === cls.id" @click="handleRegister(cls)">
+          <button v-if="!cls.isRegistered" 
+                  class="btn-submit w-full" 
+                  :disabled="cls.enrolled >= cls.max || isConflicting(cls) || totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT || loadingId === cls.id" 
+                  @click="handleRegister(cls)">
             <i v-if="loadingId === cls.id" class="pi pi-spin pi-spinner"></i>
             <i v-else-if="cls.enrolled >= cls.max" class="pi pi-ban"></i>
+            <i v-else-if="isConflicting(cls)" class="pi pi-exclamation-triangle"></i>
+            <i v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT" class="pi pi-ban"></i>
             <i v-else class="pi pi-bolt"></i>
-            {{ cls.enrolled >= cls.max ? 'Hết chỗ' : 'Đăng ký ngay' }}
+            
+            <span v-if="cls.enrolled >= cls.max">Hết chỗ</span>
+            <span v-else-if="isConflicting(cls)">Trùng lịch học</span>
+            <span v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT">Vượt giới hạn TC</span>
+            <span v-else>Đăng ký ngay</span>
           </button>
           <div v-else class="registered-label"><i class="pi pi-check"></i> Đã đăng ký thành công</div>
         </div>
@@ -216,4 +308,14 @@ async function handleRegister(cls: ClassItem) {
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 .registered-label { text-align: center; color: #166534; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.credit-stats-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0.75rem 1.25rem; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 0.25rem; }
+.stats-label { font-size: 0.75rem; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.stats-value { font-size: 1.5rem; font-weight: 700; color: #111827; display: flex; align-items: baseline; gap: 0.25rem; }
+.max-credits { font-size: 0.875rem; color: #9ca3af; font-weight: 500; }
+.stats-progress-bg { height: 6px; background: #e5e7eb; border-radius: 9999px; overflow: hidden; margin-top: 0.25rem; }
+.stats-progress-fill { height: 100%; background: #3b82f6; border-radius: 9999px; transition: width 0.3s ease; }
+.stats-progress-fill.progress-warning { background: #f59e0b; }
+.stats-progress-fill.progress-full { background: #ef4444; }
+.badge-conflict { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
 </style>
