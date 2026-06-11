@@ -40,6 +40,7 @@ const filteredClasses = computed(() => {
       (c.subject?.code && c.subject.code.toLowerCase().includes(q)) ||
       (c.subject?.name && c.subject.name.toLowerCase().includes(q)) ||
       (c.code && c.code.toLowerCase().includes(q)) ||
+      (c.name && c.name.toLowerCase().includes(q)) ||
       (c.semester && c.semester.toLowerCase().includes(q)) ||
       (c.room && c.room.toLowerCase().includes(q)) ||
       (c.manager?.fullName && c.manager.fullName.toLowerCase().includes(q))
@@ -405,7 +406,7 @@ onMounted(async () => {
               <thead>
                 <tr>
                   <th>Môn học</th>
-                  <th>Mã lớp</th>
+                  <th>Tên lớp</th>
                   <th>Học kỳ</th>
                   <th>Phòng học / Lịch học</th>
                   <th>TBM phụ trách</th>
@@ -418,7 +419,7 @@ onMounted(async () => {
                     <span class="code-cell">{{ c.subject?.code }}</span>
                     <span class="subject-name"> — {{ c.subject?.name }}</span>
                   </td>
-                  <td><strong>{{ c.code }}</strong></td>
+                  <td><strong>{{ c.name }}</strong></td>
                   <td class="semester-cell">{{ c.semester }}</td>
                   <td>
                     <div>

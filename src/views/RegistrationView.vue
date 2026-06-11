@@ -6,6 +6,7 @@ import { useToast } from 'primevue/usetoast'
 interface ClassItem {
   id: string; code?: string; name: string; subjectName: string; subjectCode: string;
   instructor: string; schedule: string; room: string; enrolled: number; max: number; isRegistered: boolean;
+  semester: string;
 }
 
 const availableClasses = ref<ClassItem[]>([])
@@ -37,7 +38,8 @@ async function loadData() {
       room: c.room || 'Chưa xếp phòng',
       enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
       max: c.maxSlots || c.max_slots || 0,
-      isRegistered: myRegistrations.value.includes(c.id)
+      isRegistered: myRegistrations.value.includes(c.id),
+      semester: c.semester || 'N/A'
     }))
   } catch (err: any) {
     errorMessage.value = err.message
@@ -123,6 +125,7 @@ async function handleRegister(cls: ClassItem) {
           <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
           <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
           <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
+          <div class="info-row"><i class="pi pi-bookmark"></i><span>Học kỳ: {{ cls.semester }}</span></div>
           <div class="capacity-section">
             <div class="capacity-labels"><span class="capacity-title">Sĩ số</span><span><strong>{{ cls.enrolled }}</strong> / {{ cls.max }}</span></div>
             <div class="progress-bg"><div class="progress-fill" :class="getProgressBarClass(cls.enrolled, cls.max)" :style="{ width: getCapacityPercent(cls.enrolled, cls.max) + '%' }"></div></div>
