@@ -20,6 +20,7 @@ const finalScore = ref<number | null>(null)
 const timeLeft = ref(0)
 let timerInterval: any = null
 const showCheatOverlay = ref(false)
+const showCheatForcedModal = ref(false)
 const submitReasonMessage = ref<string | null>(null)
 
 const questions = ref<any[]>([])
@@ -166,13 +167,14 @@ function selectExamToStart(exam: any) {
 // ==========================================
 function triggerCheatViolation() {
   if (isExamFinished.value || !isExamStarted.value) return
-  if (showCheatOverlay.value) return // Tránh cộng dồn cảnh báo khi đang hiện overlay
+  if (showCheatOverlay.value || showCheatForcedModal.value) return // Tránh cộng dồn cảnh báo khi đang hiện overlay
 
   cheatWarnings.value++
   saveExamStateToStorage()
 
   if (cheatWarnings.value >= 2) {
-    showCheatOverlay.value = true
+    showCheatOverlay.value = false
+    showCheatForcedModal.value = true
     submitExam(true)
   } else {
     showCheatOverlay.value = true
@@ -308,6 +310,10 @@ function closeExam() {
   cheatWarnings.value = 0
   authStore.isTakingExam = false
   router.push('/dashboard')
+}
+
+function confirmCheatRedirect() {
+  showCheatForcedModal.value = false
 }
 
 // Format time
@@ -501,6 +507,39 @@ onUnmounted(() => {
           <div v-else class="text-center w-full font-bold" style="color: #dc2626; width: 100%; text-align: center;">
             Hệ thống đang tự động thu bài...
           </div>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- POPUP CHI TIẾT CẢNH BÁO GIAN LẬN LẦN 2 (BẮT BUỘC NỘP BÀI) -->
+  <Transition name="fade">
+    <div v-if="showCheatForcedModal" class="modal-overlay">
+      <div class="modal-card" style="border-color: #ef4444; max-width: 30rem;">
+        <div class="modal-header" style="border-bottom: 1px solid #fee2e2;">
+          <i class="pi pi-exclamation-circle modal-icon" style="color: #ef4444; font-size: 1.75rem;"></i>
+          <h3 style="color: #ef4444; font-weight: 700;">ĐÃ ĐÌNH CHỈ LÀM BÀI</h3>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem 2rem;">
+          <p class="font-bold text-red-600 mb-2" style="font-size: 1.1rem; line-height: 1.4;">
+            Bạn đã vi phạm quy chế thi lần thứ 2!
+          </p>
+          <p class="text-gray-700 mb-4" style="line-height: 1.6;">
+            Hành vi rời khỏi vùng làm bài (Alt+Tab, chuyển tab, thoát toàn màn hình hoặc click ra ngoài) đã được hệ thống ghi nhận. 
+            <strong>Bài thi của bạn đã bị khóa và tự động nộp bài ngay lập tức.</strong>
+          </p>
+          <div class="warning-text mb-4" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 600;">
+            <i class="pi pi-info-circle"></i> Vui lòng xác nhận bên dưới để xem điểm số kết quả bài thi của bạn.
+          </div>
+        </div>
+        <div class="modal-footer" style="background: #fef2f2; border-top: 1px solid #fecaca; padding: 1rem 1.5rem 1.5rem;">
+          <button 
+            class="btn-submit w-full" 
+            style="background: #dc2626; border-color: #dc2626; font-weight: 600; font-size: 1rem; width: 100%;" 
+            @click="confirmCheatRedirect"
+          >
+            <i class="pi pi-check"></i> Xác nhận & Xem điểm số
+          </button>
         </div>
       </div>
     </div>
