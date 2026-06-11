@@ -386,9 +386,6 @@ function getAvatarBgStyle(name: string) {
                 <div class="info-label"><i class="pi pi-users"></i> Sĩ số sinh viên</div>
                 <div class="info-value">
                   {{ (selectedClass.maxSlots - (selectedClass.remainingSlots || 0)) }} / {{ selectedClass.maxSlots }}
-                  <button class="btn-view-students" @click="openStudentsModal">
-                    <i class="pi pi-list"></i> Xem danh sách
-                  </button>
                 </div>
               </div>
               <div class="info-block">
@@ -421,6 +418,9 @@ function getAvatarBgStyle(name: string) {
 
           <!-- Modal Footer -->
           <div class="modal-footer">
+            <button class="btn-primary" @click="openStudentsModal">
+              <i class="pi pi-list"></i> Xem danh sách
+            </button>
             <button class="btn-secondary" @click="closeDetail">
               <i class="pi pi-times"></i> Đóng
             </button>
@@ -666,6 +666,7 @@ function getAvatarBgStyle(name: string) {
 .modal-footer {
   padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb;
   display: flex; justify-content: flex-end;
+  gap: 0.75rem;
 }
 .btn-secondary {
   padding: 0.6rem 1.2rem; background: #fff; border: 1px solid #d1d5db;
