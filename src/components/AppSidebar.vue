@@ -516,13 +516,20 @@ function getAvatarBgStyle(name: string) {
 }
 
 /* Trạng thái Active cho Item đơn lẻ & Group đang mở */
-.menu-item.active,
-.menu-group-header.active {
+.sidebar:not(.collapsed) .menu-item.active,
+.sidebar:not(.collapsed) .menu-group-header.active {
   background-color: var(--lms-white);
   color: var(--lms-primary);
   font-weight: 500;
   box-shadow: var(--lms-shadow-sm);
   border: 1px solid var(--lms-gray-200);
+}
+
+.sidebar.collapsed .menu-item.active,
+.sidebar.collapsed .menu-group-header.active {
+  background-color: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 
 .menu-item.active .menu-icon,
