@@ -3,6 +3,7 @@
 // ============================================================================
 
 import * as classProposalModel from '../models/classProposalModel.js'
+import { validateSemesterAndDate } from './classController.js'
 
 const dayLabels = {
   'T2': 'Thứ 2',
@@ -124,12 +125,13 @@ export async function create(req, res) {
       }
     }
 
-    // Kiểm tra định dạng học kỳ: HK[1-3]-[Năm]
+    // Kiểm tra định dạng học kỳ và ngày bắt đầu nếu có
+    const semesterCheck = validateSemesterAndDate(semester, startDate)
+    if (!semesterCheck.valid) {
+      return res.status(400).json({ error: semesterCheck.error })
+    }
     const semesterRegex = /^HK([1-3])-(\d{4})$/i
     const semMatch = semester.trim().match(semesterRegex)
-    if (!semMatch) {
-      return res.status(400).json({ error: 'Học kỳ không đúng định dạng. Vui lòng nhập theo dạng HK[1-3]-[Năm] (ví dụ: HK1-2026).' })
-    }
     const semYear = parseInt(semMatch[2])
     const currentYear = new Date().getFullYear()
     if (semYear < currentYear) {

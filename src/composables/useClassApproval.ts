@@ -9,6 +9,7 @@ import { apiPut } from '@/lib/api'
 export function useClassApproval(onSuccess?: () => void) {
   const isApproveModalOpen = ref(false)
   const selectedClassId = ref<string | null>(null)
+  const selectedSemester = ref<string>('')
   const maxStudentsInput = ref<number | null>(null)
   const scheduleInput = ref<string>('')
   const roomNameInput = ref<string>('auto')
@@ -23,9 +24,11 @@ export function useClassApproval(onSuccess?: () => void) {
     defaultMaxStudents?: number,
     existingRoom?: string,
     existingStartDate?: string,
-    existingEndDate?: string
+    existingEndDate?: string,
+    semester?: string
   ) {
     selectedClassId.value = classId
+    selectedSemester.value = semester || ''
     maxStudentsInput.value = defaultMaxStudents || 50
     scheduleInput.value = existingSchedule || ''
     roomNameInput.value = existingRoom || 'auto'
@@ -38,6 +41,7 @@ export function useClassApproval(onSuccess?: () => void) {
   function closeApproveModal() {
     isApproveModalOpen.value = false
     selectedClassId.value = null
+    selectedSemester.value = ''
     maxStudentsInput.value = null
     scheduleInput.value = ''
     roomNameInput.value = 'auto'
@@ -73,6 +77,40 @@ export function useClassApproval(onSuccess?: () => void) {
       }
     }
 
+    if (startDateInput.value && selectedSemester.value) {
+      const semMatch = selectedSemester.value.trim().match(/^HK([1-3])-(\d{4})$/i)
+      if (semMatch) {
+        const semNum = parseInt(semMatch[1])
+        const semYear = parseInt(semMatch[2])
+        
+        const start = new Date(startDateInput.value)
+        const startYear = start.getFullYear()
+        const startMonth = start.getMonth() + 1
+
+        if (startYear !== semYear) {
+          errorMessage.value = `Năm của ngày bắt đầu (${startYear}) phải khớp với năm của học kỳ (${semYear}).`
+          return
+        }
+
+        if (semNum === 1) {
+          if (startMonth < 8 || startMonth > 12) {
+            errorMessage.value = `Ngày bắt đầu của Học kỳ 1 năm ${semYear} phải nằm trong khoảng từ tháng 8 đến tháng 12 năm ${semYear}.`
+            return
+          }
+        } else if (semNum === 2) {
+          if (startMonth < 1 || startMonth > 5) {
+            errorMessage.value = `Ngày bắt đầu của Học kỳ 2 năm ${semYear} phải nằm trong khoảng từ tháng 1 đến tháng 5 năm ${semYear}.`
+            return
+          }
+        } else if (semNum === 3) {
+          if (startMonth < 6 || startMonth > 7) {
+            errorMessage.value = `Ngày bắt đầu của Học kỳ 3 năm ${semYear} phải nằm trong khoảng từ tháng 6 đến tháng 7 năm ${semYear}.`
+            return
+          }
+        }
+      }
+    }
+
     submitting.value = true
     errorMessage.value = null
     try {
@@ -102,6 +140,7 @@ export function useClassApproval(onSuccess?: () => void) {
   return {
     isApproveModalOpen,
     selectedClassId,
+    selectedSemester,
     maxStudentsInput,
     scheduleInput,
     roomNameInput,

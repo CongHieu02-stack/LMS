@@ -121,6 +121,52 @@ function validateSchedule(scheduleStr) {
   return { valid: true, sessions };
 }
 
+export function validateSemesterAndDate(semester, startDateStr) {
+  if (!semester) {
+    return { valid: false, error: 'Thiếu học kỳ.' }
+  }
+  const semesterRegex = /^HK([1-3])-(\d{4})$/i
+  const semMatch = semester.trim().match(semesterRegex)
+  if (!semMatch) {
+    return { valid: false, error: 'Học kỳ không đúng định dạng. Vui lòng nhập theo dạng HK[1-3]-[Năm] (ví dụ: HK1-2026).' }
+  }
+
+  if (startDateStr) {
+    const start = new Date(startDateStr)
+    if (isNaN(start.getTime())) {
+      return { valid: false, error: 'Định dạng ngày bắt đầu không hợp lệ.' }
+    }
+    const startYear = start.getFullYear()
+    const startMonth = start.getMonth() + 1 // 1-indexed
+
+    const semNum = parseInt(semMatch[1])
+    const semYear = parseInt(semMatch[2])
+
+    if (startYear !== semYear) {
+      return { valid: false, error: `Năm của ngày bắt đầu (${startYear}) phải khớp với năm của học kỳ (${semYear}).` }
+    }
+
+    if (semNum === 1) {
+      // HK1: Tháng 8 đến Tháng 12
+      if (startMonth < 8 || startMonth > 12) {
+        return { valid: false, error: `Ngày bắt đầu của Học kỳ 1 năm ${semYear} phải nằm trong khoảng từ tháng 8 đến tháng 12 năm ${semYear}.` }
+      }
+    } else if (semNum === 2) {
+      // HK2: Tháng 1 đến Tháng 5
+      if (startMonth < 1 || startMonth > 5) {
+        return { valid: false, error: `Ngày bắt đầu của Học kỳ 2 năm ${semYear} phải nằm trong khoảng từ tháng 1 đến tháng 5 năm ${semYear}.` }
+      }
+    } else if (semNum === 3) {
+      // HK3: Tháng 6 đến Tháng 7
+      if (startMonth < 6 || startMonth > 7) {
+        return { valid: false, error: `Ngày bắt đầu của Học kỳ 3 năm ${semYear} phải nằm trong khoảng từ tháng 6 đến tháng 7 năm ${semYear}.` }
+      }
+    }
+  }
+
+  return { valid: true }
+}
+
 /**
  * GET /api/classes — Lấy danh sách tất cả lớp học đang hoạt động.
  */
@@ -233,6 +279,12 @@ export async function createClass(req, res) {
 
     if (subj.is_locked) {
       return res.status(400).json({ error: 'Môn học này hiện đang bị khóa, không thể tạo lớp học mới.' })
+    }
+
+    // --- KIỂM TRA HỌC KỲ VÀ NGÀY BẮT ĐẦU ---
+    const semesterCheck = validateSemesterAndDate(semester, startDate)
+    if (!semesterCheck.valid) {
+      return res.status(400).json({ error: semesterCheck.error })
     }
 
     // --- LOGIC XẾP PHÒNG ---
@@ -423,6 +475,24 @@ export async function approveClass(req, res) {
       }
     }
 
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data: classRec, error: classRecErr } = await supabaseAdmin
+      .from('classes')
+      .select('semester')
+      .eq('id', id)
+      .single()
+
+    if (classRecErr || !classRec) {
+      return res.status(404).json({ error: 'Lớp học không tồn tại.' })
+    }
+
+    if (startDate) {
+      const semesterCheck = validateSemesterAndDate(classRec.semester, startDate)
+      if (!semesterCheck.valid) {
+        return res.status(400).json({ error: semesterCheck.error })
+      }
+    }
+
     // Kiểm tra ràng buộc ngày tháng
     if (startDate && endDate) {
       const start = new Date(startDate)
@@ -446,9 +516,6 @@ export async function approveClass(req, res) {
         return res.status(400).json({ error: 'Ngày bắt đầu phải cách ngày hiện tại ít nhất 2 tuần (14 ngày).' })
       }
     }
-
-    const { supabaseAdmin } = await import('../config/supabase.js')
-
     // 1. Lưu lịch học và ngày tháng học vụ trước (hoặc thiết lập null nếu không nhập)
     const finalSchedule = schedule && schedule.trim() ? schedule.trim() : null
     const updatePayload = { 

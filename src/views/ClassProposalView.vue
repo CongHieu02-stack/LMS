@@ -171,6 +171,48 @@ async function handleSubmit() {
     return
   }
 
+  // Kiểm tra ngày bắt đầu có khớp học kỳ hay không
+  if (formStartDate.value) {
+    const start = new Date(formStartDate.value)
+    const startYear = start.getFullYear()
+    const startMonth = start.getMonth() + 1
+    const semNum = parseInt(semMatch[1])
+
+    if (startYear !== semYear) {
+      const msg = `Năm của ngày bắt đầu (${startYear}) phải khớp với năm của học kỳ (${semYear}).`
+      errorMsg.value = msg
+      toast.add({ severity: 'error', summary: 'Học kỳ không khớp năm', detail: msg, life: 5000 })
+      submitting.value = false
+      return
+    }
+
+    if (semNum === 1) {
+      if (startMonth < 8 || startMonth > 12) {
+        const msg = `Ngày bắt đầu của Học kỳ 1 năm ${semYear} phải nằm trong khoảng từ tháng 8 đến tháng 12 năm ${semYear}.`
+        errorMsg.value = msg
+        toast.add({ severity: 'error', summary: 'Thời gian không khớp học kỳ', detail: msg, life: 5000 })
+        submitting.value = false
+        return
+      }
+    } else if (semNum === 2) {
+      if (startMonth < 1 || startMonth > 5) {
+        const msg = `Ngày bắt đầu của Học kỳ 2 năm ${semYear} phải nằm trong khoảng từ tháng 1 đến tháng 5 năm ${semYear}.`
+        errorMsg.value = msg
+        toast.add({ severity: 'error', summary: 'Thời gian không khớp học kỳ', detail: msg, life: 5000 })
+        submitting.value = false
+        return
+      }
+    } else if (semNum === 3) {
+      if (startMonth < 6 || startMonth > 7) {
+        const msg = `Ngày bắt đầu của Học kỳ 3 năm ${semYear} phải nằm trong khoảng từ tháng 6 đến tháng 7 năm ${semYear}.`
+        errorMsg.value = msg
+        toast.add({ severity: 'error', summary: 'Thời gian không khớp học kỳ', detail: msg, life: 5000 })
+        submitting.value = false
+        return
+      }
+    }
+  }
+
   if (!formStartDate.value || !formEndDate.value) {
     const msg = 'Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc.'
     errorMsg.value = msg

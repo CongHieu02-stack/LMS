@@ -100,7 +100,45 @@ async function handleCreate() {
   const semMatch = form.value.semester.trim().match(/^HK([1-3])-(\d{4})$/i)
   if (!semMatch) { errMsg.value = 'Học kỳ không đúng định dạng. Vui lòng nhập theo dạng HK[1-3]-[Năm] (ví dụ: HK1-2026).'; return }
 
+  const semYear = parseInt(semMatch[2])
+  const currentYear = new Date().getFullYear()
+  if (semYear < currentYear) {
+    errMsg.value = `Năm của học kỳ không được trước năm hiện tại (${currentYear}).`
+    return
+  }
+
   if (!form.value.startDate || !form.value.endDate) { errMsg.value = 'Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc.'; return }
+
+  // Ràng buộc ngày bắt đầu khớp học kỳ
+  if (form.value.startDate) {
+    const start = new Date(form.value.startDate)
+    const startYear = start.getFullYear()
+    const startMonth = start.getMonth() + 1
+    const semNum = parseInt(semMatch[1])
+
+    if (startYear !== semYear) {
+      errMsg.value = `Năm của ngày bắt đầu (${startYear}) phải khớp với năm của học kỳ (${semYear}).`
+      return
+    }
+
+    if (semNum === 1) {
+      if (startMonth < 8 || startMonth > 12) {
+        errMsg.value = `Ngày bắt đầu của Học kỳ 1 năm ${semYear} phải nằm trong khoảng từ tháng 8 đến tháng 12 năm ${semYear}.`
+        return
+      }
+    } else if (semNum === 2) {
+      if (startMonth < 1 || startMonth > 5) {
+        errMsg.value = `Ngày bắt đầu của Học kỳ 2 năm ${semYear} phải nằm trong khoảng từ tháng 1 đến tháng 5 năm ${semYear}.`
+        return
+      }
+    } else if (semNum === 3) {
+      if (startMonth < 6 || startMonth > 7) {
+        errMsg.value = `Ngày bắt đầu của Học kỳ 3 năm ${semYear} phải nằm trong khoảng từ tháng 6 đến tháng 7 năm ${semYear}.`
+        return
+      }
+    }
+  }
+
   if (new Date(form.value.endDate) < new Date(form.value.startDate)) { errMsg.value = 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.'; return }
 
   if (sessions.value.length === 0) { errMsg.value = 'Vui lòng thêm ít nhất một buổi học.'; return }

@@ -21,7 +21,7 @@ const searchQuery = ref('')
 const filteredProposals = computed(() => {
   if (!searchQuery.value) return proposals.value
   const q = searchQuery.value.toLowerCase()
-  return proposals.value.filter(p => {
+  return proposals.value.filter((p: any) => {
     return (
       (p.subject?.code && p.subject.code.toLowerCase().includes(q)) ||
       (p.subject?.name && p.subject.name.toLowerCase().includes(q)) ||
@@ -35,7 +35,7 @@ const filteredProposals = computed(() => {
 const filteredClasses = computed(() => {
   if (!searchQuery.value) return classes.value
   const q = searchQuery.value.toLowerCase()
-  return classes.value.filter(c => {
+  return classes.value.filter((c: any) => {
     return (
       (c.subject?.code && c.subject.code.toLowerCase().includes(q)) ||
       (c.subject?.name && c.subject.name.toLowerCase().includes(q)) ||
@@ -132,6 +132,7 @@ function removeApprovalSession(index: number) {
 
 function openApprovalModalWithSessions(
   classId: string,
+  semester: string,
   existingSchedule?: string,
   defaultMaxStudents?: number,
   existingRoom?: string,
@@ -160,12 +161,12 @@ function openApprovalModalWithSessions(
     }
   }
 
-  openApproveModal(classId, existingSchedule, defaultMaxStudents, existingRoom, existingStartDate, existingEndDate)
+  openApproveModal(classId, existingSchedule, defaultMaxStudents, existingRoom, existingStartDate, existingEndDate, semester)
 }
 
 const {
   isApproveModalOpen, maxStudentsInput, scheduleInput, roomNameInput, startDateInput, endDateInput,
-  submitting, errorMessage, openApproveModal, closeApproveModal, submitApproveClass
+  selectedSemester, submitting, errorMessage, openApproveModal, closeApproveModal, submitApproveClass
 } = useClassApproval(async () => {
   toast.add({ severity: 'success', summary: 'Thành công', detail: 'Lớp đã được duyệt và gán phòng học!', life: 4000 })
   await loadData()
@@ -438,7 +439,7 @@ onMounted(async () => {
                   </td>
                   <td class="text-center">
                     <div v-if="c.status === 'draft'" class="action-buttons">
-                      <button class="btn-approve" @click="openApprovalModalWithSessions(c.id, c.schedule, c.maxStudents, 'auto', c.startDate, c.endDate)" :disabled="processing === c.id">
+                      <button class="btn-approve" @click="openApprovalModalWithSessions(c.id, c.semester, c.schedule, c.maxStudents, 'auto', c.startDate, c.endDate)" :disabled="processing === c.id">
                         <i class="pi pi-check"></i> Duyệt mở
                       </button>
                       <button class="btn-reject" @click="handleReject(c.id)" :disabled="processing === c.id">
