@@ -199,7 +199,7 @@ function getStatusBadge(status: string) {
 .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
 .form-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
 .mono-input { width: 100%; padding: 0.6rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; box-sizing: border-box; transition: all 0.2s; color: #1f2937; }
-.mono-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1); }
+.mono-input:focus { border-color: var(--lms-primary); box-shadow: 0 0 0 3px var(--lms-primary-light); }
 .uppercase-input { text-transform: uppercase; }
 .textarea-tall { min-height: 120px; resize: vertical; }
 .action-footer { margin-top: 0.5rem; display: flex; justify-content: flex-end; }
@@ -213,7 +213,7 @@ function getStatusBadge(status: string) {
 .proposal-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
 .proposal-item > div:first-child { flex: 1; min-width: 0; margin-right: 0.75rem; }
 .proposal-code { font-family: monospace; font-weight: 600; color: #111827; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.dep-badge { font-size: 0.7rem; font-weight: 500; color: #7c3aed; background-color: #f5f3ff; padding: 0.1rem 0.35rem; border-radius: 4px; font-family: sans-serif; white-space: normal; word-break: break-word; }
+.dep-badge { font-size: 0.7rem; font-weight: 500; color: var(--lms-primary); background-color: var(--lms-primary-light); padding: 0.1rem 0.35rem; border-radius: 4px; font-family: sans-serif; white-space: normal; word-break: break-word; }
 .proposal-name { font-size: 0.8rem; color: #6b7280; }
 .status-badge { font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; text-align: center; }
 .badge-pending { background: #fef3c7; color: #92400e; }
