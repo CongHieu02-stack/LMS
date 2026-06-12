@@ -641,6 +641,7 @@ function getAvatarBgStyle(name: string) {
 .card-footer {
   display: flex; justify-content: flex-end;
   border-top: 1px solid #f3f4f6; padding-top: 0.75rem;
+  margin-top: auto;
 }
 .view-detail-hint {
   font-size: 0.8rem; color: #7c3aed; font-weight: 500;
