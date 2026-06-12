@@ -1795,13 +1795,14 @@ onMounted(() => {
 
 /* Welcome Banner */
 .welcome-banner {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 2.25rem 2rem;
-  color: #ffffff;
+  color: #111827;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.25), 0 8px 10px -6px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
   margin-bottom: 2rem;
 }
 
@@ -1816,22 +1817,18 @@ onMounted(() => {
   font-weight: 700;
   margin: 0 0 0.5rem 0;
   letter-spacing: -0.025em;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #111827;
 }
 
 .welcome-subtitle {
   font-size: 1rem;
-  opacity: 0.9;
+  color: #4b5563;
   line-height: 1.5;
   font-weight: 400;
 }
 
 .banner-circle {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
-  z-index: 1;
-  pointer-events: none;
+  display: none;
 }
 
 .banner-circle-1 {
