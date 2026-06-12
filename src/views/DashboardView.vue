@@ -307,7 +307,9 @@ async function loadStudentData() {
       availableClasses.value = allClasses
         .map(formatClassDisplayName)
         .filter(
-          (c) => !myClassIds.includes(c.id) && (c.remainingSlots || c.remaining_slots || 0) > 0,
+          (c) => !myClassIds.includes(c.id) && 
+                 ['approved', 'APPROVED', 'open_for_reg', 'open'].includes(c.status) &&
+                 (c.remainingSlots || c.remaining_slots || 0) > 0,
         )
         .slice(0, 2)
     }

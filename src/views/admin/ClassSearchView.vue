@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { apiGet } from '@/lib/api'
+import { apiGet, apiPut } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
+import { useToast } from 'primevue/usetoast'
+import pvToast from 'primevue/toast'
+
+const authStore = useAuthStore()
+const toast = useToast()
+
+const canManageStatus = computed(() => {
+  return authStore.hasPermission('class_quantity_approve') || (authStore.profile?.rank || 0) >= 70
+})
 
 // States
 const classes = ref<any[]>([])
 const subjects = ref<any[]>([])
 const loading = ref(true)
 const errMsg = ref<string | null>(null)
+const togglingStatus = ref(false)
 
 // Filters State
 const searchQuery = ref('')
@@ -39,14 +50,10 @@ async function loadData() {
     classes.value = rawClasses
       .filter((c: any) => c.subject && !c.subject.isLocked)
       .map((c: any) => {
-        let normalizedStatus = c.status
+        let normalizedStatus = 'closed'
         // Chuẩn hóa: 'open_for_reg'/'approved'/'APPROVED' -> 'open'
-        if (c.status === 'open_for_reg' || c.status === 'approved' || c.status === 'APPROVED') {
+        if (c.status === 'open_for_reg' || c.status === 'approved' || c.status === 'APPROVED' || c.status === 'open') {
           normalizedStatus = 'open'
-        }
-        // Chuẩn hóa: 'in_progress' -> 'ongoing'
-        else if (c.status === 'in_progress') {
-          normalizedStatus = 'ongoing'
         }
 
         const subjectName = c.subject?.name || ''
@@ -89,6 +96,44 @@ async function loadData() {
     errMsg.value = err.message || 'Không thể tải dữ liệu lớp học.'
   } finally {
     loading.value = false
+  }
+}
+
+async function toggleClassRegistration() {
+  if (!selectedClass.value) return
+  const currentStatus = selectedClass.value.status // 'open' or 'closed'
+  const newStatus = currentStatus === 'open' ? 'closed' : 'open'
+  
+  togglingStatus.value = true
+  try {
+    const res = await apiPut<{ success: boolean; message: string }>(`/classes/${selectedClass.value.id}/status`, {
+      status: newStatus
+    })
+    if (res.success) {
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: res.message || 'Cập nhật trạng thái thành công.',
+        life: 4000
+      })
+      // Update local state immediately
+      selectedClass.value.status = newStatus
+      
+      // Also update in list
+      const idx = classes.value.findIndex((c: any) => c.id === selectedClass.value.id)
+      if (idx !== -1) {
+        classes.value[idx].status = newStatus
+      }
+    }
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: err.message || 'Không thể cập nhật trạng thái lớp.',
+      life: 5000
+    })
+  } finally {
+    togglingStatus.value = false
   }
 }
 
@@ -181,6 +226,7 @@ function getAvatarBgStyle(name: string) {
 </script>
 
 <template>
+  <pv-toast />
   <div class="mono-wrapper">
     <!-- Header -->
     <div class="page-header">
@@ -241,8 +287,7 @@ function getAvatarBgStyle(name: string) {
           <select v-model="classStatusFilter" class="mono-input">
             <option value="">-- Tất cả trạng thái --</option>
             <option value="open">Mở đăng ký</option>
-            <option value="ongoing">Đang diễn ra</option>
-            <option value="completed">Đã diễn ra</option>
+            <option value="closed">Đóng đăng ký</option>
           </select>
         </div>
       </div>
@@ -310,9 +355,7 @@ function getAvatarBgStyle(name: string) {
                 <i class="pi pi-info-circle icon-detail"></i>
                 <span>Trạng thái:
                   <strong v-if="c.status === 'open'" style="color: #2563eb;">Mở đăng ký</strong>
-                  <strong v-else-if="c.status === 'ongoing'" style="color: #16a34a;">Đang diễn ra</strong>
-                  <strong v-else-if="c.status === 'completed'" style="color: #4b5563;">Đã diễn ra</strong>
-                  <strong v-else style="color: #6b7280;">Không xác định</strong>
+                  <strong v-else style="color: #dc2626;">Đóng đăng ký</strong>
                 </span>
               </div>
               <div class="detail-item" v-if="c.instructor" style="display: flex; align-items: center; gap: 8px;">
@@ -408,9 +451,7 @@ function getAvatarBgStyle(name: string) {
                 <div class="info-label"><i class="pi pi-circle"></i> Trạng thái</div>
                 <div class="info-value">
                   <span v-if="selectedClass.status === 'open'" class="chip" style="background: #dbeafe; color: #1e40af;">Mở đăng ký</span>
-                  <span v-else-if="selectedClass.status === 'ongoing'" class="chip chip-active">Đang diễn ra</span>
-                  <span v-else-if="selectedClass.status === 'completed'" class="chip chip-inactive">Đã diễn ra</span>
-                  <span v-else class="chip chip-inactive">Không xác định</span>
+                  <span v-else class="chip" style="background: #fee2e2; color: #991b1b;">Đóng đăng ký</span>
                 </div>
               </div>
             </div>
@@ -418,11 +459,16 @@ function getAvatarBgStyle(name: string) {
 
           <!-- Modal Footer -->
           <div class="modal-footer">
-            <button class="btn-primary" @click="openStudentsModal">
-              <i class="pi pi-list"></i> Xem danh sách sinh viên
+            <button v-if="canManageStatus" class="btn-primary" :disabled="togglingStatus" @click="toggleClassRegistration" :style="{ backgroundColor: selectedClass.status === 'open' ? '#dc2626' : '#16a34a' }">
+              <i v-if="togglingStatus" class="pi pi-spin pi-spinner mr-1"></i>
+              <i v-else :class="selectedClass.status === 'open' ? 'pi pi-lock mr-1' : 'pi pi-lock-open mr-1'"></i>
+              {{ selectedClass.status === 'open' ? 'Đóng đăng ký' : 'Mở đăng ký' }}
+            </button>
+            <button class="btn-primary" style="background-color: #7c3aed;" @click="openStudentsModal">
+              <i class="pi pi-list mr-1"></i> Danh sách SV
             </button>
             <button class="btn-secondary" @click="closeDetail">
-              <i class="pi pi-times"></i> Đóng
+              <i class="pi pi-times mr-1"></i> Đóng
             </button>
           </div>
         </div>

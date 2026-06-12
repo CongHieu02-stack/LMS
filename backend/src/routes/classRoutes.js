@@ -36,6 +36,9 @@ router.put('/:id/approve', requirePermissionOrRank('class_quantity_approve', 70)
 // PUT /api/classes/:id/reject — Từ chối mở lớp (PĐT, rank >= 70)
 router.put('/:id/reject', requirePermissionOrRank('class_quantity_approve', 70), classController.rejectClass)
 
+// PUT /api/classes/:id/status — Cập nhật trạng thái đóng/mở đăng ký (PĐT, rank >= 70)
+router.put('/:id/status', requirePermissionOrRank('class_quantity_approve', 70), classController.updateClassStatus)
+
 // POST /api/classes/register — Đăng ký vào lớp (SV)
 router.post('/register', classController.registerToClass)
 

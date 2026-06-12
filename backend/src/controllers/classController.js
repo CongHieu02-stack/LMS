@@ -663,4 +663,41 @@ export async function getClassStudents(req, res) {
   }
 }
 
+/**
+ * PUT /api/classes/:id/status — Cập nhật trạng thái đóng/mở đăng ký
+ */
+export async function updateClassStatus(req, res) {
+  try {
+    const { id } = req.params
+    const { status } = req.body
+
+    if (!status || !['open', 'closed'].includes(status)) {
+      return res.status(400).json({ error: 'Trạng thái không hợp lệ. Chỉ chấp nhận open hoặc closed.' })
+    }
+
+    const dbStatus = status === 'open' ? 'APPROVED' : 'in_progress'
+
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data, error } = await supabaseAdmin
+      .from('classes')
+      .update({ status: dbStatus, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    await logActivity(req, 'UPDATE_CLASS_STATUS', `Cập nhật trạng thái lớp học ID: ${id} thành ${dbStatus}`)
+
+    return res.json({
+      success: true,
+      message: `Cập nhật trạng thái lớp học thành ${status === 'open' ? 'Mở đăng ký' : 'Đóng đăng ký'} thành công.`,
+      data
+    })
+  } catch (err) {
+    console.error('[ClassController.updateClassStatus]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi cập nhật trạng thái lớp học.' })
+  }
+}
+
 

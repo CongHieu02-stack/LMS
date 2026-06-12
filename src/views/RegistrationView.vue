@@ -22,7 +22,6 @@ const selectedStatuses = ref<string[]>([])
 const hideConflicting = ref(false)
 
 const statusOptions = [
-  { value: 'open', label: 'Mở đăng ký', icon: 'pi pi-bolt' },
   { value: 'registered', label: 'Đã đăng ký', icon: 'pi pi-check-circle' },
   { value: 'full', label: 'Đã đầy', icon: 'pi pi-ban' },
   { value: 'conflicting', label: 'Trùng lịch', icon: 'pi pi-exclamation-triangle' },
@@ -49,49 +48,51 @@ async function loadData() {
     // Lấy tất cả lớp mở
     const classRes = await apiGet<{ success: boolean; data: any[] }>('/classes')
     const classes = classRes.data || []
-    availableClasses.value = (Array.isArray(classes) ? classes : []).map((c: any) => {
-      const subjectName = c.subject?.name || 'N/A'
-      const subjectCode = c.subject?.code || ''
-      const className = c.name || ''
-      
-      let displayName = className
-      if (className && subjectName) {
-        if (className.toLowerCase().includes(subjectName.toLowerCase())) {
-          displayName = className
-        } else {
-          const parts = className.split(' - ')
-          if (parts.length > 1) {
-            const suffix = parts[parts.length - 1]
-            if (suffix.toLowerCase().includes('lớp')) {
-              displayName = `${subjectName} - ${suffix}`
-            } else {
-              displayName = `${subjectName} - ${className}`
-            }
+    availableClasses.value = (Array.isArray(classes) ? classes : [])
+      .filter((c: any) => ['approved', 'APPROVED', 'open_for_reg', 'open'].includes(c.status))
+      .map((c: any) => {
+        const subjectName = c.subject?.name || 'N/A'
+        const subjectCode = c.subject?.code || ''
+        const className = c.name || ''
+        
+        let displayName = className
+        if (className && subjectName) {
+          if (className.toLowerCase().includes(subjectName.toLowerCase())) {
+            displayName = className
           } else {
-            if (className.toUpperCase() === subjectCode.toUpperCase()) {
-              displayName = subjectName
+            const parts = className.split(' - ')
+            if (parts.length > 1) {
+              const suffix = parts[parts.length - 1]
+              if (suffix.toLowerCase().includes('lớp')) {
+                displayName = `${subjectName} - ${suffix}`
+              } else {
+                displayName = `${subjectName} - ${className}`
+              }
             } else {
-              displayName = `${subjectName} - ${className}`
+              if (className.toUpperCase() === subjectCode.toUpperCase()) {
+                displayName = subjectName
+              } else {
+                displayName = `${subjectName} - ${className}`
+              }
             }
           }
         }
-      }
 
-      return {
-        id: c.id,
-        name: displayName,
-        subjectName,
-        subjectCode,
-        instructor: c.instructor?.fullName || c.instructor?.full_name || 'Chưa phân công',
-        schedule: c.schedule || 'Chưa xếp lịch',
-        room: c.room || 'Chưa xếp phòng',
-        enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
-        max: c.maxSlots || c.max_slots || 0,
-        isRegistered: myRegistrations.value.includes(c.id),
-        semester: c.semester || 'N/A',
-        credits: c.subject?.credits || 0
-      }
-    })
+        return {
+          id: c.id,
+          name: displayName,
+          subjectName,
+          subjectCode,
+          instructor: c.instructor?.fullName || c.instructor?.full_name || 'Chưa phân công',
+          schedule: c.schedule || 'Chưa xếp lịch',
+          room: c.room || 'Chưa xếp phòng',
+          enrolled: (c.maxSlots || c.max_slots || 0) - (c.remainingSlots || c.remaining_slots || 0),
+          max: c.maxSlots || c.max_slots || 0,
+          isRegistered: myRegistrations.value.includes(c.id),
+          semester: c.semester || 'N/A',
+          credits: c.subject?.credits || 0
+        }
+      })
   } catch (err: any) {
     errorMessage.value = err.message
   }
