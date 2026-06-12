@@ -592,32 +592,29 @@ onMounted(() => {
         <div v-if="subjectLink !== '/dashboard' || classLink !== '/dashboard' || authStore.hasPermission('user_manage_staff') || departmentLink !== '/dashboard'" class="actions-section mt-xl">
           <h3 class="section-title">Khám phá tính năng</h3>
           <div class="actions-grid">
-            <RouterLink v-if="authStore.hasPermission('user_manage_staff')" to="/admin/users" class="lms-card action-card">
+            <div v-if="authStore.hasPermission('user_manage_staff')" class="lms-card action-card">
               <div class="action-icon-wrapper green"><i class="pi pi-users"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý người dùng</span>
                 <span class="action-desc">Tạo mới, phân quyền và khóa/mở khóa tài khoản nhân sự</span>
               </div>
-              <i class="pi pi-chevron-right action-arrow"></i>
-            </RouterLink>
+            </div>
 
-            <RouterLink v-if="subjectLink !== '/dashboard' || departmentLink !== '/dashboard'" :to="subjectLink" class="lms-card action-card">
+            <div v-if="subjectLink !== '/dashboard' || departmentLink !== '/dashboard'" class="lms-card action-card">
               <div class="action-icon-wrapper blue"><i class="pi pi-book"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý môn học</span>
                 <span class="action-desc">Đề xuất môn học, phê duyệt học phần và phân công môn học bộ môn</span>
               </div>
-              <i class="pi pi-chevron-right action-arrow"></i>
-            </RouterLink>
+            </div>
 
-            <RouterLink v-if="classLink !== '/dashboard'" :to="classLink" class="lms-card action-card">
+            <div v-if="classLink !== '/dashboard'" class="lms-card action-card">
               <div class="action-icon-wrapper purple"><i class="pi pi-sitemap"></i></div>
               <div class="action-content">
                 <span class="action-label">Quản lý lớp học</span>
                 <span class="action-desc">Quản lý và phân công lớp học</span>
               </div>
-              <i class="pi pi-chevron-right action-arrow"></i>
-            </RouterLink>
+            </div>
           </div>
         </div>
       </div>
@@ -1208,14 +1205,13 @@ onMounted(() => {
   text-decoration: none;
   padding: 1.25rem;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
+  cursor: default;
   border: 1px solid #e5e7eb;
 }
 
 .action-card:hover {
-  transform: translateY(-4px);
-  border-color: #a78bfa;
-  box-shadow: 0 10px 15px -3px rgba(124, 58, 237, 0.1), 0 4px 6px -4px rgba(124, 58, 237, 0.1);
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
 }
 
 .action-icon-wrapper {
@@ -1258,14 +1254,6 @@ onMounted(() => {
 .action-desc {
   font-size: 0.85rem;
   color: #6b7280;
-}
-.action-arrow {
-  color: #9ca3af;
-  transition: transform 0.2s;
-}
-.action-card:hover .action-arrow {
-  color: #2563eb;
-  transform: translateX(2px);
 }
 
 @keyframes fadeIn {
