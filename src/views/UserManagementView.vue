@@ -833,7 +833,7 @@ onMounted(() => {
 
 /* Header Button */
 .btn-create {
-  background: #7c3aed;
+  background: var(--lms-primary);
   color: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -856,7 +856,7 @@ onMounted(() => {
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.05),
     0 1px 2px -1px rgba(0, 0, 0, 0.03);
-  background: #7e22ce;
+  background: var(--lms-primary-hover);
 }
 
 /* Alerts */
@@ -960,7 +960,7 @@ onMounted(() => {
 }
 .self-tag {
   font-size: 0.75rem;
-  color: #9333ea;
+  color: var(--lms-primary);
   font-weight: 500;
   margin-top: 0.25rem;
 }
@@ -1189,7 +1189,7 @@ onMounted(() => {
   box-sizing: border-box;
 }
 .mono-input:focus {
-  border-color: #7c3aed;
+  border-color: var(--lms-primary);
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.05),
     0 1px 2px -1px rgba(0, 0, 0, 0.03);
@@ -1245,8 +1245,8 @@ select.mono-input {
   border: 1px solid #111827;
 }
 .btn-submit:hover:not(:disabled) {
-  background: #7c3aed;
-  border-color: #7c3aed;
+  background: var(--lms-primary);
+  border-color: var(--lms-primary);
 }
 .btn-submit:disabled {
   opacity: 0.6;

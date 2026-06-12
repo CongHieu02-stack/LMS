@@ -545,7 +545,7 @@ function getAvatarBgStyle(name: string) {
   font-family: inherit; font-size: 0.95rem; outline: none; box-sizing: border-box;
   background-color: #fff; height: 42px;
 }
-.mono-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.mono-input:focus { border-color: var(--lms-primary); box-shadow: 0 0 0 3px var(--lms-primary-light); }
 .input-icon-wrapper { position: relative; width: 100%; }
 .input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
 .mono-input.has-icon { padding-left: 2.2rem; }
@@ -570,17 +570,18 @@ function getAvatarBgStyle(name: string) {
   padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   transition: all 0.2s ease; display: flex; flex-direction: column;
   gap: 1rem; cursor: pointer; position: relative;
+  height: 100%;
 }
 .class-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 20px -5px rgba(124,58,237,0.12), 0 4px 6px -2px rgba(0,0,0,0.04);
-  border-color: #c4b5fd;
+  box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.12), 0 4px 6px -2px rgba(0,0,0,0.04);
+  border-color: #c7d2fe;
 }
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .subject-info { display: flex; flex-direction: column; gap: 0.25rem; }
 .subject-code {
-  font-size: 0.75rem; font-weight: 700; color: #7c3aed;
-  background-color: #f5f3ff; padding: 0.15rem 0.5rem; border-radius: 4px; width: fit-content;
+  font-size: 0.75rem; font-weight: 700; color: var(--lms-primary);
+  background-color: var(--lms-primary-light); padding: 0.15rem 0.5rem; border-radius: 4px; width: fit-content;
 }
 .subject-name { font-size: 0.85rem; color: #4b5563; font-weight: 500; line-height: 1.3; }
 .class-name { font-size: 1.25rem; font-weight: 700; color: #111827; margin: 0; }
@@ -595,9 +596,10 @@ function getAvatarBgStyle(name: string) {
 .card-footer {
   display: flex; justify-content: flex-end;
   border-top: 1px solid #f3f4f6; padding-top: 0.75rem;
+  margin-top: auto;
 }
 .view-detail-hint {
-  font-size: 0.8rem; color: #7c3aed; font-weight: 500;
+  font-size: 0.8rem; color: var(--lms-primary); font-weight: 500;
   display: flex; align-items: center; gap: 0.4rem; opacity: 0.7;
   transition: opacity 0.2s;
 }
@@ -621,8 +623,8 @@ function getAvatarBgStyle(name: string) {
   padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid #e5e7eb;
 }
 .modal-subject-code {
-  font-size: 0.75rem; font-weight: 700; color: #7c3aed;
-  background: #f5f3ff; padding: 0.15rem 0.5rem; border-radius: 4px;
+  font-size: 0.75rem; font-weight: 700; color: var(--lms-primary);
+  background: var(--lms-primary-light); padding: 0.15rem 0.5rem; border-radius: 4px;
   display: inline-block; margin-bottom: 0.5rem;
 }
 .modal-title { font-size: 1.5rem; font-weight: 700; color: #111827; margin: 0; }
@@ -652,12 +654,12 @@ function getAvatarBgStyle(name: string) {
 .info-label { font-size: 0.78rem; color: #6b7280; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
 .info-value { font-size: 0.95rem; color: #111827; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .btn-view-students {
-  padding: 0.3rem 0.6rem; background: #7c3aed; border: none;
+  padding: 0.3rem 0.6rem; background: var(--lms-primary); border: none;
   border-radius: 6px; color: #fff; font-size: 0.75rem; font-weight: 500;
   cursor: pointer; display: flex; align-items: center; gap: 0.3rem;
   transition: all 0.2s;
 }
-.btn-view-students:hover { background: #6d28d9; }
+.btn-view-students:hover { background: var(--lms-primary-hover); }
 
 .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 9999px; }
 .chip-active { background: #dcfce7; color: #166534; }
@@ -676,11 +678,11 @@ function getAvatarBgStyle(name: string) {
 .btn-secondary:hover { background: #f9fafb; }
 
 .btn-primary {
-  padding: 0.6rem 1.2rem; background: #7c3aed; border: none;
+  padding: 0.6rem 1.2rem; background: var(--lms-primary); border: none;
   border-radius: 8px; color: #fff; font-weight: 500; cursor: pointer;
   display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s;
 }
-.btn-primary:hover { background: #6d28d9; }
+.btn-primary:hover { background: var(--lms-primary-hover); }
 
 /* Students Modal */
 .students-modal { max-width: 800px; }

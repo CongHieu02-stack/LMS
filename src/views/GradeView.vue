@@ -447,7 +447,7 @@ onMounted(loadGrades)
   border-radius:12px;
 }
 
-.bg-purple { background:#f3e8ff; color:#9333ea; }
+.bg-purple { background: var(--lms-primary-light); color: var(--lms-primary); }
 .bg-blue { background:#dbeafe; color:#2563eb; }
 
 .stat-label { font-size: 0.75rem; color:#6b7280; }
