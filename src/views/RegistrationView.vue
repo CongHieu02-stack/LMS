@@ -154,15 +154,19 @@ const totalRegisteredCredits = computed(() => {
     .reduce((sum: number, c: ClassItem) => sum + (c.credits || 0), 0)
 })
 
-function isConflicting(cls: ClassItem) {
-  if (cls.isRegistered) return false;
+function getConflictingClass(cls: ClassItem): ClassItem | null {
+  if (cls.isRegistered) return null;
   const registeredClasses = availableClasses.value.filter((c: ClassItem) => c.isRegistered);
   for (const reg of registeredClasses) {
     if (schedulesOverlap(cls.schedule, reg.schedule)) {
-      return true;
+      return reg;
     }
   }
-  return false;
+  return null;
+}
+
+function isConflicting(cls: ClassItem) {
+  return !!getConflictingClass(cls);
 }
 
 function getClassStatus(cls: ClassItem): string {
@@ -191,6 +195,64 @@ const filteredClasses = computed(() => {
     return matchesQuery && matchesStatus && matchesConflict
   })
 })
+
+// === GOM NHÓM THEO MÔN HỌC (ACCORDION) ===
+const expandedSubjects = ref<Set<string>>(new Set())
+
+interface SubjectGroup {
+  subjectName: string
+  subjectCode: string
+  credits: number
+  classes: ClassItem[]
+  registeredCount: number
+  totalCount: number
+}
+
+const groupedBySubject = computed<SubjectGroup[]>(() => {
+  const map = new Map<string, ClassItem[]>()
+  for (const cls of filteredClasses.value) {
+    const key = cls.subjectCode || cls.subjectName
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(cls)
+  }
+  const groups: SubjectGroup[] = []
+  for (const [key, classes] of map) {
+    const first = classes[0]
+    groups.push({
+      subjectName: first.subjectName,
+      subjectCode: first.subjectCode,
+      credits: first.credits,
+      classes,
+      registeredCount: classes.filter(c => c.isRegistered).length,
+      totalCount: classes.length,
+    })
+  }
+  // Sắp xếp: môn có lớp đã đăng ký lên trước, sau đó theo tên
+  groups.sort((a, b) => {
+    if (a.registeredCount > 0 && b.registeredCount === 0) return -1
+    if (a.registeredCount === 0 && b.registeredCount > 0) return 1
+    return a.subjectName.localeCompare(b.subjectName, 'vi')
+  })
+  return groups
+})
+
+function toggleSubject(key: string) {
+  if (expandedSubjects.value.has(key)) {
+    expandedSubjects.value.delete(key)
+  } else {
+    expandedSubjects.value.add(key)
+  }
+  // Trigger reactivity
+  expandedSubjects.value = new Set(expandedSubjects.value)
+}
+
+function expandAll() {
+  expandedSubjects.value = new Set(groupedBySubject.value.map((g: SubjectGroup) => g.subjectCode || g.subjectName))
+}
+
+function collapseAll() {
+  expandedSubjects.value = new Set()
+}
 
 
 function getCapacityPercent(enrolled: number, max: number) { return max > 0 ? (enrolled / max) * 100 : 0 }
@@ -317,47 +379,125 @@ async function handleRegister(cls: ClassItem) {
         <p>Thử thay đổi từ khóa tìm kiếm hoặc tắt tùy chọn lọc trùng lịch học.</p>
       </div>
 
-      <div v-else class="class-grid">
-        <div v-for="cls in filteredClasses" :key="cls.id" class="mono-card class-card" :class="{ 'card-registered': cls.isRegistered }">
-          <div class="card-header">
-            <span class="class-code">{{ cls.subjectCode }}</span>
-            <span v-if="cls.isRegistered" class="status-badge badge-registered">Đã đăng ký</span>
-            <span v-else-if="cls.enrolled >= cls.max" class="status-badge badge-full">Đã đầy</span>
-            <span v-else-if="isConflicting(cls)" class="status-badge badge-conflict">Trùng lịch</span>
-            <span v-else class="status-badge badge-open">Mở đăng ký</span>
-          </div>
-          <div class="card-body">
-            <h3 class="subject-name">{{ cls.name }}</h3>
-            <div class="info-row"><i class="pi pi-book"></i><span>Số tín chỉ: <strong>{{ cls.credits }}</strong></span></div>
-            <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
-            <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
-            <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
-            <div class="info-row"><i class="pi pi-bookmark"></i><span>Học kỳ: {{ cls.semester }}</span></div>
-            <div class="capacity-section">
-              <div class="capacity-labels"><span class="capacity-title">Sĩ số</span><span><strong>{{ cls.enrolled }}</strong> / {{ cls.max }}</span></div>
-              <div class="progress-bg"><div class="progress-fill" :class="getProgressBarClass(cls.enrolled, cls.max)" :style="{ width: getCapacityPercent(cls.enrolled, cls.max) + '%' }"></div></div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <button v-if="!cls.isRegistered" 
-                    class="btn-submit w-full" 
-                    :disabled="cls.enrolled >= cls.max || isConflicting(cls) || totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT || loadingId === cls.id" 
-                    @click="handleRegister(cls)">
-              <i v-if="loadingId === cls.id" class="pi pi-spin pi-spinner"></i>
-              <i v-else-if="cls.enrolled >= cls.max" class="pi pi-ban"></i>
-              <i v-else-if="isConflicting(cls)" class="pi pi-exclamation-triangle"></i>
-              <i v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT" class="pi pi-ban"></i>
-              <i v-else class="pi pi-bolt"></i>
-              
-              <span v-if="cls.enrolled >= cls.max">Hết chỗ</span>
-              <span v-else-if="isConflicting(cls)">Trùng lịch học</span>
-              <span v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT">Vượt giới hạn TC</span>
-              <span v-else>Đăng ký ngay</span>
+      <template v-else>
+        <!-- Nút Mở rộng / Thu gọn tất cả -->
+        <div class="accordion-toolbar">
+          <span class="accordion-summary">
+            <i class="pi pi-list"></i>
+            {{ groupedBySubject.length }} môn học · {{ filteredClasses.length }} lớp
+          </span>
+          <div class="accordion-actions">
+            <button class="btn-text" @click="expandAll">
+              <i class="pi pi-angle-double-down"></i> Mở tất cả
             </button>
-            <div v-else class="registered-label"><i class="pi pi-check"></i> Đã đăng ký thành công</div>
+            <button class="btn-text" @click="collapseAll">
+              <i class="pi pi-angle-double-up"></i> Thu gọn
+            </button>
           </div>
         </div>
-      </div>
+
+        <!-- Accordion: Gom nhóm theo môn học -->
+        <div class="subject-accordion">
+          <div 
+            v-for="group in groupedBySubject" 
+            :key="group.subjectCode || group.subjectName" 
+            class="accordion-panel" 
+            :class="{ 'panel-has-registered': group.registeredCount > 0 }"
+          >
+            <!-- Header của Accordion -->
+            <button 
+              class="accordion-header" 
+              @click="toggleSubject(group.subjectCode || group.subjectName)"
+              :class="{ 'header-expanded': expandedSubjects.has(group.subjectCode || group.subjectName) }"
+            >
+              <div class="accordion-header-left">
+                <i 
+                  class="pi accordion-chevron" 
+                  :class="expandedSubjects.has(group.subjectCode || group.subjectName) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                ></i>
+                <span class="accordion-subject-code">{{ group.subjectCode }}</span>
+                <span class="accordion-subject-name">{{ group.subjectName }}</span>
+              </div>
+              <div class="accordion-header-right">
+                <span class="accordion-credits">
+                  <i class="pi pi-book"></i> {{ group.credits }} TC
+                </span>
+                <span v-if="group.registeredCount > 0" class="accordion-badge badge-registered-count">
+                  <i class="pi pi-check"></i> Đã đăng ký
+                </span>
+                <span class="accordion-badge badge-class-count">
+                  {{ group.totalCount }} lớp
+                </span>
+              </div>
+            </button>
+
+            <!-- Body của Accordion (danh sách lớp) -->
+            <transition name="accordion-slide">
+              <div 
+                v-if="expandedSubjects.has(group.subjectCode || group.subjectName)" 
+                class="accordion-body"
+              >
+                <div class="class-grid">
+                  <div 
+                    v-for="cls in group.classes" 
+                    :key="cls.id" 
+                    class="mono-card class-card" 
+                    :class="{ 'card-registered': cls.isRegistered }"
+                  >
+                    <div class="card-header">
+                      <span class="class-code">{{ cls.subjectCode }}</span>
+                      <span v-if="cls.isRegistered" class="status-badge badge-registered">Đã đăng ký</span>
+                      <span v-else-if="cls.enrolled >= cls.max" class="status-badge badge-full">Đã đầy</span>
+                      <span v-else-if="isConflicting(cls)" class="status-badge badge-conflict">Trùng lịch</span>
+                      <span v-else class="status-badge badge-open">Mở đăng ký</span>
+                    </div>
+                    <div class="card-body">
+                      <h3 class="subject-name">{{ cls.name }}</h3>
+                      <div class="info-row"><i class="pi pi-book"></i><span>Số tín chỉ: <strong>{{ cls.credits }}</strong></span></div>
+                      <div class="info-row"><i class="pi pi-user"></i><span>{{ cls.instructor }}</span></div>
+                      <div class="info-row"><i class="pi pi-calendar"></i><span>{{ cls.schedule }}</span></div>
+                      <div class="info-row"><i class="pi pi-map-marker"></i><span>{{ cls.room }}</span></div>
+                      <div class="info-row"><i class="pi pi-bookmark"></i><span>Học kỳ: {{ cls.semester }}</span></div>
+                      
+                      <!-- Chi tiết lịch trùng -->
+                      <div v-if="isConflicting(cls)" class="conflict-detail-box">
+                        <i class="pi pi-exclamation-triangle"></i>
+                        <div class="conflict-detail-text">
+                          Trùng lịch với: <strong>{{ getConflictingClass(cls)?.subjectCode || getConflictingClass(cls)?.name }}</strong>
+                          <div class="conflict-time">Lịch: {{ getConflictingClass(cls)?.schedule }}</div>
+                        </div>
+                      </div>
+
+                      <div class="capacity-section">
+                        <div class="capacity-labels"><span class="capacity-title">Sĩ số</span><span><strong>{{ cls.enrolled }}</strong> / {{ cls.max }}</span></div>
+                        <div class="progress-bg"><div class="progress-fill" :class="getProgressBarClass(cls.enrolled, cls.max)" :style="{ width: getCapacityPercent(cls.enrolled, cls.max) + '%' }"></div></div>
+                      </div>
+                    </div>
+                    <div class="card-footer">
+                      <button v-if="!cls.isRegistered" 
+                              class="btn-submit w-full" 
+                              :disabled="cls.enrolled >= cls.max || isConflicting(cls) || totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT || loadingId === cls.id" 
+                              @click="handleRegister(cls)">
+                        <i v-if="loadingId === cls.id" class="pi pi-spin pi-spinner"></i>
+                        <i v-else-if="cls.enrolled >= cls.max" class="pi pi-ban"></i>
+                        <i v-else-if="isConflicting(cls)" class="pi pi-exclamation-triangle"></i>
+                        <i v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT" class="pi pi-ban"></i>
+                        <i v-else class="pi pi-bolt"></i>
+                        
+                        <span v-if="cls.enrolled >= cls.max">Hết chỗ</span>
+                        <span v-else-if="isConflicting(cls)">Trùng lịch học</span>
+                        <span v-else-if="totalRegisteredCredits + cls.credits > MAX_CREDITS_LIMIT">Vượt giới hạn TC</span>
+                        <span v-else>Đăng ký ngay</span>
+                      </button>
+                      <div v-else class="registered-label"><i class="pi pi-check"></i> Đã đăng ký thành công</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -432,4 +572,75 @@ async function handleRegister(cls: ClassItem) {
 .toggle-checkbox:checked + .toggle-slider { background-color: #111827; }
 .toggle-checkbox:checked + .toggle-slider::before { transform: translateX(16px); }
 .toggle-label { font-size: 0.875rem; font-weight: 500; color: #374151; }
+
+/* === ACCORDION STYLES === */
+.accordion-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0.5rem 0; }
+.accordion-summary { font-size: 0.875rem; color: #6b7280; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; }
+.accordion-summary i { color: #9ca3af; }
+.accordion-actions { display: flex; gap: 0.5rem; }
+.btn-text { background: none; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: #4b5563; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.15s ease; font-weight: 500; }
+.btn-text:hover { background: #f3f4f6; border-color: #d1d5db; color: #111827; }
+
+.subject-accordion { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.accordion-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: box-shadow 0.2s ease; }
+.accordion-panel:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.accordion-panel.panel-has-registered { border-color: #bbf7d0; }
+
+.accordion-header { width: 100%; background: #f9fafb; border: none; padding: 1rem 1.25rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 1rem; transition: all 0.15s ease; outline: none; }
+.accordion-header:hover { background: #f3f4f6; }
+.accordion-header.header-expanded { background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
+.panel-has-registered .accordion-header { background: #f0fdf4; }
+.panel-has-registered .accordion-header:hover { background: #dcfce7; }
+.panel-has-registered .accordion-header.header-expanded { background: #dcfce7; border-bottom-color: #bbf7d0; }
+
+.accordion-header-left { display: flex; align-items: center; gap: 0.75rem; }
+.accordion-chevron { font-size: 0.85rem; color: #9ca3af; transition: transform 0.2s ease; }
+.accordion-subject-code { font-family: monospace; font-weight: 700; font-size: 0.95rem; color: #111827; background: #e5e7eb; padding: 0.2rem 0.6rem; border-radius: 6px; }
+.panel-has-registered .accordion-subject-code { background: #bbf7d0; color: #166534; }
+.accordion-subject-name { font-weight: 600; font-size: 0.95rem; color: #374151; }
+
+.accordion-header-right { display: flex; align-items: center; gap: 0.625rem; flex-shrink: 0; }
+.accordion-credits { font-size: 0.8rem; color: #6b7280; display: flex; align-items: center; gap: 0.25rem; font-weight: 500; }
+.accordion-credits i { font-size: 0.75rem; }
+.accordion-badge { font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px; }
+.badge-class-count { background: #e5e7eb; color: #4b5563; }
+.badge-registered-count { background: #166534; color: #fff; }
+
+.accordion-body { padding: 1.25rem; background: #fafafa; }
+.accordion-body .class-grid { gap: 1rem; }
+
+/* Accordion transition */
+.accordion-slide-enter-active { animation: accordionOpen 0.25s ease-out; }
+.accordion-slide-leave-active { animation: accordionClose 0.2s ease-in; }
+@keyframes accordionOpen { from { opacity: 0; max-height: 0; transform: translateY(-8px); } to { opacity: 1; max-height: 2000px; transform: translateY(0); } }
+@keyframes accordionClose { from { opacity: 1; max-height: 2000px; } to { opacity: 0; max-height: 0; } }
+
+/* Conflict Detail Alert Box */
+.conflict-detail-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  font-size: 0.8rem;
+  color: #b45309; /* Amber 700 */
+  background: #fffbeb; /* Amber 50 */
+  border: 1px solid #fde68a; /* Amber 200 */
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+.conflict-detail-box i {
+  color: #d97706; /* Amber 600 */
+  font-size: 0.9rem;
+  margin-top: 0.1rem;
+}
+.conflict-detail-text {
+  line-height: 1.35;
+}
+.conflict-time {
+  font-size: 0.75rem;
+  color: #78350f; /* Amber 900 */
+  margin-top: 0.15rem;
+  font-weight: 500;
+}
 </style>

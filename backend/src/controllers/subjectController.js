@@ -119,9 +119,24 @@ export async function create(req, res) {
     if (!code || !name) {
       return res.status(400).json({ error: 'Thiếu mã môn học hoặc tên.' })
     }
+
+    // Kiểm tra trùng mã hoặc tên môn học
+    const duplicates = await subjectModel.findByCodeOrName(code, name)
+    if (duplicates && duplicates.length > 0) {
+      const hasCodeMatch = duplicates.some(d => d.code.trim().toUpperCase() === code.trim().toUpperCase())
+      const hasNameMatch = duplicates.some(d => d.name.trim().toLowerCase() === name.trim().toLowerCase())
+      
+      if (hasCodeMatch) {
+        return res.status(409).json({ error: 'Mã môn học đã tồn tại trong hệ thống.' })
+      }
+      if (hasNameMatch) {
+        return res.status(409).json({ error: 'Tên môn học đã tồn tại trong hệ thống.' })
+      }
+    }
+
     const subject = await subjectModel.create({
-      code: code.toUpperCase(),
-      name,
+      code: code.trim().toUpperCase(),
+      name: name.trim(),
       description: description || '',
       credits: parseInt(credits) || 3,
       department: department || 'Khoa Công nghệ thông tin',

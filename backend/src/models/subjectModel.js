@@ -21,6 +21,22 @@ export async function findAll() {
 }
 
 /**
+ * Tìm môn học bằng mã hoặc tên (không phân biệt hoa thường)
+ * @param {string} code 
+ * @param {string} name 
+ * @returns {Array}
+ */
+export async function findByCodeOrName(code, name) {
+  const { data, error } = await supabaseAdmin
+    .from('subjects')
+    .select('id, code, name')
+    .or(`code.eq.${code.trim().toUpperCase()},name.ilike.${name.trim()}`)
+
+  if (error) throw error
+  return data || []
+}
+
+/**
  * Tạo môn học mới
  * @param {object} subjectData — { code, name, description?, credits?, created_by }
  * @returns {object} — Subject vừa tạo

@@ -154,6 +154,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requirePermission: 'class_register' },
     },
     {
+      path: '/my-classes',
+      name: 'my-classes',
+      component: () => import('@/views/MyClassesView.vue'),
+      meta: { requiresAuth: true, requirePermission: 'class_register' },
+    },
+    {
       path: '/exam',
       name: 'exam-take',
       component: () => import('@/views/ExamTakeView.vue'),

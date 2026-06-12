@@ -150,6 +150,13 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
     studentOnly: true,
   },
   {
+    label: 'Lớp học của tôi',
+    to: '/my-classes',
+    icon: 'pi pi-sitemap',
+    requiredPermission: 'class_register',
+    studentOnly: true,
+  },
+  {
     label: 'Bài thi của tôi',
     to: '/exam',
     icon: 'pi pi-file-edit',
@@ -161,13 +168,6 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
     to: '/grades',
     icon: 'pi pi-chart-bar',
     requiredPermission: 'grade_view',
-    studentOnly: true,
-  },
-  {
-    label: 'Lớp học của tôi',
-    to: '/my-classes',
-    icon: 'pi pi-sitemap',
-    requiredPermission: 'class_register',
     studentOnly: true,
   },
 ])
@@ -274,6 +274,12 @@ function toggleSidebar() {
   isCollapsed.value = !isCollapsed.value
 }
 
+function handleSidebarClick() {
+  if (isCollapsed.value) {
+    isCollapsed.value = false
+  }
+}
+
 function getInitials(name: string): string {
   if (!name) return '?'
   const parts = name.trim().split(/\s+/)
@@ -296,7 +302,7 @@ function getAvatarBgStyle(name: string) {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed: isCollapsed }">
+  <aside class="sidebar" :class="{ collapsed: isCollapsed }" @click="handleSidebarClick">
     <!-- Brand / User Info -->
     <div class="sidebar-header">
       <div class="brand-icon-wrapper" @click="router.push('/dashboard')" style="cursor: pointer;" title="Đi tới trang tổng quan">
@@ -377,7 +383,7 @@ function getAvatarBgStyle(name: string) {
         <span v-if="!isCollapsed" class="menu-label">Đăng xuất</span>
       </div>
 
-      <div class="menu-item collapse-btn" @click="toggleSidebar">
+      <div class="menu-item collapse-btn" @click.stop="toggleSidebar">
         <i
           :class="isCollapsed ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'"
           class="menu-icon"

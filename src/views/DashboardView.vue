@@ -408,7 +408,7 @@ onMounted(() => {
                 <h3 class="card-title">
                   <i class="pi pi-bookmark-fill text-purple-600 mr-2"></i> Lớp học của tôi
                 </h3>
-                <span class="text-sm text-gray-500 font-medium">Bấm vào để vào lớp học</span>
+                <RouterLink to="/my-classes" class="link-more">Xem tất cả</RouterLink>
               </div>
 
               <div
@@ -420,7 +420,7 @@ onMounted(() => {
 
               <div v-else class="my-classes-list">
                 <div
-                  v-for="cls in myRegisteredClasses"
+                  v-for="cls in myRegisteredClasses.slice(0, 3)"
                   :key="cls.id"
                   class="my-class-row"
                   @click="viewLessons(cls)"
