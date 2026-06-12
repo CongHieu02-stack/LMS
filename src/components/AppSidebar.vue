@@ -527,9 +527,9 @@ function getAvatarBgStyle(name: string) {
 
 .sidebar.collapsed .menu-item.active,
 .sidebar.collapsed .menu-group-header.active {
-  background-color: transparent;
-  border: 1px solid transparent;
-  box-shadow: none;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
 }
 
 .menu-item.active .menu-icon,
