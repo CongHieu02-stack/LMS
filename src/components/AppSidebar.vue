@@ -532,9 +532,9 @@ function getAvatarBgStyle(name: string) {
   box-shadow: none !important;
 }
 
-.menu-item.active .menu-icon,
-.menu-group-header.active .menu-icon,
-.menu-group-header.active .chevron-icon {
+.sidebar:not(.collapsed) .menu-item.active .menu-icon,
+.sidebar:not(.collapsed) .menu-group-header.active .menu-icon,
+.sidebar:not(.collapsed) .menu-group-header.active .chevron-icon {
   color: var(--lms-primary);
 }
 
