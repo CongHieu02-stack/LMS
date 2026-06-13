@@ -101,8 +101,12 @@ export function formatStudentRegistrations(rawList) {
             name: item.class.name,
             remainingSlots: item.class.remaining_slots,
             maxSlots: item.class.max_slots,
+            schedule: item.class.schedule,
+            room: item.class.room,
+            semester: item.class.semester,
             subjectCode: item.class.subject?.code,
             subjectName: item.class.subject?.name,
+            credits: item.class.subject?.credits,
             instructor: item.class.instructor,
           }
         : null,

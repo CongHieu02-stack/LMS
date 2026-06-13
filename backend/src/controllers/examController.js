@@ -169,27 +169,17 @@ export async function getSubmissionDetail(req, res) {
     }
 
     let questions = []
-    let showAnswers = true
 
     if (submission.exam_id) {
       // Lấy chi tiết đề thi
       const { data: exam, error: examErr } = await supabaseAdmin
         .from('exams')
-        .select('questions, show_answers_to_students')
+        .select('questions')
         .eq('id', submission.exam_id)
         .single()
 
       if (exam) {
-        showAnswers = exam.show_answers_to_students !== false
         questions = exam.questions || []
-        
-        // Nếu giảng viên tắt quyền xem đáp án đúng, xóa trường answer khỏi câu hỏi trả về
-        if (!showAnswers) {
-          questions = questions.map(q => {
-            const { answer, ...rest } = q
-            return rest
-          })
-        }
       }
     }
 
@@ -206,7 +196,7 @@ export async function getSubmissionDetail(req, res) {
         answers: submission.answers || []
       },
       questions,
-      showAnswers
+      showAnswers: true
     })
   } catch (err) {
     console.error('[getSubmissionDetail]', err.message)

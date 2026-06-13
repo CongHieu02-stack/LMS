@@ -78,8 +78,8 @@ export async function findRegistrationsByStudent(studentId) {
       `
       id,
       registered_at,
-      class:classes(id, name, remaining_slots, max_slots,
-        subject:subjects(code, name),
+      class:classes(id, name, remaining_slots, max_slots, schedule, room, semester,
+        subject:subjects(code, name, credits),
         instructor:profiles!instructor_id(id, full_name, email, avatar_url)
       )
     `,

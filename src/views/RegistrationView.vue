@@ -13,6 +13,7 @@ interface ClassItem {
 
 const availableClasses = ref<ClassItem[]>([])
 const myRegistrations = ref<string[]>([])
+const registeredClassesData = ref<any[]>([])
 const loading = ref(true)
 const loadingId = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
@@ -45,7 +46,8 @@ async function loadData() {
   try {
     // Lấy lớp đã đăng ký
     const regRes = await apiGet<{ success: boolean; data: any[] }>('/classes/my-registrations')
-    myRegistrations.value = (regRes.data || []).map((r: any) => r.class?.id || r.class_id)
+    registeredClassesData.value = (regRes.data || []).map((r: any) => r.class).filter(Boolean)
+    myRegistrations.value = registeredClassesData.value.map((c: any) => c.id)
 
     // Lấy tất cả lớp mở
     const classRes = await apiGet<{ success: boolean; data: any[] }>('/classes')
@@ -168,10 +170,9 @@ const totalRegisteredCredits = computed(() => {
     .reduce((sum: number, c: ClassItem) => sum + (c.credits || 0), 0)
 })
 
-function getConflictingClass(cls: ClassItem): ClassItem | null {
+function getConflictingClass(cls: ClassItem): any | null {
   if (cls.isRegistered) return null;
-  const registeredClasses = availableClasses.value.filter((c: ClassItem) => c.isRegistered);
-  for (const reg of registeredClasses) {
+  for (const reg of registeredClassesData.value) {
     if (schedulesOverlap(cls.schedule, reg.schedule)) {
       return reg;
     }
@@ -477,7 +478,7 @@ async function handleRegister(cls: ClassItem) {
                       <div v-if="isConflicting(cls)" class="conflict-detail-box">
                         <i class="pi pi-exclamation-triangle"></i>
                         <div class="conflict-detail-text">
-                          Trùng lịch với: <strong>{{ getConflictingClass(cls)?.subjectCode || getConflictingClass(cls)?.name }}</strong>
+                          Trùng lịch với: <strong>{{ getConflictingClass(cls)?.subjectCode ? getConflictingClass(cls)?.subjectCode + ' - ' + getConflictingClass(cls)?.name : getConflictingClass(cls)?.name }}</strong>
                           <div class="conflict-time">Lịch: {{ getConflictingClass(cls)?.schedule }}</div>
                         </div>
                       </div>
@@ -567,7 +568,7 @@ async function handleRegister(cls: ClassItem) {
 .stats-progress-fill { height: 100%; background: #3b82f6; border-radius: 9999px; transition: width 0.3s ease; }
 .stats-progress-fill.progress-warning { background: #f59e0b; }
 .stats-progress-fill.progress-full { background: #ef4444; }
-.badge-conflict { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
+.badge-conflict { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
 
 .filter-bar-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
 .search-input-wrapper { position: relative; flex: 1; min-width: 280px; }
@@ -636,15 +637,15 @@ async function handleRegister(cls: ClassItem) {
   align-items: flex-start;
   gap: 0.625rem;
   font-size: 0.8rem;
-  color: #b45309; /* Amber 700 */
-  background: #fffbeb; /* Amber 50 */
-  border: 1px solid #fde68a; /* Amber 200 */
+  color: #b91c1c; /* Red 700 */
+  background: #fef2f2; /* Red 50 */
+  border: 1px solid #fecaca; /* Red 200 */
   padding: 0.625rem 0.75rem;
   border-radius: 8px;
   margin-top: 0.5rem;
 }
 .conflict-detail-box i {
-  color: #d97706; /* Amber 600 */
+  color: #dc2626; /* Red 600 */
   font-size: 0.9rem;
   margin-top: 0.1rem;
 }
@@ -653,7 +654,7 @@ async function handleRegister(cls: ClassItem) {
 }
 .conflict-time {
   font-size: 0.75rem;
-  color: #78350f; /* Amber 900 */
+  color: #7f1d1d; /* Red 900 */
   margin-top: 0.15rem;
   font-weight: 500;
 }

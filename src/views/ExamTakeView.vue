@@ -27,6 +27,12 @@ const submitReasonMessage = ref<string | null>(null)
 const questions = ref<any[]>([])
 const answers = ref<Record<number, number>>({})
 
+// === TRẠNG THÁI XEM LẠI BÀI THI ===
+const showDetailModal = ref(false)
+const loadingDetail = ref(false)
+const selectedDetail = ref<any>(null)
+const mySubmissions = ref<any[]>([])
+
 // Watch answers to auto-save state
 watch(answers, () => {
   saveExamStateToStorage()
@@ -77,11 +83,74 @@ async function loadExams() {
         } catch (e) { console.warn(e) }
       }
     }
-    availableExams.value = examsList
+
+    // Lấy danh sách bài đã nộp để đánh dấu hoàn thành
+    try {
+      const subRes = await apiGet<{ success: boolean; data: any[] }>('/exam/my-submissions')
+      mySubmissions.value = subRes.data || []
+    } catch (e) { 
+      console.warn('Could not load submissions:', e)
+      mySubmissions.value = []
+    }
+
+    // Kết hợp: gắn cờ isCompleted, submissionId, score lên từng bài thi
+    availableExams.value = examsList.map(exam => {
+      const submission = mySubmissions.value.find((s: any) => s.examId === exam.id || s.exam_id === exam.id)
+      return {
+        ...exam,
+        isCompleted: !!submission,
+        submissionId: submission?.id || null,
+        studentScore: submission?.score ?? null
+      }
+    })
   } catch (err) {
     console.error(err)
   }
   loading.value = false
+}
+
+// === XEM LẠI BÀI THI ===
+async function viewSubmissionDetail(exam: any) {
+  if (!exam.submissionId) return
+  loadingDetail.value = true
+  showDetailModal.value = true
+  try {
+    const res = await apiGet<any>(`/exam/submission/${exam.submissionId}`)
+    selectedDetail.value = {
+      examTitle: res.submission?.examTitle || exam.title,
+      score: res.submission?.score ?? exam.studentScore,
+      violations: res.submission?.violations || 0,
+      isForced: res.submission?.isForced || false,
+      submittedAt: res.submission?.submittedAt || '',
+      startedAt: res.submission?.startedAt || '',
+      answers: res.submission?.answers || [],
+      questions: res.questions || [],
+      showAnswers: res.showAnswers !== false
+    }
+  } catch (err) {
+    console.error('Error loading submission detail:', err)
+    selectedDetail.value = null
+  }
+  loadingDetail.value = false
+}
+
+function closeDetailModal() {
+  showDetailModal.value = false
+  selectedDetail.value = null
+}
+
+function getStudentAnswer(detail: any, qIndex: number) {
+  if (!detail?.answers) return null
+  const ans = detail.answers[qIndex]
+  if (ans === undefined || ans === null) return null
+  // answer can be { selected_option: number } or just a number
+  return ans.selected_option ?? ans.answer ?? ans
+}
+
+function formatDateTime(dateStr: string) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // Storage Key
@@ -314,7 +383,8 @@ function closeExam() {
   questions.value = []
   cheatWarnings.value = 0
   authStore.isTakingExam = false
-  router.push('/dashboard')
+  // Reload để cập nhật trạng thái hoàn thành
+  loadExams()
 }
 
 function confirmCheatRedirect() {
@@ -375,8 +445,17 @@ onUnmounted(() => {
     </div>
     
     <div class="grid-cards" v-else>
-      <div v-for="e in availableExams" :key="e.id" class="mono-card">
-        <div class="card-header"><span>{{ e.className }}</span></div>
+      <div 
+        v-for="e in availableExams" :key="e.id" 
+        class="mono-card" 
+        :class="{ 'card-completed': e.isCompleted }"
+      >
+        <div class="card-header" :class="{ 'card-header-completed': e.isCompleted }">
+          <span>{{ e.className }}</span>
+          <span v-if="e.isCompleted" class="completed-badge">
+            <i class="pi pi-check-circle"></i> Đã hoàn thành
+          </span>
+        </div>
         <div class="card-body">
           <h3 class="font-bold">{{ e.title }}</h3>
           <p class="text-sm text-gray-500 mb-4">{{ e.subjectName }}</p>
@@ -386,7 +465,30 @@ onUnmounted(() => {
               <i class="pi pi-file"></i> {{ getExamTypeLabel(e.exam_type) }}
             </span>
           </div>
-          <button class="btn-submit w-full mt-4" @click="selectExamToStart(e)">Bắt đầu kiểm tra</button>
+
+          <!-- Hiển thị điểm nếu đã hoàn thành -->
+          <div v-if="e.isCompleted" class="score-inline">
+            <span class="score-inline-label">Điểm số:</span>
+            <span class="score-inline-value" :class="e.studentScore >= 5 ? 'score-pass' : 'score-fail'">
+              {{ e.studentScore }} <small>/ 10</small>
+            </span>
+          </div>
+
+          <!-- Nút hành động -->
+          <button 
+            v-if="!e.isCompleted" 
+            class="btn-submit w-full mt-4" 
+            @click="selectExamToStart(e)"
+          >
+            Bắt đầu kiểm tra
+          </button>
+          <button 
+            v-else 
+            class="btn-review w-full mt-4" 
+            @click="viewSubmissionDetail(e)"
+          >
+            <i class="pi pi-eye"></i> Xem lại bài làm
+          </button>
         </div>
       </div>
     </div>
@@ -479,7 +581,7 @@ onUnmounted(() => {
       </div>
 
       <button class="btn-submit mx-auto mt-8" @click="closeExam">
-        Đóng và Trở về trang chủ
+        Đóng và Trở về danh sách bài thi
       </button>
     </div>
   </div>
@@ -575,6 +677,105 @@ onUnmounted(() => {
       </div>
     </div>
   </Transition>
+
+  <!-- MODAL XEM LẠI BÀI THI CHI TIẾT -->
+  <Transition name="fade">
+    <div v-if="showDetailModal" class="modal-overlay" @click.self="closeDetailModal">
+      <div class="review-modal-card">
+        <div class="review-modal-header">
+          <div class="review-modal-title-section">
+            <i class="pi pi-file-edit review-modal-icon"></i>
+            <div>
+              <h3>Xem lại bài làm</h3>
+              <p v-if="selectedDetail">{{ selectedDetail.examTitle }}</p>
+            </div>
+          </div>
+          <button class="review-close-btn" @click="closeDetailModal">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+
+        <div v-if="loadingDetail" class="review-modal-loading">
+          <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: #6b7280;"></i>
+          <p>Đang tải chi tiết bài làm...</p>
+        </div>
+
+        <div v-else-if="selectedDetail" class="review-modal-body">
+          <!-- Summary bar -->
+          <div class="review-summary-bar">
+            <div class="review-summary-item">
+              <span class="review-summary-label">Điểm số</span>
+              <span class="review-summary-value" :class="selectedDetail.score >= 5 ? 'score-pass' : 'score-fail'">
+                {{ selectedDetail.score }} / 10
+              </span>
+            </div>
+            <div class="review-summary-item" v-if="selectedDetail.violations > 0">
+              <span class="review-summary-label">Vi phạm</span>
+              <span class="review-summary-value score-fail">{{ selectedDetail.violations }} lần</span>
+            </div>
+            <div class="review-summary-item" v-if="selectedDetail.submittedAt">
+              <span class="review-summary-label">Nộp lúc</span>
+              <span class="review-summary-value">{{ formatDateTime(selectedDetail.submittedAt) }}</span>
+            </div>
+          </div>
+
+          <!-- Danh sách câu hỏi & đáp án -->
+          <div class="review-questions-list">
+            <div 
+              v-for="(q, index) in selectedDetail.questions" 
+              :key="index" 
+              class="review-question-card"
+            >
+              <div class="review-question-header">
+                <span class="review-question-number">Câu {{ index + 1 }}</span>
+                <span 
+                  v-if="selectedDetail.showAnswers"
+                  class="review-question-status"
+                  :class="getStudentAnswer(selectedDetail, index) === q.answer ? 'status-correct' : 'status-wrong'"
+                >
+                  <i :class="getStudentAnswer(selectedDetail, index) === q.answer ? 'pi pi-check-circle' : 'pi pi-times-circle'"></i>
+                  {{ getStudentAnswer(selectedDetail, index) === q.answer ? 'Đúng' : 'Sai' }}
+                </span>
+                <span 
+                  v-else-if="getStudentAnswer(selectedDetail, index) === null" 
+                  class="review-question-status status-skip"
+                >
+                  <i class="pi pi-minus-circle"></i> Bỏ qua
+                </span>
+              </div>
+              <p class="review-question-text">{{ q.text }}</p>
+              <div class="review-options-list">
+                <div 
+                  v-for="(opt, optIdx) in q.options" 
+                  :key="optIdx"
+                  class="review-option"
+                  :class="{
+                    'option-correct': selectedDetail.showAnswers && optIdx === q.answer,
+                    'option-wrong': selectedDetail.showAnswers && getStudentAnswer(selectedDetail, index) === optIdx && optIdx !== q.answer,
+                    'option-selected': getStudentAnswer(selectedDetail, index) === optIdx
+                  }"
+                >
+                  <span class="review-option-letter">{{ String.fromCharCode(65 + optIdx) }}</span>
+                  <span class="review-option-text">{{ opt }}</span>
+                  <i v-if="selectedDetail.showAnswers && optIdx === q.answer" class="pi pi-check review-correct-icon"></i>
+                  <i v-else-if="selectedDetail.showAnswers && getStudentAnswer(selectedDetail, index) === optIdx && optIdx !== q.answer" class="pi pi-times review-wrong-icon"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="review-modal-loading">
+          <i class="pi pi-exclamation-triangle" style="font-size: 2rem; color: #ef4444;"></i>
+          <p>Không thể tải chi tiết bài làm.</p>
+        </div>
+
+        <div class="review-modal-footer">
+          <button class="btn-submit" @click="closeDetailModal">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -601,6 +802,7 @@ onUnmounted(() => {
 .mb-6 { margin-bottom: 1.5rem; }
 .mb-4 { margin-bottom: 1rem; }
 .mb-2 { margin-bottom: 0.5rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
 .text-center { text-align: center; }
 .text-xl { font-size: 1.25rem; }
 .text-2xl { font-size: 1.5rem; }
@@ -609,8 +811,10 @@ onUnmounted(() => {
 .text-sm { font-size: 0.85rem; }
 .text-gray-900 { color: #111827; }
 .text-gray-500 { color: #6b7280; }
+.text-gray-700 { color: #374151; }
 .text-green-600 { color: #166534; }
 .text-green-500 { color: #22c55e; }
+.text-red-500 { color: #ef4444; }
 .text-red-600 { color: #dc2626; }
 .text-orange-500 { color: #f97316; }
 .text-blue-600 { color: #2563eb; }
@@ -642,13 +846,87 @@ onUnmounted(() => {
 }
 
 /* Card */
-.mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
+.mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; transition: all 0.3s ease; }
 .bg-primary-gradient {
   background: linear-gradient(135deg, var(--lms-primary, #4f46e5) 0%, var(--lms-primary-hover, #4338ca) 100%) !important;
 }
 .text-white { color: #fff !important; }
-.card-header { padding: 1rem 1.5rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; background: #f9fafb; color: #111827; }
+.card-header { 
+  padding: 1rem 1.5rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; background: #f9fafb; color: #111827;
+  display: flex; justify-content: space-between; align-items: center;
+}
 .card-body { padding: 1.5rem; }
+
+/* Card hoàn thành */
+.card-completed {
+  border-color: #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+.card-header-completed {
+  background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+  border-bottom-color: #bbf7d0;
+}
+.completed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* Điểm số inline trên thẻ */
+.score-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.score-inline-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+.score-inline-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.score-inline-value small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+.score-pass { color: #15803d; }
+.score-fail { color: #dc2626; }
+
+/* Nút xem lại */
+.btn-review {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #15803d;
+  background: #f0fdf4;
+  color: #15803d;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+.btn-review:hover {
+  background: #dcfce7;
+  border-color: #166534;
+  box-shadow: 0 4px 6px rgba(22, 101, 52, 0.1);
+}
 
 /* Buttons */
 .btn-submit {
@@ -892,6 +1170,256 @@ onUnmounted(() => {
   }
   .nav-sidebar-grid {
     grid-template-columns: repeat(10, 1fr);
+  }
+}
+
+/* =============================================
+   MODAL XEM LẠI BÀI THI CHI TIẾT
+   ============================================= */
+.review-modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid #e5e7eb;
+  width: 100%;
+  max-width: 48rem;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.review-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f0fdf4 0%, #f9fafb 100%);
+}
+
+.review-modal-title-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.review-modal-icon {
+  font-size: 1.5rem;
+  color: #15803d;
+}
+
+.review-modal-title-section h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.review-modal-title-section p {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.15rem 0 0 0;
+}
+
+.review-close-btn {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.review-close-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.review-modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+  color: #6b7280;
+}
+
+.review-modal-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 1.5rem;
+}
+
+/* Summary bar */
+.review-summary-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.review-summary-item {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  flex: 1;
+  min-width: 120px;
+}
+.review-summary-label {
+  display: block;
+  font-size: 0.7rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.review-summary-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Questions list in review modal */
+.review-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.review-question-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.25rem;
+  background: #fff;
+  transition: box-shadow 0.2s;
+}
+.review-question-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.review-question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.review-question-number {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--lms-primary, #4f46e5);
+  background: var(--lms-primary-light, #e0e7ff);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+.review-question-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+.status-correct {
+  color: #15803d;
+  background: #dcfce7;
+}
+.status-wrong {
+  color: #dc2626;
+  background: #fee2e2;
+}
+.status-skip {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+.review-question-text {
+  font-size: 0.95rem;
+  color: #111827;
+  font-weight: 500;
+  line-height: 1.5;
+  margin: 0 0 0.75rem 0;
+}
+
+/* Options in review */
+.review-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.review-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+  font-size: 0.9rem;
+  color: #374151;
+  transition: all 0.15s;
+  position: relative;
+}
+.review-option.option-correct {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+  font-weight: 500;
+}
+.review-option.option-wrong {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #dc2626;
+  font-weight: 500;
+}
+.review-option.option-selected:not(.option-correct):not(.option-wrong) {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+.review-option-letter {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #6b7280;
+  min-width: 1.25rem;
+}
+.option-correct .review-option-letter {
+  color: #15803d;
+}
+.option-wrong .review-option-letter {
+  color: #dc2626;
+}
+.review-option-text {
+  flex: 1;
+}
+.review-correct-icon {
+  color: #15803d;
+  font-size: 1rem;
+}
+.review-wrong-icon {
+  color: #dc2626;
+  font-size: 1rem;
+}
+
+.review-modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .review-modal-card {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .review-summary-bar {
+    flex-direction: column;
   }
 }
 </style>

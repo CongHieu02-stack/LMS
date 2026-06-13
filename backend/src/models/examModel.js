@@ -21,8 +21,7 @@ export async function saveSubmission(submission) {
       answers: submission.answers || [],
       score: submission.score !== undefined ? submission.score : null,
       is_forced: submission.is_forced || false,
-      violations: submission.violations || 0,
-      started_at: submission.started_at || null
+      violations: submission.violations || 0
     })
     .select()
     .single()

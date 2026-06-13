@@ -166,12 +166,6 @@ const router = createRouter({
       meta: { requiresAuth: true, requirePermission: 'exam_take' },
     },
     {
-      path: '/exam/history',
-      name: 'exam-history',
-      component: () => import('@/views/ExamHistoryView.vue'),
-      meta: { requiresAuth: true, requirePermission: 'exam_take' },
-    },
-    {
       path: '/grades',
       name: 'grades',
       component: () => import('@/views/GradeView.vue'),

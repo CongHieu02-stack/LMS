@@ -226,7 +226,7 @@ export async function registerToClass(req, res) {
     const { supabaseAdmin } = await import('../config/supabase.js')
     const { data: classData, error: classErr } = await supabaseAdmin
       .from('classes')
-      .select('id, name, subject:subjects(department)')
+      .select('id, name, schedule, subject:subjects(department)')
       .eq('id', classId)
       .single()
 
@@ -241,6 +241,21 @@ export async function registerToClass(req, res) {
       return res.status(400).json({
         error: `Sinh viên thuộc ${studentDept} không thể đăng ký môn học của ${classDept}.`
       })
+    }
+
+    // Đối chiếu thời khóa biểu của các lớp đã đăng ký trước đó
+    if (classData.schedule) {
+      const registrations = await classModel.findRegistrationsByStudent(studentId)
+      for (const reg of registrations) {
+        const regClass = reg.class
+        if (regClass && regClass.schedule && regClass.id !== classId) {
+          if (schedulesOverlap(classData.schedule, regClass.schedule)) {
+            return res.status(400).json({
+              error: `Trùng lịch học: Lớp học này trùng lịch với lớp "${regClass.name}" (${regClass.schedule}) mà bạn đã đăng ký.`
+            })
+          }
+        }
+      }
     }
 
     // Gọi Model → RPC Supabase
