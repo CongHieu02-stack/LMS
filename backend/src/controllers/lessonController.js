@@ -58,6 +58,27 @@ export async function uploadFile(req, res) {
   }
 }
 
+export async function uploadFiles(req, res) {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'Không có file được tải lên.' })
+    }
+
+    const uploadedFiles = req.files.map(file => {
+      const fileExt = file.originalname.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
+      return {
+        fileUrl: `/uploads/${file.filename}`,
+        fileName: file.originalname,
+        fileExt
+      }
+    })
+    return res.json({ success: true, files: uploadedFiles })
+  } catch (err) {
+    console.error('[LessonController.uploadFiles]', err.message)
+    return res.status(500).json({ error: 'Lỗi khi tải lên các file.' })
+  }
+}
+
 export async function getByClass(req, res) {
   try {
     const lessons = await lessonModel.findByClass(req.params.classId)

@@ -127,19 +127,29 @@ function toggleStudentLessonExpand(id: string) {
 function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
-    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.pdfUrl || parsed.fileUrl ? 'file' : 'doc'))
+    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.pdfUrl || parsed.fileUrl || parsed.files ? 'file' : 'doc'))
     const fileUrl = parsed.fileUrl || parsed.pdfUrl || ''
     const fileExt = parsed.fileExt || (fileUrl.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf')
     const fileName = parsed.fileName || (fileUrl ? fileUrl.split('/').pop()?.split('?')[0] || 'Tài liệu' : '')
+    
+    let files = parsed.files || []
+    if (files.length === 0 && fileUrl) {
+      files = [{
+        fileUrl,
+        fileExt,
+        fileName
+      }]
+    }
     
     return {
       type: type === 'pdf' ? 'file' : type,
       youtubeId: parsed.youtubeId || '',
       docContent: parsed.docContent || '',
-      fileUrl,
-      pdfUrl: fileUrl,
-      fileName,
-      fileExt,
+      fileUrl: fileUrl || (files[0]?.fileUrl || ''),
+      pdfUrl: fileUrl || (files[0]?.fileUrl || ''),
+      fileName: fileName || (files[0]?.fileName || 'Tài liệu'),
+      fileExt: fileExt || (files[0]?.fileExt || 'pdf'),
+      files,
       description: parsed.description || '',
     }
   } catch {
@@ -151,6 +161,7 @@ function parseLessonContent(contentStr: string) {
       pdfUrl: '',
       fileName: '',
       fileExt: '',
+      files: [],
       description: contentStr || '',
     }
   }
@@ -333,29 +344,32 @@ function exportToPDF(lesson: any) {
                 </div>
 
                 <!-- Generic file content area (PDF & DOCX) -->
-                <div v-if="parseLessonContent(l.content).type === 'file'" class="student-pdf-wrapper mb-3">
-                  <div class="doc-actions mb-3">
-                    <a :href="parseLessonContent(l.content).fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
-                      <i class="pi pi-download mr-1"></i> Tải tài liệu ({{ parseLessonContent(l.content).fileExt.toUpperCase() }})
-                    </a>
-                  </div>
-                  
-                  <!-- Show inline PDF viewer if PDF -->
-                  <div v-if="parseLessonContent(l.content).fileExt === 'pdf'" class="pdf-viewer-container">
-                    <iframe :src="parseLessonContent(l.content).fileUrl" class="pdf-iframe-viewer" frameborder="0"></iframe>
-                  </div>
-                  <!-- Show premium download card if DOCX -->
-                  <div v-else class="docx-download-card">
-                    <div class="docx-info">
-                      <i class="pi pi-file-word docx-icon"></i>
-                      <div class="docx-details">
-                        <span class="docx-filename">{{ parseLessonContent(l.content).fileName || 'Tài liệu Word' }}</span>
-                        <span class="docx-hint">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
-                      </div>
+                <div v-if="parseLessonContent(l.content).type === 'file'" class="student-pdf-wrapper mb-3" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; border: 0; background: transparent; box-shadow: none; padding: 0;">
+                  <div v-for="(file, idx) in parseLessonContent(l.content).files" :key="idx" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                      <span>Tài liệu {{ idx + 1 }}: {{ file.fileName }}</span>
+                      <a :href="file.fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                        <i class="pi pi-download mr-1"></i> Tải về ({{ file.fileExt.toUpperCase() }})
+                      </a>
                     </div>
-                    <a :href="parseLessonContent(l.content).fileUrl" target="_blank" class="btn-download-docx">
-                      <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
-                    </a>
+                    
+                    <!-- Show inline PDF viewer if PDF -->
+                    <div v-if="file.fileExt === 'pdf'" class="pdf-viewer-container" style="height: 350px;">
+                      <iframe :src="file.fileUrl" class="pdf-iframe-viewer" style="height: 100%;" frameborder="0"></iframe>
+                    </div>
+                    <!-- Show premium download card if DOCX -->
+                    <div v-else class="docx-download-card" style="border: 1px solid #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px;">
+                      <div class="docx-info">
+                        <i class="pi pi-file-word docx-icon" style="font-size: 2rem;"></i>
+                        <div class="docx-details">
+                          <span class="docx-filename" style="font-size: 0.85rem;">{{ file.fileName || 'Tài liệu Word' }}</span>
+                          <span class="docx-hint">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
+                        </div>
+                      </div>
+                      <a :href="file.fileUrl" target="_blank" class="btn-download-docx" style="padding: 0.4rem 0.80rem; font-size: 0.8rem;">
+                        <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
+                      </a>
+                    </div>
                   </div>
                 </div>
 

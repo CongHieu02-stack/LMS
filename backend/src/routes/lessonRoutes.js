@@ -9,8 +9,8 @@ import * as ctrl from '../controllers/lessonController.js'
 const router = Router()
 router.use(authMiddleware)
 
-// POST /api/lessons/upload — Tải lên file (GV trở lên, rank >= 50)
-router.post('/upload', requirePermissionOrRank('lesson_exam_manage', 50), ctrl.upload.single('file'), ctrl.uploadFile)
+// POST /api/lessons/upload — Tải lên nhiều file (GV trở lên, rank >= 50)
+router.post('/upload', requirePermissionOrRank('lesson_exam_manage', 50), ctrl.upload.array('files', 10), ctrl.uploadFiles)
 
 // GET /api/lessons/class/:classId — Lấy bài học theo lớp
 router.get('/class/:classId', ctrl.getByClass)

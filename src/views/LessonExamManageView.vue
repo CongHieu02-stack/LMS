@@ -251,14 +251,23 @@ function getYouTubeId(url: string) {
 function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
-    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.fileUrl || parsed.pdfUrl ? 'file' : 'doc'))
+    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.fileUrl || parsed.pdfUrl || parsed.files ? 'file' : 'doc'))
+    let files = parsed.files || []
+    if (files.length === 0 && (parsed.fileUrl || parsed.pdfUrl)) {
+      files = [{
+        fileUrl: parsed.fileUrl || parsed.pdfUrl,
+        fileExt: parsed.fileExt || 'pdf',
+        fileName: parsed.fileName || 'Tài liệu'
+      }]
+    }
     return {
       type,
       youtubeId: parsed.youtubeId || '',
       docContent: parsed.docContent || '',
-      fileUrl: parsed.fileUrl || parsed.pdfUrl || '',
-      fileExt: parsed.fileExt || '',
-      fileName: parsed.fileName || '',
+      fileUrl: parsed.fileUrl || parsed.pdfUrl || (files[0]?.fileUrl || ''),
+      fileExt: parsed.fileExt || (files[0]?.fileExt || 'pdf'),
+      fileName: parsed.fileName || (files[0]?.fileName || 'Tài liệu'),
+      files,
       description: parsed.description || ''
     }
   } catch {
@@ -269,6 +278,7 @@ function parseLessonContent(contentStr: string) {
       fileUrl: '',
       fileExt: '',
       fileName: '',
+      files: [],
       description: contentStr || ''
     }
   }
@@ -385,6 +395,10 @@ async function loadClassContent() {
 
 onMounted(loadClasses)
 
+const selectedFiles = ref<File[]>([])
+const editSelectedFiles = ref<File[]>([])
+const existingFiles = ref<any[]>([])
+
 const selectedFile = ref<File | null>(null)
 const editSelectedFile = ref<File | null>(null)
 const existingFileUrl = ref('')
@@ -400,27 +414,39 @@ function formatFileSize(bytes: number) {
 }
 
 function handleFileChange(event: any) {
-  const file = event.target.files?.[0]
-  if (file) {
+  const files = Array.from(event.target.files || []) as File[]
+  for (const file of files) {
     if (file.size > 100 * 1024 * 1024) {
-      showToast('warning', 'Cảnh báo', 'Tệp tin vượt quá dung lượng tối đa cho phép (100MB)!')
-      event.target.value = ''
-      return
+      showToast('warning', 'Cảnh báo', `Tệp tin "${file.name}" vượt quá dung lượng tối đa cho phép (100MB)!`)
+      continue
     }
-    selectedFile.value = file
+    selectedFiles.value.push(file)
   }
+  event.target.value = ''
 }
 
 function handleEditFileChange(event: any) {
-  const file = event.target.files?.[0]
-  if (file) {
+  const files = Array.from(event.target.files || []) as File[]
+  for (const file of files) {
     if (file.size > 100 * 1024 * 1024) {
-      showToast('warning', 'Cảnh báo', 'Tệp tin vượt quá dung lượng tối đa cho phép (100MB)!')
-      event.target.value = ''
-      return
+      showToast('warning', 'Cảnh báo', `Tệp tin "${file.name}" vượt quá dung lượng tối đa cho phép (100MB)!`)
+      continue
     }
-    editSelectedFile.value = file
+    editSelectedFiles.value.push(file)
   }
+  event.target.value = ''
+}
+
+function removeSelectedFile(index: number) {
+  selectedFiles.value.splice(index, 1)
+}
+
+function removeEditSelectedFile(index: number) {
+  editSelectedFiles.value.splice(index, 1)
+}
+
+function removeExistingFile(index: number) {
+  existingFiles.value.splice(index, 1)
 }
 
 async function createLesson() {
@@ -452,22 +478,21 @@ async function createLesson() {
         description: lessonForm.value.description
       })
     } else if (lessonForm.value.type === 'file') {
-      if (!selectedFile.value) {
-        showToast('warning', 'Cảnh báo', 'Vui lòng chọn một tệp tin để tải lên!')
+      if (selectedFiles.value.length === 0) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một tệp tin để tải lên!')
         return
       }
       const formData = new FormData()
-      formData.append('file', selectedFile.value)
+      selectedFiles.value.forEach(file => {
+        formData.append('files', file)
+      })
       
-      const uploadRes = await apiPost<{ success: boolean; fileUrl: string }>('/lessons/upload', formData)
+      const uploadRes = await apiPost<{ success: boolean; files: any[] }>('/lessons/upload', formData)
       
       if (uploadRes.success) {
-        const fileExt = selectedFile.value.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
         contentPayload = JSON.stringify({
           type: 'file',
-          fileUrl: uploadRes.fileUrl,
-          fileExt,
-          fileName: selectedFile.value.name,
+          files: uploadRes.files,
           description: lessonForm.value.description
         })
       } else {
@@ -490,7 +515,7 @@ async function createLesson() {
       type: 'video', 
       sortOrder: lessons.value.length + 2 
     }
-    selectedFile.value = null
+    selectedFiles.value = []
     loadClassContent()
     showCreateLessonModal.value = false
     showToast('success', 'Thành công', 'Tạo bài học thành công!')
@@ -560,10 +585,8 @@ function startEditLesson(lesson: any) {
     description: content.description || '',
     sortOrder: lesson.sort_order || lesson.sortOrder || 1
   }
-  existingFileUrl.value = content.fileUrl || ''
-  existingFileName.value = content.fileName || ''
-  existingFileExt.value = content.fileExt || ''
-  editSelectedFile.value = null
+  existingFiles.value = [...(content.files || [])]
+  editSelectedFiles.value = []
   showEditLessonModal.value = true
 }
 
@@ -596,32 +619,32 @@ async function saveEditLesson() {
         description: editLessonForm.value.description
       })
     } else if (editLessonForm.value.type === 'file') {
-      if (editSelectedFile.value) {
+      let filesPayload = [...existingFiles.value]
+      
+      if (editSelectedFiles.value.length > 0) {
         const formData = new FormData()
-        formData.append('file', editSelectedFile.value)
-        const uploadRes = await apiPost<{ success: boolean; fileUrl: string }>('/lessons/upload', formData)
+        editSelectedFiles.value.forEach(file => {
+          formData.append('files', file)
+        })
+        const uploadRes = await apiPost<{ success: boolean; files: any[] }>('/lessons/upload', formData)
         
         if (uploadRes.success) {
-          const fileExt = editSelectedFile.value.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
-          contentPayload = JSON.stringify({
-            type: 'file',
-            fileUrl: uploadRes.fileUrl,
-            fileExt,
-            fileName: editSelectedFile.value.name,
-            description: editLessonForm.value.description
-          })
+          filesPayload = [...filesPayload, ...uploadRes.files]
         } else {
           throw new Error('Tải lên tệp tin thất bại.')
         }
-      } else {
-        contentPayload = JSON.stringify({
-          type: 'file',
-          fileUrl: existingFileUrl.value,
-          fileExt: existingFileExt.value,
-          fileName: existingFileName.value,
-          description: editLessonForm.value.description
-        })
       }
+      
+      if (filesPayload.length === 0) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng tải lên ít nhất một tệp tin!')
+        return
+      }
+      
+      contentPayload = JSON.stringify({
+        type: 'file',
+        files: filesPayload,
+        description: editLessonForm.value.description
+      })
     }
 
     await apiPut(`/lessons/${editingLessonId.value}`, {
@@ -632,7 +655,8 @@ async function saveEditLesson() {
 
     showEditLessonModal.value = false
     editingLessonId.value = null
-    editSelectedFile.value = null
+    editSelectedFiles.value = []
+    existingFiles.value = []
     loadClassContent()
     showToast('success', 'Thành công', 'Cập nhật bài giảng thành công!')
   } catch (err: any) {
@@ -861,19 +885,26 @@ async function saveEditExam() {
 
           <div v-else-if="lessonForm.type === 'file'" class="frm-col">
             <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
-              <input type="file" @change="handleFileChange" accept=".pdf,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
-              <div v-if="!selectedFile" class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
+              <input type="file" @change="handleFileChange" accept=".pdf,.docx" multiple style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+              <div class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
                 <i class="pi pi-upload" style="font-size: 1.5rem; color: #7c3aed;"></i>
-                <span style="font-size: 0.9rem; font-weight: 500;">Chọn tệp PDF hoặc Word (.docx)</span>
-                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 100MB</span>
+                <span style="font-size: 0.9rem; font-weight: 500;">Chọn một hoặc nhiều tệp PDF hoặc Word (.docx)</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 100MB mỗi tệp</span>
               </div>
-              <div v-else class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
-                <i :class="selectedFile.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="selectedFile.name.endsWith('.docx') ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
-                <div style="text-align: left;">
-                  <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ selectedFile.name }}</div>
-                  <div style="font-size: 0.75rem; color: #64748b;">{{ formatFileSize(selectedFile.size) }}</div>
+            </div>
+            
+            <!-- Danh sách tệp đã chọn -->
+            <div v-if="selectedFiles.length > 0" class="selected-files-list" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: #475569;">Các tệp đã chọn ({{ selectedFiles.length }}):</div>
+              <div v-for="(file, idx) in selectedFiles" :key="idx" class="file-uploaded-info" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <i :class="file.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="file.name.endsWith('.docx') ? 'font-size: 1.25rem; color: #2563eb;' : 'font-size: 1.25rem; color: #ef4444;'"></i>
+                  <div style="text-align: left;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ file.name }}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">{{ formatFileSize(file.size) }}</div>
+                  </div>
                 </div>
-                <button type="button" @click.stop="selectedFile = null" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="pi pi-times"></i></button>
+                <button type="button" @click.stop="removeSelectedFile(idx)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem;"><i class="pi pi-times"></i></button>
               </div>
             </div>
           </div>
@@ -1046,29 +1077,32 @@ async function saveEditExam() {
         </div>
 
         <!-- Generic file content area (PDF & DOCX) -->
-        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'file'" class="student-pdf-wrapper mb-3" style="width: 100%;">
-          <div class="doc-actions mb-3" style="display: flex; justify-content: flex-end;">
-            <a :href="parseLessonContent(selectedLessonDetail.content).fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; background: #7c3aed; color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
-              <i class="pi pi-download mr-1"></i> Tải tài liệu ({{ parseLessonContent(selectedLessonDetail.content).fileExt.toUpperCase() }})
-            </a>
-          </div>
-          
-          <!-- Show inline PDF viewer if PDF -->
-          <div v-if="parseLessonContent(selectedLessonDetail.content).fileExt === 'pdf'" class="pdf-viewer-container" style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; height: 450px;">
-            <iframe :src="parseLessonContent(selectedLessonDetail.content).fileUrl" class="pdf-iframe-viewer" style="width: 100%; height: 100%; border: 0;" frameborder="0"></iframe>
-          </div>
-          <!-- Show download card if DOCX -->
-          <div v-else class="docx-download-card" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; gap: 1rem; flex-wrap: wrap;">
-            <div class="docx-info" style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 200px;">
-              <i class="pi pi-file-word docx-icon" style="font-size: 2.25rem; color: #2563eb;"></i>
-              <div class="docx-details" style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <span class="docx-filename" style="font-weight: 600; color: #1e293b; font-size: 0.9rem;">{{ parseLessonContent(selectedLessonDetail.content).fileName || 'Tài liệu Word' }}</span>
-                <span class="docx-hint" style="font-size: 0.75rem; color: #64748b;">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
-              </div>
+        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'file'" class="student-pdf-wrapper mb-3" style="width: 100%; display: flex; flex-direction: column; gap: 1.5rem;">
+          <div v-for="(file, idx) in parseLessonContent(selectedLessonDetail.content).files" :key="idx" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; background: #fff;">
+            <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+              <span>Tài liệu {{ idx + 1 }}: {{ file.fileName }}</span>
+              <a :href="file.fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; background: #7c3aed; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.75rem;">
+                <i class="pi pi-download mr-1"></i> Tải về ({{ file.fileExt.toUpperCase() }})
+              </a>
             </div>
-            <a :href="parseLessonContent(selectedLessonDetail.content).fileUrl" target="_blank" class="btn-download-docx" style="background: #2563eb; color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center;">
-              <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
-            </a>
+            
+            <!-- Show inline PDF viewer if PDF -->
+            <div v-if="file.fileExt === 'pdf'" class="pdf-viewer-container" style="border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; height: 350px;">
+              <iframe :src="file.fileUrl" class="pdf-iframe-viewer" style="width: 100%; height: 100%; border: 0;" frameborder="0"></iframe>
+            </div>
+            <!-- Show download card if DOCX -->
+            <div v-else class="docx-download-card" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; gap: 1rem; flex-wrap: wrap;">
+              <div class="docx-info" style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 200px;">
+                <i class="pi pi-file-word docx-icon" style="font-size: 2rem; color: #2563eb;"></i>
+                <div class="docx-details" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <span class="docx-filename" style="font-weight: 600; color: #1e293b; font-size: 0.85rem;">{{ file.fileName || 'Tài liệu Word' }}</span>
+                  <span class="docx-hint" style="font-size: 0.75rem; color: #64748b;">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
+                </div>
+              </div>
+              <a :href="file.fileUrl" target="_blank" class="btn-download-docx" style="background: #2563eb; color: #fff; padding: 0.4rem 0.80rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center;">
+                <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
+              </a>
+            </div>
           </div>
         </div>
 
@@ -1164,33 +1198,41 @@ async function saveEditExam() {
 
           <div v-else-if="editLessonForm.type === 'file'" class="frm-col">
             <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
-              <input type="file" @change="handleEditFileChange" accept=".pdf,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
-              
-              <!-- If no new file is selected and no existing file exists -->
-              <div v-if="!editSelectedFile && !existingFileUrl" class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
+              <input type="file" @change="handleEditFileChange" accept=".pdf,.docx" multiple style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+              <div class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
                 <i class="pi pi-upload" style="font-size: 1.5rem; color: #7c3aed;"></i>
-                <span style="font-size: 0.9rem; font-weight: 500;">Chọn tệp PDF hoặc Word (.docx) mới</span>
-                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 100MB</span>
+                <span style="font-size: 0.9rem; font-weight: 500;">Chọn thêm tệp PDF hoặc Word (.docx) mới</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 100MB mỗi tệp</span>
               </div>
-              
-              <!-- If a new file has been selected -->
-              <div v-else-if="editSelectedFile" class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
-                <i :class="editSelectedFile.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="editSelectedFile.name.endsWith('.docx') ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
-                <div style="text-align: left;">
-                  <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ editSelectedFile.name }} (Mới)</div>
-                  <div style="font-size: 0.75rem; color: #64748b;">{{ formatFileSize(editSelectedFile.size) }}</div>
+            </div>
+            
+            <!-- Danh sách tài liệu hiện có -->
+            <div v-if="existingFiles.length > 0" class="existing-files-list" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: #475569;">Tài liệu đã có ({{ existingFiles.length }}):</div>
+              <div v-for="(file, idx) in existingFiles" :key="'exist-' + idx" class="file-uploaded-info" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <i :class="file.fileExt === 'docx' ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="file.fileExt === 'docx' ? 'font-size: 1.25rem; color: #2563eb;' : 'font-size: 1.25rem; color: #ef4444;'"></i>
+                  <div style="text-align: left;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ file.fileName || 'Tài liệu' }}</div>
+                    <div style="font-size: 0.75rem; color: #10b981; font-weight: 500;">Đã tải lên</div>
+                  </div>
                 </div>
-                <button type="button" @click.stop="editSelectedFile = null" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="pi pi-times"></i></button>
+                <button type="button" @click.stop="removeExistingFile(idx)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem;" title="Xóa file này"><i class="pi pi-times"></i></button>
               </div>
+            </div>
 
-              <!-- If no new file selected but existing file exists -->
-              <div v-else class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
-                <i :class="existingFileExt === 'docx' ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="existingFileExt === 'docx' ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
-                <div style="text-align: left;">
-                  <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ existingFileName || 'Tài liệu đã tải lên' }}</div>
-                  <div style="font-size: 0.75rem; color: #64748b;">Đã có sẵn trên hệ thống</div>
+            <!-- Danh sách tệp mới chọn -->
+            <div v-if="editSelectedFiles.length > 0" class="new-files-list" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: #475569;">Tài liệu mới chọn ({{ editSelectedFiles.length }}):</div>
+              <div v-for="(file, idx) in editSelectedFiles" :key="'new-' + idx" class="file-uploaded-info" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <i :class="file.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="file.name.endsWith('.docx') ? 'font-size: 1.25rem; color: #2563eb;' : 'font-size: 1.25rem; color: #ef4444;'"></i>
+                  <div style="text-align: left;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #166534; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ file.name }} (Chờ lưu)</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">{{ formatFileSize(file.size) }}</div>
+                  </div>
                 </div>
-                <span style="font-size: 0.75rem; color: #7c3aed; font-weight: 600; padding: 0.2rem 0.4rem; background: #f3e8ff; border-radius: 4px;">Nhấp để đổi file</span>
+                <button type="button" @click.stop="removeEditSelectedFile(idx)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem;"><i class="pi pi-times"></i></button>
               </div>
             </div>
           </div>
