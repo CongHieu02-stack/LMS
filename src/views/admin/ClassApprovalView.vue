@@ -62,6 +62,11 @@ const filteredProposals = computed(() => {
         return false
       }
     }
+    if (selectedStatusFilter.value) {
+      if (p.status !== selectedStatusFilter.value) {
+        return false
+      }
+    }
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase()
       const matchSearch = (
@@ -114,6 +119,29 @@ const filteredClasses = computed(() => {
   })
 })
 
+const pendingProposalsCount = computed(() => {
+  return proposals.value.filter((p: any) => p.status === 'pending').length
+})
+
+const pendingClassesCount = computed(() => {
+  return classes.value.filter((c: any) => c.status === 'draft').length
+})
+
+const statusOptions = computed(() => {
+  if (activeTab.value === 'proposals') {
+    return [
+      { value: 'pending', label: 'Chờ duyệt' },
+      { value: 'approved', label: 'Đã duyệt' },
+      { value: 'rejected', label: 'Đã từ chối' }
+    ]
+  } else {
+    return [
+      { value: 'draft', label: 'Chờ duyệt' },
+      { value: 'approved', label: 'Đã duyệt' }
+    ]
+  }
+})
+
 // Custom Confirm Modal State
 const isConfirmModalOpen = ref(false)
 const confirmTitle = ref('')
@@ -145,7 +173,7 @@ async function loadData() {
   msg.value = null
   try {
     const [propRes, classRes, roomRes] = await Promise.all([
-      apiGet<{ success: boolean; data: any[] }>('/class-proposals/pending'),
+      apiGet<{ success: boolean; data: any[] }>('/class-proposals'),
       apiGet<any>('/classes'),
       apiGet<{ success: boolean; data: any[] }>('/classes/rooms')
     ])
@@ -362,18 +390,18 @@ onMounted(async () => {
       <button class="tab-btn" :class="{ active: activeTab === 'proposals' }" @click="activeTab = 'proposals'; selectedStatusFilter = ''">
         <i class="pi pi-list"></i>
         Đề xuất số lượng lớp
-        <span class="tab-badge" v-if="proposals.length > 0">{{ proposals.length }}</span>
+        <span class="tab-badge" v-if="pendingProposalsCount > 0">{{ pendingProposalsCount }}</span>
       </button>
-      <button class="tab-btn" :class="{ active: activeTab === 'classes' }" @click="activeTab = 'classes'">
+      <button class="tab-btn" :class="{ active: activeTab === 'classes' }" @click="activeTab = 'classes'; selectedStatusFilter = ''">
         <i class="pi pi-building"></i>
         Lớp học chờ xếp phòng
-        <span class="tab-badge" v-if="classes.length > 0">{{ classes.length }}</span>
+        <span class="tab-badge" v-if="pendingClassesCount > 0">{{ pendingClassesCount }}</span>
       </button>
     </div>
 
     <!-- Search & Filter Card -->
     <div class="filter-card mb-6" v-if="!loading && (proposals.length > 0 || classes.length > 0)">
-      <div class="filter-grid" :class="{ 'has-status-filter': activeTab === 'classes' }">
+      <div class="filter-grid">
         <div class="fg search-fg">
           <label>Tìm kiếm thông tin</label>
           <div class="search-box">
@@ -400,12 +428,13 @@ onMounted(async () => {
             <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
           </select>
         </div>
-        <div class="fg" v-if="activeTab === 'classes'">
-          <label>Trạng thái lớp</label>
+        <div class="fg">
+          <label>Trạng thái</label>
           <select v-model="selectedStatusFilter" class="mono-input select-filter">
             <option value="">-- Tất cả trạng thái --</option>
-            <option value="draft">Chờ duyệt (Draft)</option>
-            <option value="approved">Đã duyệt (Approved)</option>
+            <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
           </select>
         </div>
       </div>
@@ -422,17 +451,17 @@ onMounted(async () => {
       <div v-if="activeTab === 'proposals'">
         <div v-if="proposals.length === 0" class="empty-state">
           <i class="pi pi-check-circle empty-icon"></i>
-          <h3>Không có đề xuất số lượng lớp nào chờ duyệt</h3>
-          <p>Tất cả đề xuất mở lớp học từ Trưởng bộ môn đã được xử lý.</p>
+          <h3>Không có đề xuất số lượng lớp nào</h3>
+          <p>Chưa có đề xuất mở lớp học nào từ Trưởng bộ môn.</p>
         </div>
         <div v-else-if="filteredProposals.length === 0" class="empty-state">
           <i class="pi pi-search empty-icon"></i>
           <h3>Không tìm thấy đề xuất phù hợp</h3>
-          <p>Hãy thử tìm kiếm với từ khóa khác.</p>
+          <p>Hãy thử thay đổi điều kiện lọc hoặc từ khóa tìm kiếm.</p>
         </div>
         <div v-else class="mono-card">
           <div class="card-header">
-            <span>Danh sách đề xuất chờ duyệt</span>
+            <span>Danh sách đề xuất</span>
             <i class="pi pi-check-square"></i>
           </div>
           <div class="table-container">
@@ -462,13 +491,23 @@ onMounted(async () => {
                   </td>
                   <td class="reason-cell">{{ p.reason || '—' }}</td>
                   <td class="text-center">
-                    <div class="action-buttons">
+                    <div v-if="p.status === 'pending'" class="action-buttons">
                       <button class="btn-approve" @click="handleProposalAction(p.id, 'approved')" :disabled="processing === p.id">
                         <i class="pi pi-check"></i> Duyệt đề xuất
                       </button>
                       <button class="btn-reject" @click="handleProposalAction(p.id, 'rejected')" :disabled="processing === p.id">
                         <i class="pi pi-times"></i> Từ chối
                       </button>
+                    </div>
+                    <div v-else-if="p.status === 'approved'">
+                      <span class="badge-status badge-status-approved">
+                        <i class="pi pi-check-circle"></i> Đã duyệt
+                      </span>
+                    </div>
+                    <div v-else-if="p.status === 'rejected'">
+                      <span class="badge-status badge-status-rejected">
+                        <i class="pi pi-times-circle"></i> Đã từ chối
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -905,6 +944,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: #166534;
   border: 1px solid #bbf7d0;
 }
+.badge-status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -968,11 +1012,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .filter-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr;
+  grid-template-columns: 2fr 1fr 1.5fr 1.25fr;
   gap: 1.25rem;
-}
-.filter-grid.has-status-filter {
-  grid-template-columns: 2fr 1fr 1.5fr 1fr;
 }
 .fg {
   display: flex;
