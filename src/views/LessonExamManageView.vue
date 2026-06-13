@@ -428,7 +428,18 @@ async function createLesson() {
   try {
     let contentPayload = ''
     if (lessonForm.value.type === 'video') {
-      const ytId = getYouTubeId(lessonForm.value.youtubeUrl)
+      const url = (lessonForm.value.youtubeUrl || '').trim()
+      if (!url) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng nhập link video YouTube!')
+        return
+      }
+      const ytId = getYouTubeId(url)
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+      const isValid = url.match(regExp) && ytId && ytId.length === 11
+      if (!isValid) {
+        showToast('warning', 'Cảnh báo', 'Link video YouTube không hợp lệ! Vui lòng nhập đúng định dạng link xem video (Ví dụ: https://www.youtube.com/watch?v=...)')
+        return
+      }
       contentPayload = JSON.stringify({
         type: 'video',
         youtubeId: ytId,
@@ -561,7 +572,18 @@ async function saveEditLesson() {
   try {
     let contentPayload = ''
     if (editLessonForm.value.type === 'video') {
-      const ytId = getYouTubeId(editLessonForm.value.youtubeUrl)
+      const url = (editLessonForm.value.youtubeUrl || '').trim()
+      if (!url) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng nhập link video YouTube!')
+        return
+      }
+      const ytId = getYouTubeId(url)
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+      const isValid = url.match(regExp) && ytId && ytId.length === 11
+      if (!isValid) {
+        showToast('warning', 'Cảnh báo', 'Link video YouTube không hợp lệ! Vui lòng nhập đúng định dạng link xem video (Ví dụ: https://www.youtube.com/watch?v=...)')
+        return
+      }
       contentPayload = JSON.stringify({
         type: 'video',
         youtubeId: ytId,
