@@ -448,9 +448,8 @@ onUnmounted(() => {
       <div 
         v-for="e in availableExams" :key="e.id" 
         class="mono-card" 
-        :class="{ 'card-completed': e.isCompleted }"
       >
-        <div class="card-header" :class="{ 'card-header-completed': e.isCompleted }">
+        <div class="card-header">
           <span>{{ e.className }}</span>
           <span v-if="e.isCompleted" class="completed-badge">
             <i class="pi pi-check-circle"></i> Đã hoàn thành
