@@ -404,7 +404,7 @@ onMounted(async () => {
           <label>Trạng thái lớp</label>
           <select v-model="selectedStatusFilter" class="mono-input select-filter">
             <option value="">-- Tất cả trạng thái --</option>
-            <option value="draft">Chờ xếp phòng (Draft)</option>
+            <option value="draft">Chờ duyệt (Draft)</option>
             <option value="approved">Đã duyệt (Approved)</option>
           </select>
         </div>
