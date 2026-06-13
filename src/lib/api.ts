@@ -106,7 +106,7 @@ export function apiGet<T = unknown>(endpoint: string): Promise<T> {
 export function apiPost<T = unknown>(endpoint: string, body: unknown): Promise<T> {
   return api<T>(endpoint, {
     method: 'POST',
-    body: JSON.stringify(body)
+    body: body instanceof FormData ? body : JSON.stringify(body)
   })
 }
 
@@ -116,7 +116,7 @@ export function apiPost<T = unknown>(endpoint: string, body: unknown): Promise<T
 export function apiPut<T = unknown>(endpoint: string, body: unknown): Promise<T> {
   return api<T>(endpoint, {
     method: 'PUT',
-    body: JSON.stringify(body)
+    body: body instanceof FormData ? body : JSON.stringify(body)
   })
 }
 
