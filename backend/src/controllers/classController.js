@@ -268,7 +268,10 @@ export async function registerToClass(req, res) {
 export async function getMyRegistrations(req, res) {
   try {
     const registrations = await classModel.findRegistrationsByStudent(req.user.id)
-    return res.json(classView.formatStudentRegistrations(registrations))
+    return res.json({
+      success: true,
+      ...classView.formatStudentRegistrations(registrations)
+    })
   } catch (err) {
     console.error('[ClassController.getMyRegistrations]', err.message)
     return res.status(500).json({ error: 'Lỗi khi lấy danh sách đăng ký.' })
