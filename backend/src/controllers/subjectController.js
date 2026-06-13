@@ -134,6 +134,7 @@ export async function create(req, res) {
       }
     }
 
+    const isAutoApprove = req.profile && req.profile.rank >= 90
     const subject = await subjectModel.create({
       code: code.trim().toUpperCase(),
       name: name.trim(),
@@ -141,19 +142,23 @@ export async function create(req, res) {
       credits: parseInt(credits) || 3,
       department: department || 'Khoa Công nghệ thông tin',
       creator_id: req.user.id,
-      status: 'pending',
+      status: isAutoApprove ? 'approved' : 'pending',
     })
 
     await logActivity(
       req,
-      'PROPOSE_SUBJECT',
-      `Đề xuất môn học mới: ${name} (${code.toUpperCase()})`,
+      isAutoApprove ? 'APPROVE_SUBJECT' : 'PROPOSE_SUBJECT',
+      isAutoApprove
+        ? `Tạo và duyệt môn học mới: ${name} (${code.toUpperCase()})`
+        : `Đề xuất môn học mới: ${name} (${code.toUpperCase()})`,
       { targetType: 'subject', targetId: subject.id },
     )
 
     return res.status(201).json({
       success: true,
-      message: 'Đề xuất môn học đã được gửi tới Hiệu trưởng để phê duyệt.',
+      message: isAutoApprove
+        ? 'Môn học mới đã được khởi tạo thành công.'
+        : 'Đề xuất môn học đã được gửi tới Hiệu trưởng để phê duyệt.',
       data: subject,
     })
   } catch (err) {

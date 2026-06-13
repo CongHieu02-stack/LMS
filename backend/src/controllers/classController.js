@@ -222,6 +222,27 @@ export async function registerToClass(req, res) {
       return res.status(400).json({ error: 'Thiếu classId.' })
     }
 
+    // Kiểm tra khoa của sinh viên và khoa của lớp học
+    const { supabaseAdmin } = await import('../config/supabase.js')
+    const { data: classData, error: classErr } = await supabaseAdmin
+      .from('classes')
+      .select('id, name, subject:subjects(department)')
+      .eq('id', classId)
+      .single()
+
+    if (classErr || !classData) {
+      return res.status(404).json({ error: 'Lớp học không tồn tại.' })
+    }
+
+    const studentDept = req.profile?.department
+    const classDept = classData.subject?.department
+
+    if (req.profile?.role === 'SINH_VIEN' && studentDept && classDept && studentDept !== classDept) {
+      return res.status(400).json({
+        error: `Sinh viên thuộc ${studentDept} không thể đăng ký môn học của ${classDept}.`
+      })
+    }
+
     // Gọi Model → RPC Supabase
     const result = await classModel.registerStudent(classId, studentId)
 
@@ -295,12 +316,13 @@ export async function createClass(req, res) {
         .from('rooms')
         .select('id, name, capacity')
         .gte('capacity', parseInt(maxSlots))
+        .order('capacity', { ascending: true })
         .order('name', { ascending: true })
 
       const { data: activeClasses } = await supabaseAdmin
         .from('classes')
         .select('room_id, room, schedule')
-        .is('room_id', 'not.null')
+        .not('room_id', 'is', null)
 
       const availableRooms = (allRooms || []).filter(r => {
         const hasConflict = (activeClasses || []).some(c => c.room_id === r.id && schedulesOverlap(c.schedule, schedule))
@@ -447,9 +469,9 @@ export async function assignInstructor(req, res) {
         return res.status(403).json({ error: 'Tài khoản Trưởng bộ môn chưa được gán khoa phụ trách.' })
       }
 
-      if (classDept !== userDept) {
+      if (classDept !== userDept && classData.manager_id !== req.profile.id) {
         return res.status(403).json({
-          error: `Bạn chỉ có quyền phân công giảng viên cho các lớp thuộc ${userDept}.`
+          error: `Bạn chỉ có quyền phân công giảng viên cho các lớp thuộc ${userDept} hoặc lớp do bạn trực tiếp quản lý.`
         })
       }
     }
@@ -611,15 +633,76 @@ export async function approveClass(req, res) {
         data: updatedClass
       })
     } else {
-      // Tự động xếp phòng ngẫu nhiên
-      const result = await classModel.approveClassAndRandomRoom(id, parseInt(maxStudents))
-      
-      await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${result.room || 'Chưa xếp'}, Lịch học: ${result.schedule || 'Chưa xếp'})`)
+      // Tự động xếp phòng phù hợp có sức chứa gần nhất (order by capacity ASC)
+      const { supabaseAdmin } = await import('../config/supabase.js')
+      const { data: currentClass, error: getErr } = await supabaseAdmin
+        .from('classes')
+        .select('schedule')
+        .eq('id', id)
+        .single()
+
+      if (getErr || !currentClass) {
+        return res.status(404).json({ error: 'Không tìm thấy thông tin lớp học.' })
+      }
+
+      const v_class_schedule = currentClass.schedule
+
+      // Lấy tất cả phòng có sức chứa >= maxStudents
+      const { data: allRooms, error: rErr } = await supabaseAdmin
+        .from('rooms')
+        .select('id, name, capacity')
+        .gte('capacity', parseInt(maxStudents))
+        .order('capacity', { ascending: true })
+        .order('name', { ascending: true })
+
+      if (rErr) throw rErr
+
+      // Lấy danh sách các lớp đang hoạt động để kiểm tra trùng lịch
+      const { data: activeClasses, error: acErr } = await supabaseAdmin
+        .from('classes')
+        .select('room_id, schedule')
+        .in('status', ['approved', 'APPROVED', 'open_for_reg', 'in_progress'])
+        .not('room_id', 'is', null)
+
+      if (acErr) throw acErr
+
+      const availableRoom = (allRooms || []).find(r => {
+        const hasConflict = (activeClasses || []).some(c => c.room_id === r.id && schedulesOverlap(c.schedule, v_class_schedule))
+        return !hasConflict
+      })
+
+      if (!availableRoom) {
+        return res.status(400).json({
+          error: `Không tìm thấy phòng học nào trống có sức chứa >= ${maxStudents} vào lịch học: ${v_class_schedule || 'Chưa xếp lịch'}`
+        })
+      }
+
+      // Cập nhật lớp học
+      const { data: updatedClass, error: updateErr } = await supabaseAdmin
+        .from('classes')
+        .update({
+          status: 'APPROVED',
+          room_id: availableRoom.id,
+          room: availableRoom.name,
+          max_students: parseInt(maxStudents),
+          max_slots: parseInt(maxStudents),
+          remaining_slots: parseInt(maxStudents),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateErr) {
+        return res.status(500).json({ error: `Lỗi khi tự động xếp phòng cho lớp: ${updateErr.message}` })
+      }
+
+      await logActivity(req, 'APPROVE_CLASS', `Phê duyệt mở lớp học ID: ${id} (Phòng: ${availableRoom.name}, Lịch học: ${v_class_schedule || 'Chưa xếp'})`)
 
       return res.json({
         success: true,
         message: `Duyệt lớp học và tự động xếp phòng thành công.`,
-        data: result
+        data: updatedClass
       })
     }
   } catch (err) {

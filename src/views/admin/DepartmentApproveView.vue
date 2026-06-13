@@ -35,9 +35,7 @@ const {
   closeReasonModal,
   submitAction
 } = useAdminActions(async (action) => {
-  successMessage.value = action === 'TU_CHOI' 
-    ? 'Đã từ chối môn học thành công.' 
-    : 'Đã khóa môn học thành công.'
+  successMessage.value = 'Từ chối môn học thành công.'
   await fetchSubjects()
 })
 
@@ -135,12 +133,7 @@ function handleReject(subject: any) {
   openReasonModal(subject.id, 'department', 'TU_CHOI')
 }
 
-function handleLock(subject: any) {
-  openReasonModal(subject.id, 'department', 'KHOA')
-}
-
 function getStatusBadge(s: any) {
-  if (s.is_locked) return { text: 'Đã khóa', cls: 'badge-locked' }
   if (s.status === 'approved') return { text: 'Đã duyệt', cls: 'badge-approved' }
   if (s.status === 'rejected') return { text: 'Bị từ chối', cls: 'badge-rejected' }
   return { text: 'Chờ duyệt', cls: 'badge-pending' }
@@ -153,8 +146,8 @@ function getStatusBadge(s: any) {
     <div class="page-header">
       <div>
         <div class="breadcrumb">Quản lý Bộ môn / <span>Phê duyệt môn học</span></div>
-        <h1 class="page-title">Phê Duyệt & Khóa Môn Học</h1>
-        <div class="page-subtitle">Xem xét các đề xuất môn học từ Khoa/Bộ môn, duyệt hoặc khóa môn học kèm lý do.</div>
+        <h1 class="page-title">Phê Duyệt Môn Học</h1>
+        <div class="page-subtitle">Xem xét các đề xuất môn học từ Khoa/Bộ môn, duyệt hoặc từ chối đề xuất môn học.</div>
       </div>
       <button class="btn-refresh" @click="fetchSubjects" :disabled="loading">
         <i class="pi pi-refresh" :class="{ 'pi-spin': loading }"></i> Tải lại
@@ -242,7 +235,6 @@ function getStatusBadge(s: any) {
                 <td class="name-cell">
                   <strong>{{ s.name }}</strong>
                   <div v-if="s.rejection_reason" class="reason-text">Lý do từ chối: {{ s.rejection_reason }}</div>
-                  <div v-if="s.is_locked" class="reason-text text-red">Lý do khóa: {{ s.lock_reason }}</div>
                 </td>
                 <td>{{ s.credits }} TC</td>
                 <td><span class="dept-tag">{{ s.department || 'Công nghệ thông tin' }}</span></td>
@@ -254,21 +246,13 @@ function getStatusBadge(s: any) {
                 <td class="desc-cell">{{ s.description }}</td>
                 <td class="actions-cell">
                   <!-- Actions for Pending -->
-                  <div class="btn-group" v-if="s.status === 'pending' && !s.is_locked">
+                  <div class="btn-group" v-if="s.status === 'pending'">
                     <button class="action-btn btn-approve" @click="handleApprove(s)" title="Phê duyệt">
                       <i class="pi pi-check"></i> Duyệt
                     </button>
                     <button class="action-btn btn-reject" @click="handleReject(s)" title="Từ chối">
                       <i class="pi pi-times"></i> Từ chối
                     </button>
-                  </div>
-
-                  <!-- Actions for Approved / Rejected (Can lock or unlock) -->
-                  <div class="btn-group" v-else>
-                    <button v-if="!s.is_locked" class="action-btn btn-lock" @click="handleLock(s)" title="Khóa môn học">
-                      <i class="pi pi-lock"></i> Khóa môn
-                    </button>
-                    <span v-else class="text-muted"><i class="pi pi-lock"></i> Đã bị khóa</span>
                   </div>
                 </td>
               </tr>
@@ -281,7 +265,7 @@ function getStatusBadge(s: any) {
     <!-- Unified Dialog Component -->
     <ReasonDialog
       :visible="showModal"
-      :title="actionType === 'KHOA' ? 'Khóa môn học' : 'Từ chối môn học'"
+      title="Từ chối môn học"
       :action-type="actionType"
       v-model="reason"
       :submitting="submitting"

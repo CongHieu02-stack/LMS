@@ -72,7 +72,11 @@ async function loadData() {
 
     if (authStore.profile?.role === 'TRUONG_BO_MON' && authStore.profile?.department) {
       const userDept = authStore.profile.department
-      classes.value = cdListFormatted.filter((c: any) => c.subject?.department === userDept)
+      classes.value = cdListFormatted.filter((c: any) => 
+        c.subject?.department === userDept || 
+        c.managerId === authStore.profile?.id || 
+        c.manager_id === authStore.profile?.id
+      )
       instructors.value = allInstructors.filter((p: any) => p.role === 'GIANG_VIEN')
     } else {
       classes.value = cdListFormatted

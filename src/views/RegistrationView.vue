@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { apiGet, apiPost } from '@/lib/api'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/stores/auth'
 
 interface ClassItem {
   id: string; code?: string; name: string; subjectName: string; subjectCode: string;
@@ -37,6 +38,7 @@ function toggleStatus(value: string) {
 }
 
 const toast = useToast()
+const authStore = useAuthStore()
 
 async function loadData() {
   loading.value = true
@@ -48,8 +50,19 @@ async function loadData() {
     // Lấy tất cả lớp mở
     const classRes = await apiGet<{ success: boolean; data: any[] }>('/classes')
     const classes = classRes.data || []
+    
+    const isStudent = authStore.profile?.role === 'SINH_VIEN'
+    const userDept = authStore.profile?.department
+
     availableClasses.value = (Array.isArray(classes) ? classes : [])
-      .filter((c: any) => ['approved', 'APPROVED', 'open_for_reg', 'open'].includes(c.status))
+      .filter((c: any) => {
+        const isStatusMatch = ['approved', 'APPROVED', 'open_for_reg', 'open'].includes(c.status)
+        if (!isStatusMatch) return false
+        if (isStudent && userDept) {
+          return c.subject?.department === userDept
+        }
+        return true
+      })
       .map((c: any) => {
         const subjectName = c.subject?.name || 'N/A'
         const subjectCode = c.subject?.code || ''

@@ -23,6 +23,43 @@ const modalError = ref<string | null>(null)
 const currentFilter = ref('all') // all, active, locked, rejected
 
 const searchQuery = ref('')
+const selectedDeptFilter = ref('')
+
+function getDeptBadgeStyle(dept: string) {
+  if (!dept) return { color: '#4b5563', backgroundColor: '#f3f4f6' }
+  const d = dept.toLowerCase()
+  if (d.includes('công nghệ thông tin')) {
+    return { color: '#2563eb', backgroundColor: '#eff6ff' }
+  }
+  if (d.includes('sức khỏe') || d.includes('sức khoẻ')) {
+    return { color: '#7c3aed', backgroundColor: '#f5f3ff' }
+  }
+  if (d.includes('quản trị') || d.includes('marketing')) {
+    return { color: '#ea580c', backgroundColor: '#fff7ed' }
+  }
+  if (d.includes('tài chính') || d.includes('thương mại')) {
+    return { color: '#0d9488', backgroundColor: '#f0fdfa' }
+  }
+  return { color: '#059669', backgroundColor: '#ecfdf5' }
+}
+
+const deptStats = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const sub of subjects.value) {
+    const dept = sub.department || 'Khoa Công nghệ thông tin'
+    counts[dept] = (counts[dept] || 0) + 1
+  }
+  return Object.entries(counts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+})
+
+function getDeptCardStyle(dept: string) {
+  const style = getDeptBadgeStyle(dept)
+  return {
+    borderLeft: `4px solid ${style.color}`,
+  }
+}
 
 const filteredSubjects = computed(() => {
   return subjects.value.filter((sub: any) => {
@@ -34,12 +71,18 @@ const filteredSubjects = computed(() => {
       if (sub.status !== 'rejected') return false
     }
 
+    if (selectedDeptFilter.value) {
+      const subDept = sub.department || 'Khoa Công nghệ thông tin'
+      if (subDept !== selectedDeptFilter.value) return false
+    }
+
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase()
       const codeMatch = sub.code && sub.code.toLowerCase().includes(q)
       const nameMatch = sub.name && sub.name.toLowerCase().includes(q)
       const descMatch = sub.description && sub.description.toLowerCase().includes(q)
-      if (!codeMatch && !nameMatch && !descMatch) return false
+      const deptMatch = sub.department && sub.department.toLowerCase().includes(q)
+      if (!codeMatch && !nameMatch && !descMatch && !deptMatch) return false
     }
 
     return true
@@ -169,16 +212,30 @@ onMounted(() => {
       <div><strong>THÀNH CÔNG:</strong> {{ successMessage }}</div>
     </div>
 
-    <!-- Search Bar -->
-    <div class="search-container mb-6" v-if="!loading && subjects.length > 0">
-      <div class="search-box">
+    <!-- Search and Filter Bar -->
+    <div class="search-filter-row mb-6" v-if="!loading && subjects.length > 0">
+      <div class="search-box-wrapper">
         <i class="pi pi-search search-icon"></i>
         <input
           type="text"
           v-model="searchQuery"
-          placeholder="Tìm mã môn, tên môn học..."
+          placeholder="Tìm mã môn, tên môn học, khoa..."
           class="search-input"
         />
+      </div>
+      
+      <div class="filter-select-wrapper">
+        <i class="pi pi-filter filter-icon"></i>
+        <select v-model="selectedDeptFilter" class="dept-select">
+          <option value="">Tất cả các khoa ({{ subjects.length }} môn)</option>
+          <option 
+            v-for="dept in deptStats" 
+            :key="dept.name" 
+            :value="dept.name"
+          >
+            {{ dept.name }} ({{ dept.count }} môn)
+          </option>
+        </select>
       </div>
     </div>
 
@@ -240,6 +297,7 @@ onMounted(() => {
               <tr>
                 <th>Mã</th>
                 <th>Tên môn học</th>
+                <th>Khoa</th>
                 <th class="text-center">Số TC</th>
                 <th>Tình trạng</th>
                 <th class="text-right">Thao tác</th>
@@ -255,6 +313,11 @@ onMounted(() => {
               >
                 <td class="code-cell">{{ sub.code }}</td>
                 <td class="subject-name">{{ sub.name }}</td>
+                <td>
+                  <span class="dep-badge" :style="getDeptBadgeStyle(sub.department)">
+                    {{ sub.department || 'Khoa Công nghệ thông tin' }}
+                  </span>
+                </td>
                 <td class="text-center">{{ sub.credits }}</td>
                 <td>
                   <span v-if="sub.is_locked" class="mono-badge badge-locked"
@@ -318,6 +381,10 @@ onMounted(() => {
               <li>
                 <span>Trạng thái duyệt:</span>
                 <strong>{{ selectedSubject.status.toUpperCase() }}</strong>
+              </li>
+              <li>
+                <span>Khoa phụ trách:</span>
+                <strong>{{ selectedSubject.department || 'Khoa Công nghệ thông tin' }}</strong>
               </li>
               <li v-if="selectedSubject.rejection_reason">
                 <span>Lý do từ chối:</span>
@@ -661,6 +728,13 @@ onMounted(() => {
   background: #e5e7eb;
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
+}
+.dep-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  display: inline-block;
 }
 
 /* Empty State */
@@ -1027,5 +1101,58 @@ onMounted(() => {
 }
 .mb-6 {
   margin-bottom: 1.5rem;
+}
+.search-filter-row {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  flex-shrink: 0;
+}
+.search-box-wrapper {
+  position: relative;
+  flex: 1;
+}
+.filter-select-wrapper {
+  position: relative;
+  width: 280px;
+  flex-shrink: 0;
+}
+.filter-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+.dept-select {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 2.5rem 0.6rem 2.5rem;
+  font-size: 0.875rem;
+  outline: none;
+  background-color: #fff;
+  font-weight: 500;
+  color: #374151;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  appearance: none;
+  cursor: pointer;
+}
+.dept-select:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+}
+.filter-select-wrapper::after {
+  content: '\e902';
+  font-family: 'primeicons';
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+  font-size: 0.8rem;
 }
 </style>
