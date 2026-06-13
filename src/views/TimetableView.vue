@@ -788,14 +788,14 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 .view-toggle button { padding: 0.5rem 0.75rem; border: none; background: #fff; cursor: pointer; color: #6b7280; transition: all 0.2s; }
 .view-toggle button.active { background: #111827; color: #fff; }
 .view-toggle button:hover:not(.active) { background: #f3f4f6; }
-.btn-pdf { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.25rem; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background 0.2s; font-size: 0.875rem; }
-.btn-pdf:hover:not(:disabled) { background: #6d28d9; }
+.btn-pdf { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.25rem; background: var(--lms-primary); color: #fff; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background 0.2s; font-size: 0.875rem; }
+.btn-pdf:hover:not(:disabled) { background: var(--lms-primary-hover); }
 .btn-pdf:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ─── Stats ─── */
 .tt-stats { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .stat-pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 1rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 20px; font-size: 0.8rem; color: #374151; font-weight: 500; }
-.stat-pill i { color: #7c3aed; font-size: 0.85rem; }
+.stat-pill i { color: var(--lms-primary); font-size: 0.85rem; }
 
 /* ─── States ─── */
 .tt-loading { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 5rem 0; color: #6b7280; }
@@ -847,9 +847,9 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 }
 
 .shift-grid-table th.is-today {
-  background-color: #f5f3ff;
-  border-bottom: 3px solid #7c3aed;
-  color: #7c3aed;
+  background-color: var(--lms-primary-light);
+  border-bottom: 3px solid var(--lms-primary);
+  color: var(--lms-primary);
 }
 
 .th-day-label {
@@ -978,9 +978,9 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 .list-container { display: flex; flex-direction: column; gap: 1.25rem; }
 .list-day-group { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .list-day-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-weight: 600; font-size: 0.9rem; color: #111827; }
-.list-day-header.is-today { background: #ede9fe; color: #7c3aed; }
+.list-day-header.is-today { background: var(--lms-primary-light); color: var(--lms-primary); }
 .day-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: #e5e7eb; font-weight: 700; font-size: 0.75rem; color: #374151; }
-.list-day-header.is-today .day-icon { background: #7c3aed; color: #fff; }
+.list-day-header.is-today .day-icon { background: var(--lms-primary); color: #fff; }
 .day-count { margin-left: auto; font-size: 0.75rem; font-weight: 500; color: #9ca3af; }
 
 .list-items { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -1116,7 +1116,7 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 }
 
 .current-week-label i {
-  color: #7c3aed;
+  color: var(--lms-primary);
 }
 
 .date-picker-wrapper {
@@ -1143,7 +1143,7 @@ const isAdminView = computed(() => !['SINH_VIEN', 'GIANG_VIEN', 'TRUONG_BO_MON']
 }
 
 .date-input:focus {
-  border-color: #7c3aed;
+  border-color: var(--lms-primary);
 }
 
 .list-empty-week {

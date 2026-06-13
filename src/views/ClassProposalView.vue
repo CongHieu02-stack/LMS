@@ -422,7 +422,7 @@ function statusBadge(s: string) {
               <div>
                 <div class="li-code">{{ p.subject?.code || 'N/A' }} — {{ p.subject?.name || '' }}</div>
                 <div class="li-meta">SL: {{ p.quantity }} | Sĩ số: {{ p.max_students || 50 }} | {{ p.semester }}</div>
-                <div v-if="p.schedule" class="li-meta" style="color: #7c3aed; font-weight: 500;"><i class="pi pi-calendar mr-1"></i>Lịch học: {{ p.schedule }}</div>
+                <div v-if="p.schedule" class="li-meta" style="color: var(--lms-primary); font-weight: 500;"><i class="pi pi-calendar mr-1"></i>Lịch học: {{ p.schedule }}</div>
                 <div v-if="p.start_date || p.end_date" class="li-meta" style="color: #4b5563;"><i class="pi pi-clock mr-1"></i>Thời gian: {{ formatDate(p.start_date) }} - {{ formatDate(p.end_date) }}</div>
               </div>
               <span class="badge" :class="statusBadge(p.status).c">{{ statusBadge(p.status).t }}</span>
@@ -453,7 +453,7 @@ function statusBadge(s: string) {
 .fg { display: flex; flex-direction: column; gap: 0.4rem; }
 .fg label, .fg-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
 .mono-input { width: 100%; padding: 0.6rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; box-sizing: border-box; transition: border 0.2s; }
-.mono-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.mono-input:focus { border-color: var(--lms-primary); box-shadow: 0 0 0 3px var(--lms-primary-light); }
 .ta { min-height: 80px; resize: vertical; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
 .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
@@ -471,7 +471,7 @@ function statusBadge(s: string) {
 .btn-add-session {
   background: transparent;
   border: none;
-  color: #7c3aed;
+  color: var(--lms-primary);
   font-weight: 600;
   font-size: 0.8rem;
   cursor: pointer;
@@ -482,7 +482,7 @@ function statusBadge(s: string) {
   border-radius: 4px;
 }
 .btn-add-session:hover {
-  background: #faf5ff;
+  background: var(--lms-primary-light);
 }
 .session-row {
   display: flex;

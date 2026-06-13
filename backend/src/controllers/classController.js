@@ -428,6 +428,16 @@ export async function assignInstructor(req, res) {
       return res.status(404).json({ error: 'Không tìm thấy giảng viên.' })
     }
 
+    // Ràng buộc: Không cho phép gán giảng viên thuộc khoa khác phụ trách môn học của khoa này
+    const classDept = classData.subject?.department
+    const instructorDept = instructorData.department
+
+    if (classDept && instructorDept && classDept !== instructorDept) {
+      return res.status(400).json({
+        error: `Không thể phân công giảng viên thuộc ${instructorDept} phụ trách môn học của ${classDept}.`
+      })
+    }
+
     // 3. Ràng buộc khoa cho Trưởng bộ môn (rank === 60 hoặc role === 'TRUONG_BO_MON')
     if (req.profile.role === 'TRUONG_BO_MON') {
       const userDept = req.profile.department

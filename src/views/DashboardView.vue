@@ -94,7 +94,7 @@ async function handleAvatarChange(event: Event) {
   try {
     const fileExt = file.name.split('.').pop()
     const fileName = `${authStore.profile?.id}-${Math.random()}.${fileExt}`
-    
+
     const { error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(fileName, file)
@@ -102,7 +102,7 @@ async function handleAvatarChange(event: Event) {
     if (uploadError) throw uploadError
 
     const { data } = supabase.storage.from('avatars').getPublicUrl(fileName)
-    
+
     const res = await apiPut<any>(`/profiles/${authStore.profile?.id}`, {
       avatar_url: data.publicUrl
     })
@@ -172,7 +172,7 @@ function parseLessonContent(contentStr: string) {
     const fileUrl = parsed.fileUrl || parsed.pdfUrl || ''
     const fileExt = parsed.fileExt || (fileUrl.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf')
     const fileName = parsed.fileName || (fileUrl ? fileUrl.split('/').pop()?.split('?')[0] || 'Tài liệu' : '')
-    
+
     return {
       type: type === 'pdf' ? 'file' : type,
       youtubeId: parsed.youtubeId || '',
@@ -202,9 +202,9 @@ const exportingPDF = ref<string | null>(null)
 function exportToPDF(lesson: any) {
   const element = document.getElementById(`pdf-content-${lesson.id}`)
   if (!element) return
-  
+
   exportingPDF.value = lesson.id
-  
+
   const opt = {
     margin:       0.5,
     filename:     `${lesson.title.replace(/\s+/g, '_')}.pdf`,
@@ -239,7 +239,7 @@ async function loadStudentData() {
       const subjectName = c.subject?.name || ''
       const subjectCode = c.subject?.code || ''
       const className = c.name || ''
-      
+
       let displayName = className
       if (className && subjectName) {
         if (className.toLowerCase().includes(subjectName.toLowerCase())) {
@@ -349,7 +349,7 @@ onMounted(() => {
     <!-- Header Banner -->
     <div class="welcome-banner mb-xl">
       <div class="welcome-banner-content">
-        <h1 class="welcome-title">Chào mừng trở lại, {{ authStore.profile?.fullName }} 👋</h1>
+        <h1 class="welcome-title">Chào mừng trở lại, {{ authStore.profile?.fullName }} </h1>
         <div class="welcome-subtitle">
           {{
             isStudent
@@ -675,8 +675,8 @@ onMounted(() => {
         <div class="modal-body-premium">
           <div v-if="loadingLessons" class="loading-center-lessons">
             <i
-              class="pi pi-spin pi-spinner spinner-purple"
-              style="font-size: 2rem; color: #7c3aed"
+              class="pi pi-spin pi-spinner spinner-primary"
+              style="font-size: 2rem; color: var(--lms-primary)"
             ></i>
             <span style="margin-top: 0.5rem; font-size: 0.875rem; color: #6b7280"
               >Đang tải danh sách bài học...</span
@@ -746,7 +746,7 @@ onMounted(() => {
                       Xuất bài giảng PDF
                     </button>
                   </div>
-                  
+
                   <!-- Đây là vùng nội dung sẽ được xuất PDF -->
                   <div :id="'pdf-content-' + l.id" class="pdf-print-area">
                     <div class="pdf-header-print">
@@ -773,7 +773,7 @@ onMounted(() => {
                       <i class="pi pi-download mr-1"></i> Tải tài liệu ({{ parseLessonContent(l.content).fileExt.toUpperCase() }})
                     </a>
                   </div>
-                  
+
                   <!-- Show inline PDF viewer if PDF -->
                   <div v-if="parseLessonContent(l.content).fileExt === 'pdf'" class="pdf-viewer-container">
                     <iframe :src="parseLessonContent(l.content).fileUrl" class="pdf-iframe-viewer" frameborder="0"></iframe>
@@ -870,10 +870,10 @@ onMounted(() => {
   background: #dbeafe;
 }
 .text-purple-600 {
-  color: #9333ea;
+  color: var(--lms-primary);
 }
 .bg-purple-100 {
-  background: #f3e8ff;
+  background: var(--lms-primary-light);
 }
 .text-green-600 {
   color: #166534;
@@ -932,19 +932,19 @@ onMounted(() => {
 .stat-dept {
   font-size: 0.72rem;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--lms-primary);
   margin-top: 4px;
 }
 .profile-dept-badge {
   display: inline-flex;
   align-items: center;
-  background: #f5f3ff;
-  border: 1px solid #ddd6fe;
+  background: var(--lms-primary-light);
+  border: 1px solid #c7d2fe;
   padding: 0.2rem 0.6rem;
   border-radius: 9999px;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--lms-primary);
   margin-bottom: 1.5rem;
 }
 
@@ -1063,7 +1063,7 @@ onMounted(() => {
   gap: 0.35rem;
 }
 .btn-purple-small {
-  background: #7c3aed;
+  background: var(--lms-primary);
   color: #fff;
   padding: 0.6rem 1.25rem;
   border-radius: 6px;
@@ -1073,7 +1073,7 @@ onMounted(() => {
   transition: background 0.2s;
 }
 .btn-purple-small:hover {
-  background: #6d28d9;
+  background: var(--lms-primary-hover);
 }
 
 /* Profile Card */
@@ -1231,8 +1231,8 @@ onMounted(() => {
   color: #0284c7;
 }
 .action-icon-wrapper.purple {
-  background: #f3e8ff;
-  color: #9333ea;
+  background: var(--lms-primary-light);
+  color: var(--lms-primary);
 }
 .action-icon-wrapper.green {
   background: #dcfce7;
@@ -1300,10 +1300,10 @@ onMounted(() => {
   transition: all 0.2s ease;
 }
 .my-class-row:hover {
-  border-color: #7c3aed;
+  border-color: var(--lms-primary);
   background: #fbfbfe;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(124, 58, 237, 0.05);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.05);
 }
 .my-class-info {
   display: flex;
@@ -1314,7 +1314,7 @@ onMounted(() => {
 .my-class-code {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #7c3aed;
+  color: var(--lms-primary);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -1327,7 +1327,7 @@ onMounted(() => {
   color: #6b7280;
 }
 .btn-learn {
-  background: #7c3aed;
+  background: var(--lms-primary);
   color: #fff;
   border: none;
   padding: 0.5rem 1rem;
@@ -1340,7 +1340,7 @@ onMounted(() => {
   transition: background 0.2s;
 }
 .btn-learn:hover {
-  background: #6d28d9;
+  background: var(--lms-primary-hover);
 }
 
 /* Premium Modal Overlay & Content */
@@ -1432,7 +1432,7 @@ onMounted(() => {
   padding: 4rem;
   color: #7c3aed;
 }
-.spinner-purple {
+.spinner-primary {
   animation: spin 1s linear infinite;
 }
 @keyframes spin {
@@ -1541,8 +1541,8 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   font-size: 0.7rem;
-  background: #f3e8ff;
-  color: #6b21a8;
+  background: var(--lms-primary-light);
+  color: var(--lms-primary);
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;
@@ -1740,7 +1740,7 @@ onMounted(() => {
   color: #000;
 }
 .pdf-body-content :deep(blockquote) {
-  border-left: 4px solid #7c3aed;
+  border-left: 4px solid var(--lms-primary);
   background: #f9fafb;
   padding: 0.75rem 1rem;
   margin: 1rem 0;
@@ -1798,13 +1798,13 @@ onMounted(() => {
 /* Welcome Banner */
 .welcome-banner {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--lms-gray-200);
   border-radius: 16px;
   padding: 2.25rem 2rem;
-  color: #111827;
+  color: var(--lms-gray-800);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--lms-shadow-sm);
   margin-bottom: 2rem;
 }
 
@@ -1819,12 +1819,12 @@ onMounted(() => {
   font-weight: 700;
   margin: 0 0 0.5rem 0;
   letter-spacing: -0.025em;
-  color: #111827;
+  color: var(--lms-gray-900);
 }
 
 .welcome-subtitle {
   font-size: 1rem;
-  color: #4b5563;
+  color: var(--lms-gray-600);
   line-height: 1.5;
   font-weight: 400;
 }
