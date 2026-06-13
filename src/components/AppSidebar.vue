@@ -121,12 +121,12 @@ const menuGroups = ref<MainMenuGroup[]>([
         requiredPermission: 'lesson_exam_manage',
       },
       {
-        label: 'Tạo lớp học (Khung)',
+        label: 'Tạo lớp học ',
         to: '/admin/classes',
         requiredPermission: ['class_create', 'class_quantity_approve'],
       },
       {
-        label: 'Tra cứu lớp (Bộ lọc)',
+        label: 'Tra cứu lớp',
         to: '/admin/classes/search',
         requiredPermission: 'class_view',
       },
