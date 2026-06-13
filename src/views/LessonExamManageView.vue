@@ -402,6 +402,11 @@ function formatFileSize(bytes: number) {
 function handleFileChange(event: any) {
   const file = event.target.files?.[0]
   if (file) {
+    if (file.size > 100 * 1024 * 1024) {
+      showToast('warning', 'Cảnh báo', 'Tệp tin vượt quá dung lượng tối đa cho phép (100MB)!')
+      event.target.value = ''
+      return
+    }
     selectedFile.value = file
   }
 }
@@ -409,6 +414,11 @@ function handleFileChange(event: any) {
 function handleEditFileChange(event: any) {
   const file = event.target.files?.[0]
   if (file) {
+    if (file.size > 100 * 1024 * 1024) {
+      showToast('warning', 'Cảnh báo', 'Tệp tin vượt quá dung lượng tối đa cho phép (100MB)!')
+      event.target.value = ''
+      return
+    }
     editSelectedFile.value = file
   }
 }
@@ -817,10 +827,6 @@ async function saveEditExam() {
                 <span><i class="pi pi-video"></i> Video YouTube</span>
               </label>
               <label class="radio-option">
-                <input type="radio" v-model="lessonForm.type" value="doc" />
-                <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
-              </label>
-              <label class="radio-option">
                 <input type="radio" v-model="lessonForm.type" value="file" />
                 <span><i class="pi pi-upload"></i> Tài liệu (PDF, Word)</span>
               </label>
@@ -830,11 +836,6 @@ async function saveEditExam() {
           <div v-if="lessonForm.type === 'video'">
             <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
           </div>
-          
-          <div v-else-if="lessonForm.type === 'doc'">
-            <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
-            <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
-          </div>
 
           <div v-else-if="lessonForm.type === 'file'" class="frm-col">
             <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
@@ -842,7 +843,7 @@ async function saveEditExam() {
               <div v-if="!selectedFile" class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
                 <i class="pi pi-upload" style="font-size: 1.5rem; color: #7c3aed;"></i>
                 <span style="font-size: 0.9rem; font-weight: 500;">Chọn tệp PDF hoặc Word (.docx)</span>
-                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 10MB</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 100MB</span>
               </div>
               <div v-else class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
                 <i :class="selectedFile.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="selectedFile.name.endsWith('.docx') ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
@@ -1129,10 +1130,6 @@ async function saveEditExam() {
                 <span><i class="pi pi-video"></i> Video YouTube</span>
               </label>
               <label class="radio-option">
-                <input type="radio" v-model="editLessonForm.type" value="doc" />
-                <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
-              </label>
-              <label class="radio-option">
                 <input type="radio" v-model="editLessonForm.type" value="file" />
                 <span><i class="pi pi-upload"></i> Tài liệu (PDF, Word)</span>
               </label>
@@ -1141,10 +1138,6 @@ async function saveEditExam() {
 
           <div v-if="editLessonForm.type === 'video'">
             <input v-model="editLessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube..." />
-          </div>
-          
-          <div v-else-if="editLessonForm.type === 'doc'">
-            <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
           </div>
 
           <div v-else-if="editLessonForm.type === 'file'" class="frm-col">
@@ -1155,7 +1148,7 @@ async function saveEditExam() {
               <div v-if="!editSelectedFile && !existingFileUrl" class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
                 <i class="pi pi-upload" style="font-size: 1.5rem; color: #7c3aed;"></i>
                 <span style="font-size: 0.9rem; font-weight: 500;">Chọn tệp PDF hoặc Word (.docx) mới</span>
-                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 10MB</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 100MB</span>
               </div>
               
               <!-- If a new file has been selected -->
