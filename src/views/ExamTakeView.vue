@@ -100,7 +100,8 @@ async function loadExams() {
         ...exam,
         isCompleted: !!submission,
         submissionId: submission?.id || null,
-        studentScore: submission?.score ?? null
+        studentScore: submission?.score ?? null,
+        submittedAt: submission?.submittedAt || submission?.submitted_at || null
       }
     })
   } catch (err) {
@@ -459,6 +460,7 @@ onUnmounted(() => {
           <h3 class="font-bold">{{ e.title }}</h3>
           <p class="text-sm text-gray-500 mb-4">{{ e.subjectName }}</p>
           <div class="info-row"><i class="pi pi-clock"></i> {{ e.duration_minutes }} phút</div>
+          <div class="info-row"><i class="pi pi-list"></i> Số câu hỏi: {{ e.questions?.length || 0 }} câu</div>
           <div class="info-row">
             <span class="badge-exam-type" :class="'badge-' + (e.exam_type || 'other')">
               <i class="pi pi-file"></i> {{ getExamTypeLabel(e.exam_type) }}
@@ -467,10 +469,15 @@ onUnmounted(() => {
 
           <!-- Hiển thị điểm nếu đã hoàn thành -->
           <div v-if="e.isCompleted" class="score-inline">
-            <span class="score-inline-label">Điểm số:</span>
-            <span class="score-inline-value" :class="e.studentScore >= 5 ? 'score-pass' : 'score-fail'">
-              {{ e.studentScore }} <small>/ 10</small>
-            </span>
+            <div class="score-inline-main">
+              <span class="score-inline-label">Điểm số:</span>
+              <span class="score-inline-value" :class="e.studentScore >= 5 ? 'score-pass' : 'score-fail'">
+                {{ e.studentScore }} <small>/ 10</small>
+              </span>
+            </div>
+            <div v-if="e.submittedAt" class="submission-time-label">
+              Đã nộp: {{ formatDateTime(e.submittedAt) }}
+            </div>
           </div>
 
           <!-- Nút hành động -->
@@ -846,6 +853,11 @@ onUnmounted(() => {
 
 /* Card */
 .mono-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; transition: all 0.3s ease; }
+.mono-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  border-color: #cbd5e1;
+}
 .bg-primary-gradient {
   background: linear-gradient(135deg, var(--lms-primary, #4f46e5) 0%, var(--lms-primary-hover, #4338ca) 100%) !important;
 }
@@ -880,13 +892,24 @@ onUnmounted(() => {
 /* Điểm số inline trên thẻ */
 .score-inline {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
   margin-top: 0.75rem;
   padding: 0.6rem 0.75rem;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
+}
+.score-inline-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.submission-time-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
 }
 .score-inline-label {
   font-size: 0.8rem;
