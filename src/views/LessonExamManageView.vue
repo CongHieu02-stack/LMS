@@ -1512,6 +1512,26 @@ async function saveEditExam() {
   border-radius: 999px;
   font-weight: 600;
 }
+.badge-word {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.badge-pdf {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
 .instructor-doc-wrapper {
   margin-top: 0.5rem;
 }
