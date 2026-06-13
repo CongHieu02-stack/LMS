@@ -251,10 +251,14 @@ function getYouTubeId(url: string) {
 function parseLessonContent(contentStr: string) {
   try {
     const parsed = JSON.parse(contentStr)
+    const type = parsed.type || (parsed.youtubeId ? 'video' : (parsed.fileUrl || parsed.pdfUrl ? 'file' : 'doc'))
     return {
-      type: parsed.type || (parsed.youtubeId ? 'video' : 'doc'),
+      type,
       youtubeId: parsed.youtubeId || '',
       docContent: parsed.docContent || '',
+      fileUrl: parsed.fileUrl || parsed.pdfUrl || '',
+      fileExt: parsed.fileExt || '',
+      fileName: parsed.fileName || '',
       description: parsed.description || ''
     }
   } catch {
@@ -262,6 +266,9 @@ function parseLessonContent(contentStr: string) {
       type: 'video',
       youtubeId: '',
       docContent: '',
+      fileUrl: '',
+      fileExt: '',
+      fileName: '',
       description: contentStr || ''
     }
   }
@@ -378,6 +385,34 @@ async function loadClassContent() {
 
 onMounted(loadClasses)
 
+const selectedFile = ref<File | null>(null)
+const editSelectedFile = ref<File | null>(null)
+const existingFileUrl = ref('')
+const existingFileName = ref('')
+const existingFileExt = ref('')
+
+function formatFileSize(bytes: number) {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function handleFileChange(event: any) {
+  const file = event.target.files?.[0]
+  if (file) {
+    selectedFile.value = file
+  }
+}
+
+function handleEditFileChange(event: any) {
+  const file = event.target.files?.[0]
+  if (file) {
+    editSelectedFile.value = file
+  }
+}
+
 async function createLesson() {
   if (!selectedClass.value) return
   try {
@@ -389,12 +424,34 @@ async function createLesson() {
         youtubeId: ytId,
         description: lessonForm.value.description
       })
-    } else {
+    } else if (lessonForm.value.type === 'doc') {
       contentPayload = JSON.stringify({
         type: 'doc',
         docContent: lessonForm.value.docContent,
         description: lessonForm.value.description
       })
+    } else if (lessonForm.value.type === 'file') {
+      if (!selectedFile.value) {
+        showToast('warning', 'Cảnh báo', 'Vui lòng chọn một tệp tin để tải lên!')
+        return
+      }
+      const formData = new FormData()
+      formData.append('file', selectedFile.value)
+      
+      const uploadRes = await apiPost<{ success: boolean; fileUrl: string }>('/lessons/upload', formData)
+      
+      if (uploadRes.success) {
+        const fileExt = selectedFile.value.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
+        contentPayload = JSON.stringify({
+          type: 'file',
+          fileUrl: uploadRes.fileUrl,
+          fileExt,
+          fileName: selectedFile.value.name,
+          description: lessonForm.value.description
+        })
+      } else {
+        throw new Error('Tải lên tệp tin thất bại.')
+      }
     }
 
     await apiPost('/lessons', {
@@ -412,6 +469,7 @@ async function createLesson() {
       type: 'video', 
       sortOrder: lessons.value.length + 2 
     }
+    selectedFile.value = null
     loadClassContent()
     showCreateLessonModal.value = false
     showToast('success', 'Thành công', 'Tạo bài học thành công!')
@@ -481,6 +539,10 @@ function startEditLesson(lesson: any) {
     description: content.description || '',
     sortOrder: lesson.sort_order || lesson.sortOrder || 1
   }
+  existingFileUrl.value = content.fileUrl || ''
+  existingFileName.value = content.fileName || ''
+  existingFileExt.value = content.fileExt || ''
+  editSelectedFile.value = null
   showEditLessonModal.value = true
 }
 
@@ -495,12 +557,39 @@ async function saveEditLesson() {
         youtubeId: ytId,
         description: editLessonForm.value.description
       })
-    } else {
+    } else if (editLessonForm.value.type === 'doc') {
       contentPayload = JSON.stringify({
         type: 'doc',
         docContent: editLessonForm.value.docContent,
         description: editLessonForm.value.description
       })
+    } else if (editLessonForm.value.type === 'file') {
+      if (editSelectedFile.value) {
+        const formData = new FormData()
+        formData.append('file', editSelectedFile.value)
+        const uploadRes = await apiPost<{ success: boolean; fileUrl: string }>('/lessons/upload', formData)
+        
+        if (uploadRes.success) {
+          const fileExt = editSelectedFile.value.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
+          contentPayload = JSON.stringify({
+            type: 'file',
+            fileUrl: uploadRes.fileUrl,
+            fileExt,
+            fileName: editSelectedFile.value.name,
+            description: editLessonForm.value.description
+          })
+        } else {
+          throw new Error('Tải lên tệp tin thất bại.')
+        }
+      } else {
+        contentPayload = JSON.stringify({
+          type: 'file',
+          fileUrl: existingFileUrl.value,
+          fileExt: existingFileExt.value,
+          fileName: existingFileName.value,
+          description: editLessonForm.value.description
+        })
+      }
     }
 
     await apiPut(`/lessons/${editingLessonId.value}`, {
@@ -511,6 +600,7 @@ async function saveEditLesson() {
 
     showEditLessonModal.value = false
     editingLessonId.value = null
+    editSelectedFile.value = null
     loadClassContent()
     showToast('success', 'Thành công', 'Cập nhật bài giảng thành công!')
   } catch (err: any) {
@@ -645,7 +735,10 @@ async function saveEditExam() {
                         <i class="pi pi-video mr-1"></i>Video
                       </span>
                       <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
-                        <i class="pi pi-file-pdf mr-1"></i>Tài liệu
+                        <i class="pi pi-file mr-1"></i>Tài liệu (HTML)
+                      </span>
+                      <span v-else-if="parseLessonContent(l.content).type === 'file'" class="ml-2" :class="parseLessonContent(l.content).fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
+                        <i :class="parseLessonContent(l.content).fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>{{ parseLessonContent(l.content).fileExt === 'docx' ? 'Word' : 'PDF' }}
                       </span>
                     </div>
                     <div class="lesson-actions">
@@ -727,6 +820,10 @@ async function saveEditExam() {
                 <input type="radio" v-model="lessonForm.type" value="doc" />
                 <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
               </label>
+              <label class="radio-option">
+                <input type="radio" v-model="lessonForm.type" value="file" />
+                <span><i class="pi pi-upload"></i> Tài liệu (PDF, Word)</span>
+              </label>
             </div>
           </div>
 
@@ -737,6 +834,25 @@ async function saveEditExam() {
           <div v-else-if="lessonForm.type === 'doc'">
             <textarea v-model="lessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung bài giảng (Hỗ trợ định dạng HTML cơ bản: <p>, <h3>, <strong>, <ul>, <li>, <blockquote>,...)"></textarea>
             <div class="editor-hint">Gợi ý: Dùng các thẻ HTML để trình bày bài giảng đẹp mắt hơn khi xuất PDF.</div>
+          </div>
+
+          <div v-else-if="lessonForm.type === 'file'" class="frm-col">
+            <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
+              <input type="file" @change="handleFileChange" accept=".pdf,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+              <div v-if="!selectedFile" class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
+                <i class="pi pi-upload" style="font-size: 1.5rem; color: #7c3aed;"></i>
+                <span style="font-size: 0.9rem; font-weight: 500;">Chọn tệp PDF hoặc Word (.docx)</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 10MB</span>
+              </div>
+              <div v-else class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                <i :class="selectedFile.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="selectedFile.name.endsWith('.docx') ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
+                <div style="text-align: left;">
+                  <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ selectedFile.name }}</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">{{ formatFileSize(selectedFile.size) }}</div>
+                </div>
+                <button type="button" @click.stop="selectedFile = null" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="pi pi-times"></i></button>
+              </div>
+            </div>
           </div>
 
           <textarea v-model="lessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt bài giảng / Ghi chú cho sinh viên..."></textarea>
@@ -906,6 +1022,39 @@ async function saveEditExam() {
           </div>
         </div>
 
+        <!-- Generic file content area (PDF & DOCX) -->
+        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'file'" class="student-pdf-wrapper mb-3" style="width: 100%;">
+          <div class="doc-actions mb-3" style="display: flex; justify-content: flex-end;">
+            <a :href="parseLessonContent(selectedLessonDetail.content).fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; background: #7c3aed; color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
+              <i class="pi pi-download mr-1"></i> Tải tài liệu ({{ parseLessonContent(selectedLessonDetail.content).fileExt.toUpperCase() }})
+            </a>
+          </div>
+          
+          <!-- Show inline PDF viewer if PDF -->
+          <div v-if="parseLessonContent(selectedLessonDetail.content).fileExt === 'pdf'" class="pdf-viewer-container" style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; height: 450px;">
+            <iframe :src="parseLessonContent(selectedLessonDetail.content).fileUrl" class="pdf-iframe-viewer" style="width: 100%; height: 100%; border: 0;" frameborder="0"></iframe>
+          </div>
+          <!-- Show download card if DOCX -->
+          <div v-else class="docx-download-card" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; gap: 1rem; flex-wrap: wrap;">
+            <div class="docx-info" style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 200px;">
+              <i class="pi pi-file-word docx-icon" style="font-size: 2.25rem; color: #2563eb;"></i>
+              <div class="docx-details" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <span class="docx-filename" style="font-weight: 600; color: #1e293b; font-size: 0.9rem;">{{ parseLessonContent(selectedLessonDetail.content).fileName || 'Tài liệu Word' }}</span>
+                <span class="docx-hint" style="font-size: 0.75rem; color: #64748b;">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
+              </div>
+            </div>
+            <a :href="parseLessonContent(selectedLessonDetail.content).fileUrl" target="_blank" class="btn-download-docx" style="background: #2563eb; color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center;">
+              <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
+            </a>
+          </div>
+        </div>
+
+        <!-- Description for Video and File lessons -->
+        <div v-if="['video', 'file'].includes(parseLessonContent(selectedLessonDetail.content).type) && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3" style="margin-top: 1rem; background: #f1f5f9; padding: 1rem; border-radius: 10px; font-size: 0.85rem; color: #475569; line-height: 1.5; border-left: 4px solid #cbd5e1;">
+          <strong style="color: #374151; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Mô tả / Ghi chú:</strong>
+          {{ parseLessonContent(selectedLessonDetail.content).description }}
+        </div>
+
         <!-- Description for video lessons -->
         <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3">
           <strong style="color: #374151; font-size: 0.9rem;">Mô tả:</strong>
@@ -983,6 +1132,10 @@ async function saveEditExam() {
                 <input type="radio" v-model="editLessonForm.type" value="doc" />
                 <span><i class="pi pi-file-pdf"></i> Tài liệu (Doc)</span>
               </label>
+              <label class="radio-option">
+                <input type="radio" v-model="editLessonForm.type" value="file" />
+                <span><i class="pi pi-upload"></i> Tài liệu (PDF, Word)</span>
+              </label>
             </div>
           </div>
 
@@ -992,6 +1145,39 @@ async function saveEditExam() {
           
           <div v-else-if="editLessonForm.type === 'doc'">
             <textarea v-model="editLessonForm.docContent" class="inp w-full html-editor" style="min-height:150px" placeholder="Nhập nội dung HTML bài giảng..."></textarea>
+          </div>
+
+          <div v-else-if="editLessonForm.type === 'file'" class="frm-col">
+            <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
+              <input type="file" @change="handleEditFileChange" accept=".pdf,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+              
+              <!-- If no new file is selected and no existing file exists -->
+              <div v-if="!editSelectedFile && !existingFileUrl" class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
+                <i class="pi pi-upload" style="font-size: 1.5rem; color: #7c3aed;"></i>
+                <span style="font-size: 0.9rem; font-weight: 500;">Chọn tệp PDF hoặc Word (.docx) mới</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Dung lượng tối đa 10MB</span>
+              </div>
+              
+              <!-- If a new file has been selected -->
+              <div v-else-if="editSelectedFile" class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                <i :class="editSelectedFile.name.endsWith('.docx') ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="editSelectedFile.name.endsWith('.docx') ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
+                <div style="text-align: left;">
+                  <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ editSelectedFile.name }} (Mới)</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">{{ formatFileSize(editSelectedFile.size) }}</div>
+                </div>
+                <button type="button" @click.stop="editSelectedFile = null" style="background: none; border: none; color: #ef4444; cursor: pointer;"><i class="pi pi-times"></i></button>
+              </div>
+
+              <!-- If no new file selected but existing file exists -->
+              <div v-else class="file-uploaded-info" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                <i :class="existingFileExt === 'docx' ? 'pi pi-file-word' : 'pi pi-file-pdf'" :style="existingFileExt === 'docx' ? 'font-size: 1.5rem; color: #2563eb;' : 'font-size: 1.5rem; color: #ef4444;'"></i>
+                <div style="text-align: left;">
+                  <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ existingFileName || 'Tài liệu đã tải lên' }}</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">Đã có sẵn trên hệ thống</div>
+                </div>
+                <span style="font-size: 0.75rem; color: #7c3aed; font-weight: 600; padding: 0.2rem 0.4rem; background: #f3e8ff; border-radius: 4px;">Nhấp để đổi file</span>
+              </div>
+            </div>
           </div>
 
           <textarea v-model="editLessonForm.description" class="inp" style="min-height:70px" placeholder="Mô tả tóm tắt..."></textarea>
