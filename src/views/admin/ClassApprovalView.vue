@@ -17,34 +17,100 @@ const processing = ref<string | null>(null)
 const msg = ref<string | null>(null)
 const minStartDateStr = ref('')
 const searchQuery = ref('')
+const selectedSemesterFilter = ref('')
+const selectedDepartmentFilter = ref('')
+const selectedStatusFilter = ref('')
+
+const semesters = computed(() => {
+  const list = new Set<string>()
+  proposals.value.forEach(p => { if (p.semester) list.add(p.semester) })
+  classes.value.forEach(c => { if (c.semester) list.add(c.semester) })
+  return Array.from(list).sort()
+})
+
+const departments = computed(() => {
+  const list = new Set<string>()
+  proposals.value.forEach(p => { 
+    const dept = p.subject?.department
+    if (dept) list.add(dept)
+  })
+  classes.value.forEach(c => {
+    const dept = c.subject?.department
+    if (dept) list.add(dept)
+  })
+  if (list.size === 0) {
+    return [
+      'Khoa Công nghệ thông tin',
+      'Khoa Quản trị - Marketing',
+      'Khoa Tài chính - Thương mại',
+      'Khoa Khoa học Xã hội & Ngôn ngữ Quốc tế',
+      'Khoa Truyền thông số',
+      'Khoa Khoa học Sức khỏe'
+    ]
+  }
+  return Array.from(list).sort()
+})
 
 const filteredProposals = computed(() => {
-  if (!searchQuery.value) return proposals.value
-  const q = searchQuery.value.toLowerCase()
   return proposals.value.filter((p: any) => {
-    return (
-      (p.subject?.code && p.subject.code.toLowerCase().includes(q)) ||
-      (p.subject?.name && p.subject.name.toLowerCase().includes(q)) ||
-      (p.semester && p.semester.toLowerCase().includes(q)) ||
-      (p.proposer?.full_name && p.proposer.full_name.toLowerCase().includes(q)) ||
-      (p.reason && p.reason.toLowerCase().includes(q))
-    )
+    if (selectedSemesterFilter.value && p.semester !== selectedSemesterFilter.value) {
+      return false
+    }
+    if (selectedDepartmentFilter.value) {
+      const dept = p.subject?.department || 'Khoa Công nghệ thông tin'
+      if (dept !== selectedDepartmentFilter.value) {
+        return false
+      }
+    }
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase()
+      const matchSearch = (
+        (p.subject?.code && p.subject.code.toLowerCase().includes(q)) ||
+        (p.subject?.name && p.subject.name.toLowerCase().includes(q)) ||
+        (p.semester && p.semester.toLowerCase().includes(q)) ||
+        (p.proposer?.full_name && p.proposer.full_name.toLowerCase().includes(q)) ||
+        (p.reason && p.reason.toLowerCase().includes(q))
+      )
+      if (!matchSearch) return false
+    }
+    return true
   })
 })
 
 const filteredClasses = computed(() => {
-  if (!searchQuery.value) return classes.value
-  const q = searchQuery.value.toLowerCase()
   return classes.value.filter((c: any) => {
-    return (
-      (c.subject?.code && c.subject.code.toLowerCase().includes(q)) ||
-      (c.subject?.name && c.subject.name.toLowerCase().includes(q)) ||
-      (c.code && c.code.toLowerCase().includes(q)) ||
-      (c.name && c.name.toLowerCase().includes(q)) ||
-      (c.semester && c.semester.toLowerCase().includes(q)) ||
-      (c.room && c.room.toLowerCase().includes(q)) ||
-      (c.manager?.fullName && c.manager.fullName.toLowerCase().includes(q))
-    )
+    if (selectedSemesterFilter.value && c.semester !== selectedSemesterFilter.value) {
+      return false
+    }
+    if (selectedDepartmentFilter.value) {
+      const dept = c.subject?.department || 'Khoa Công nghệ thông tin'
+      if (dept !== selectedDepartmentFilter.value) {
+        return false
+      }
+    }
+    if (selectedStatusFilter.value) {
+      const status = (c.status || '').toLowerCase()
+      if (selectedStatusFilter.value === 'draft' && status !== 'draft') {
+        return false
+      }
+      if (selectedStatusFilter.value === 'approved' && status !== 'approved') {
+        return false
+      }
+    }
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase()
+      const matchSearch = (
+        (c.subject?.code && c.subject.code.toLowerCase().includes(q)) ||
+        (c.subject?.name && c.subject.name.toLowerCase().includes(q)) ||
+        (c.code && c.code.toLowerCase().includes(q)) ||
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.semester && c.semester.toLowerCase().includes(q)) ||
+        (c.room && c.room.toLowerCase().includes(q)) ||
+        (c.manager?.fullName && c.manager.fullName.toLowerCase().includes(q))
+      )
+      if (!matchSearch) return false
+    }
+    return true
   })
 })
 
@@ -293,7 +359,7 @@ onMounted(async () => {
 
     <!-- Tab Navigation -->
     <div class="tabs-container">
-      <button class="tab-btn" :class="{ active: activeTab === 'proposals' }" @click="activeTab = 'proposals'">
+      <button class="tab-btn" :class="{ active: activeTab === 'proposals' }" @click="activeTab = 'proposals'; selectedStatusFilter = ''">
         <i class="pi pi-list"></i>
         Đề xuất số lượng lớp
         <span class="tab-badge" v-if="proposals.length > 0">{{ proposals.length }}</span>
@@ -305,16 +371,43 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- Search Bar -->
-    <div class="search-container mb-6" v-if="!loading && (proposals.length > 0 || classes.length > 0)">
-      <div class="search-box">
-        <i class="pi pi-search search-icon"></i>
-        <input
-          type="text"
-          v-model="searchQuery"
-          placeholder="Tìm kiếm môn học, mã lớp, học kỳ, người quản lý/đề xuất..."
-          class="search-input"
-        />
+    <!-- Search & Filter Card -->
+    <div class="filter-card mb-6" v-if="!loading && (proposals.length > 0 || classes.length > 0)">
+      <div class="filter-grid" :class="{ 'has-status-filter': activeTab === 'classes' }">
+        <div class="fg search-fg">
+          <label>Tìm kiếm thông tin</label>
+          <div class="search-box">
+            <i class="pi pi-search search-icon"></i>
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Tìm kiếm môn học, mã lớp, học kỳ, người quản lý/đề xuất..."
+              class="search-input"
+            />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Học kỳ</label>
+          <select v-model="selectedSemesterFilter" class="mono-input select-filter">
+            <option value="">-- Tất cả học kỳ --</option>
+            <option v-for="sem in semesters" :key="sem" :value="sem">{{ sem }}</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Khoa / Bộ môn</label>
+          <select v-model="selectedDepartmentFilter" class="mono-input select-filter">
+            <option value="">-- Tất cả khoa --</option>
+            <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
+          </select>
+        </div>
+        <div class="fg" v-if="activeTab === 'classes'">
+          <label>Trạng thái lớp</label>
+          <select v-model="selectedStatusFilter" class="mono-input select-filter">
+            <option value="">-- Tất cả trạng thái --</option>
+            <option value="draft">Chờ xếp phòng (Draft)</option>
+            <option value="approved">Đã duyệt (Approved)</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -866,8 +959,35 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   cursor: not-allowed;
 }
 
-.search-container {
+.filter-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  gap: 1.25rem;
+}
+.filter-grid.has-status-filter {
+  grid-template-columns: 2fr 1fr 1.5fr 1fr;
+}
+.fg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   width: 100%;
+}
+.fg label {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: #374151;
+}
+.select-filter {
+  width: 100%;
+  cursor: pointer;
 }
 .search-box {
   position: relative;
@@ -884,7 +1004,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   width: 100%;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  padding: 0.65rem 1rem 0.65rem 2.5rem;
   font-size: 0.875rem;
   outline: none;
   background-color: #fff;
