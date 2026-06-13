@@ -226,7 +226,6 @@ function getStatusBadge(s: any) {
                 <th>Khoa/Bộ môn</th>
                 <th>Trạng thái</th>
                 <th>Mô tả/Đề cương</th>
-                <th class="actions-col">Hành động</th>
               </tr>
             </thead>
             <tbody>
@@ -244,17 +243,6 @@ function getStatusBadge(s: any) {
                   </span>
                 </td>
                 <td class="desc-cell">{{ s.description }}</td>
-                <td class="actions-cell">
-                  <!-- Actions for Pending -->
-                  <div class="btn-group" v-if="s.status === 'pending'">
-                    <button class="action-btn btn-approve" @click="handleApprove(s)" title="Phê duyệt">
-                      <i class="pi pi-check"></i> Duyệt
-                    </button>
-                    <button class="action-btn btn-reject" @click="handleReject(s)" title="Từ chối">
-                      <i class="pi pi-times"></i> Từ chối
-                    </button>
-                  </div>
-                </td>
               </tr>
             </tbody>
           </table>
