@@ -164,6 +164,13 @@ const standaloneMenus = ref<(SubMenuItem & { icon?: string })[]>([
     studentOnly: true,
   },
   {
+    label: 'Lịch sử thi',
+    to: '/exam/history',
+    icon: 'pi pi-history',
+    requiredPermission: 'exam_take',
+    studentOnly: true,
+  },
+  {
     label: 'Bảng điểm',
     to: '/grades',
     icon: 'pi pi-chart-bar',

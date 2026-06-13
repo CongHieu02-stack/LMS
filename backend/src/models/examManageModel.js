@@ -27,7 +27,7 @@ export async function findById(id) {
 export async function findPublishedByClass(classId) {
   const { data, error } = await supabaseAdmin
     .from('exams')
-    .select('id, title, duration_minutes, exam_type, questions, status, class_id')
+    .select('id, title, duration_minutes, exam_type, questions, status, class_id, show_answers_to_students')
     .eq('class_id', classId)
     .eq('status', 'published')
   if (error) throw error

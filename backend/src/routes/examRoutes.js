@@ -18,4 +18,7 @@ router.post('/submit', examController.submitExam)
 // GET /api/exam/my-submissions — Bài nộp của SV hiện tại
 router.get('/my-submissions', examController.getMySubmissions)
 
+// GET /api/exam/submission/:id — Chi tiết bài nộp của SV
+router.get('/submission/:id', examController.getSubmissionDetail)
+
 export { router }

@@ -36,11 +36,14 @@ export function formatSubmissionList(rawList) {
   return {
     data: (rawList || []).map(item => ({
       id: item.id,
+      examId: item.exam_id,
       examTitle: item.exam_title,
       score: item.score,
       isForced: item.is_forced,
       violations: item.violations,
       submittedAt: item.submitted_at,
+      startedAt: item.started_at,
+      answers: item.answers || [],
       student: item.student ? {
         id: item.student.id,
         fullName: item.student.full_name,

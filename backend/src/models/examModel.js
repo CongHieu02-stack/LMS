@@ -16,10 +16,13 @@ export async function saveSubmission(submission) {
     .from('exam_submissions')
     .insert({
       student_id: submission.student_id,
+      exam_id: submission.exam_id || null,
       exam_title: submission.exam_title || 'Untitled Exam',
       answers: submission.answers || [],
+      score: submission.score !== undefined ? submission.score : null,
       is_forced: submission.is_forced || false,
-      violations: submission.violations || 0
+      violations: submission.violations || 0,
+      started_at: submission.started_at || null
     })
     .select()
     .single()

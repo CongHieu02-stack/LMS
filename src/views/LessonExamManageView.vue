@@ -16,7 +16,7 @@ const msg = ref<string | null>(null)
 
 // Forms
 const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
-const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm' })
+const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm', showAnswersToStudents: true })
 
 // Modal state variables
 const showCreateLessonModal = ref(false)
@@ -534,9 +534,10 @@ async function createExam() {
       title: examForm.value.title,
       durationMinutes: examForm.value.durationMinutes,
       examType: examForm.value.examType,
+      showAnswersToStudents: examForm.value.showAnswersToStudents,
       questions: questions.value
     })
-    examForm.value = { title: '', durationMinutes: 60, examType: 'other' }
+    examForm.value = { title: '', durationMinutes: 60, examType: 'midterm', showAnswersToStudents: true }
     questions.value = []
     editingQuestionIndex.value = null
     loadClassContent()
@@ -670,7 +671,8 @@ const editingExamId = ref<string | null>(null)
 const editExamForm = ref({
   title: '',
   durationMinutes: 60,
-  examType: 'midterm'
+  examType: 'midterm',
+  showAnswersToStudents: true
 })
 const editExamQuestions = ref<any[]>([])
 
@@ -684,7 +686,8 @@ function startEditExam(exam: any) {
   editExamForm.value = {
     title: exam.title,
     durationMinutes: exam.duration_minutes || exam.durationMinutes || 60,
-    examType: exam.exam_type || exam.examType || 'midterm'
+    examType: exam.exam_type || exam.examType || 'midterm',
+    showAnswersToStudents: exam.show_answers_to_students !== false
   }
   // Deep copy questions
   editExamQuestions.value = (exam.questions || []).map((q: any) => ({
@@ -732,6 +735,7 @@ async function saveEditExam() {
       title: editExamForm.value.title,
       duration_minutes: editExamForm.value.durationMinutes,
       examType: editExamForm.value.examType,
+      showAnswersToStudents: editExamForm.value.showAnswersToStudents,
       questions: editExamQuestions.value
     })
     showEditExamModal.value = false
@@ -782,9 +786,10 @@ async function saveEditExam() {
                 Chưa có bài giảng nào trong lớp này. Hãy bấm "+ Tạo bài giảng" để bắt đầu.
               </div>
               <div v-else class="lst">
-                <div v-for="l in lessons" :key="l.id" class="lesson-card-static">
+                <div v-for="(l, idx) in lessons" :key="l.id" class="lesson-card-static">
                   <div class="lesson-card-header-static">
                     <div class="lesson-card-title">
+                      <span class="lesson-index mr-2">BÀI {{ idx + 1 }}</span>
                       <span class="lesson-title-text">{{ l.title }}</span>
                       
                       <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
@@ -941,6 +946,10 @@ async function saveEditExam() {
               <option value="midterm">Giữa kỳ</option>
               <option value="final">Cuối kỳ</option>
             </select>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.25rem">
+            <input type="checkbox" v-model="examForm.showAnswersToStudents" id="showAnswersToStudents" style="width:16px;height:16px;cursor:pointer;" />
+            <label for="showAnswersToStudents" style="cursor:pointer;font-size:0.9rem;font-weight:600;color:#4b5563">Cho phép sinh viên xem đáp án chi tiết sau khi nộp</label>
           </div>
 
           <!-- BỘ TẠO CÂU HỎI TRẮC NGHIỆM TƯƠNG TÁC -->
@@ -1275,6 +1284,10 @@ async function saveEditExam() {
               <option value="final">Cuối kỳ</option>
             </select>
           </div>
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.25rem">
+            <input type="checkbox" v-model="editExamForm.showAnswersToStudents" id="editShowAnswersToStudents" style="width:16px;height:16px;cursor:pointer;" />
+            <label for="editShowAnswersToStudents" style="cursor:pointer;font-size:0.9rem;font-weight:600;color:#4b5563">Cho phép sinh viên xem đáp án chi tiết sau khi nộp</label>
+          </div>
 
           <!-- Bộ soạn câu hỏi trong Edit modal -->
           <div class="question-builder-box">
@@ -1421,6 +1434,15 @@ async function saveEditExam() {
 .lesson-card-header { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: #f9fafb; cursor: pointer; user-select: none; }
 .lesson-card-title { display: flex; align-items: center; font-weight: 600; color: #111827; }
 .lesson-title-text { font-size: 0.95rem; }
+.lesson-index {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
 .badge-video { display: inline-flex; align-items: center; font-size: 0.7rem; background: #f3e8ff; color: #6b21a8; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600; }
 .lesson-card-body { padding: 1.25rem; border-top: 1px solid #e5e7eb; background: #fff; }
 .video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.07); border: 1px solid #e5e7eb; background: #000; }
@@ -1778,6 +1800,9 @@ async function saveEditExam() {
 }
 .ml-2 {
   margin-left: 0.5rem;
+}
+.mr-2 {
+  margin-right: 0.5rem;
 }
 
 /* Modal Popup Styles */

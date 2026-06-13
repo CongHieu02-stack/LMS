@@ -18,6 +18,7 @@ const isExamFinished = ref(false)
 const cheatWarnings = ref(0)
 const finalScore = ref<number | null>(null)
 const timeLeft = ref(0)
+const startedAt = ref<string | null>(null)
 let timerInterval: any = null
 const showCheatOverlay = ref(false)
 const showCheatForcedModal = ref(false)
@@ -70,7 +71,7 @@ async function loadExams() {
             examsList.push(...exRes.data.map(e => ({
               ...e, 
               className: reg.class?.name || 'Lớp học',
-              subjectName: reg.class?.subject?.name || 'Môn học'
+              subjectName: reg.class?.subjectName || 'Môn học'
             })))
           }
         } catch (e) { console.warn(e) }
@@ -99,7 +100,8 @@ function saveExamStateToStorage() {
     timeLeft: timeLeft.value,
     cheatWarnings: cheatWarnings.value,
     isExamStarted: isExamStarted.value,
-    showCheatOverlay: showCheatOverlay.value
+    showCheatOverlay: showCheatOverlay.value,
+    startedAt: startedAt.value
   }
   localStorage.setItem(storageKey.value, JSON.stringify(state))
 }
@@ -122,6 +124,7 @@ function loadExamStateFromStorage() {
       cheatWarnings.value = state.cheatWarnings || 0
       isExamStarted.value = state.isExamStarted || false
       showCheatOverlay.value = state.showCheatOverlay || false
+      startedAt.value = state.startedAt || null
       
       if (isExamStarted.value) {
         // Gắn lại event listeners
@@ -236,6 +239,7 @@ async function startExam() {
   if (!selectedExam.value) return
   await enterFullscreen()
   isExamStarted.value = true
+  startedAt.value = new Date().toISOString()
   
   // Gắn event listeners
   document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -287,7 +291,8 @@ async function submitExam(isForced = false) {
       classId: selectedExam.value.class_id,
       answers: answersList,
       isForced,
-      violations: cheatWarnings.value
+      violations: cheatWarnings.value,
+      startedAt: startedAt.value
     })
     
     // Backend tự động tính điểm và lưu vào grades table
@@ -321,6 +326,13 @@ function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0')
   const s = (seconds % 60).toString().padStart(2, '0')
   return `${m}:${s}`
+}
+
+function scrollToQuestion(index: number) {
+  const el = document.getElementById(`question-card-${index}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 }
 
 function getExamTypeLabel(type: string) {
@@ -415,18 +427,37 @@ onUnmounted(() => {
       <button class="btn-outline" @click="triggerSubmitConfirmation">Nộp bài</button>
     </div>
 
-    <!-- Nội dung câu hỏi -->
-    <div class="exam-content">
-      <div v-if="questions.length === 0" class="text-center py-10 text-gray-500">Bài thi chưa có nội dung câu hỏi.</div>
-      <div class="mono-card mb-6" v-for="(q, index) in questions" :key="q.id">
-        <div class="card-body">
-          <h3 class="question-text">Câu {{ (index as number) + 1 }}: {{ q.text }}</h3>
-          <div class="options-grid">
-            <label v-for="(opt, optIndex) in q.options" :key="optIndex" class="option-label">
-              <input type="radio" :name="`q_${q.id}`" :value="optIndex" v-model="answers[q.id]" class="radio-input" />
-              <span class="option-box">{{ opt }}</span>
-            </label>
+    <!-- Layout Container -->
+    <div class="exam-layout-container">
+      <!-- Nội dung câu hỏi (bên trái) -->
+      <div class="exam-questions-area">
+        <div v-if="questions.length === 0" class="text-center py-10 text-gray-500">Bài thi chưa có nội dung câu hỏi.</div>
+        <div :id="`question-card-${index}`" class="mono-card mb-6" v-for="(q, index) in questions" :key="q.id">
+          <div class="card-body">
+            <h3 class="question-text">Câu {{ (index as number) + 1 }}: {{ q.text }}</h3>
+            <div class="options-grid">
+              <label v-for="(opt, optIndex) in q.options" :key="optIndex" class="option-label">
+                <input type="radio" :name="`q_${q.id}`" :value="optIndex" v-model="answers[q.id]" class="radio-input" />
+                <span class="option-box"><strong>{{ String.fromCharCode(65 + Number(optIndex)) }}.</strong> {{ opt }}</span>
+              </label>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Sidebar câu hỏi nhanh (bên phải) -->
+      <div class="exam-navigation-sidebar">
+        <div class="nav-sidebar-title">Danh sách câu hỏi</div>
+        <div class="nav-sidebar-grid">
+          <button 
+            v-for="(q, index) in questions" 
+            :key="q.id" 
+            class="nav-sidebar-btn"
+            :class="{ 'answered': answers[q.id] !== undefined }"
+            @click="scrollToQuestion(index)"
+          >
+            {{ index + 1 }}
+          </button>
         </div>
       </div>
     </div>
@@ -782,5 +813,85 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.exam-layout-container {
+  display: flex;
+  max-width: 68rem;
+  margin: 2rem auto;
+  width: 100%;
+  padding: 0 1rem;
+  gap: 2rem;
+  flex-grow: 1;
+  box-sizing: border-box;
+}
+.exam-questions-area {
+  flex: 1;
+}
+.exam-navigation-sidebar {
+  width: 240px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  height: fit-content;
+  position: sticky;
+  top: 5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-sizing: border-box;
+}
+.nav-sidebar-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #111827;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: center;
+}
+.nav-sidebar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.nav-sidebar-btn {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #4b5563;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.nav-sidebar-btn:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+.nav-sidebar-btn.answered {
+  background: var(--lms-primary, #4f46e5);
+  color: #ffffff;
+  border-color: var(--lms-primary, #4f46e5);
+}
+
+@media (max-width: 1024px) {
+  .exam-layout-container {
+    flex-direction: column-reverse;
+    gap: 1.5rem;
+  }
+  .exam-navigation-sidebar {
+    width: 100%;
+    position: static;
+  }
+  .nav-sidebar-grid {
+    grid-template-columns: repeat(10, 1fr);
+  }
 }
 </style>
