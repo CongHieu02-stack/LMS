@@ -704,15 +704,28 @@ onMounted(() => {
                 <div class="student-lesson-title">
                   <span class="lesson-index">Bài {{ Number(idx) + 1 }}</span>
                   <span class="lesson-name">{{ l.title }}</span>
-                  <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
-                    <i class="pi pi-video mr-1"></i>Video
-                  </span>
-                  <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
-                    <i class="pi pi-file mr-1"></i>Tài liệu
-                  </span>
-                  <span v-else-if="parseLessonContent(l.content).type === 'file'" class="ml-2" :class="parseLessonContent(l.content).fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
-                    <i :class="parseLessonContent(l.content).fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>{{ parseLessonContent(l.content).fileExt === 'docx' ? 'Word' : 'PDF' }}
-                  </span>
+                  <template v-if="parseLessonContent(l.content).youtubeId && parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0">
+                    <span class="badge-mixed ml-2">
+                      <i class="pi pi-clone mr-1"></i>Video + Tài liệu
+                    </span>
+                  </template>
+                  <template v-else-if="parseLessonContent(l.content).youtubeId">
+                    <span class="badge-video ml-2">
+                      <i class="pi pi-video mr-1"></i>Video
+                    </span>
+                  </template>
+                  <template v-else-if="parseLessonContent(l.content).type === 'doc'">
+                    <span class="badge-doc ml-2">
+                      <i class="pi pi-file mr-1"></i>Tài liệu
+                    </span>
+                  </template>
+                  <template v-else-if="parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0">
+                    <span class="ml-2" :class="parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
+                      <i :class="parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>
+                      {{ parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'Word' : 'PDF' }}
+                      <span v-if="parseLessonContent(l.content).files.length > 1"> (+{{ parseLessonContent(l.content).files.length - 1 }})</span>
+                    </span>
+                  </template>
                 </div>
                 <i
                   class="pi"
@@ -726,26 +739,8 @@ onMounted(() => {
 
               <div v-if="expandedStudentLessons.includes(l.id)" class="student-lesson-body">
                 <!-- Video player -->
-                <div
-                  v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).youtubeId"
-                  class="student-video-wrapper mb-3"
-                >
-                  <iframe
-                    :src="
-                      'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId
-                    "
-                    frameborder="0"
-                    allow="
-                      accelerometer;
-                      autoplay;
-                      clipboard-write;
-                      encrypted-media;
-                      gyroscope;
-                      picture-in-picture;
-                    "
-                    allowfullscreen
-                  >
-                  </iframe>
+                <div v-if="parseLessonContent(l.content).youtubeId" class="student-video-wrapper mb-3">
+                  <iframe :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;" allowfullscreen></iframe>
                 </div>
 
                 <!-- Document viewer -->
@@ -757,8 +752,7 @@ onMounted(() => {
                       Xuất bài giảng PDF
                     </button>
                   </div>
-
-                  <!-- Đây là vùng nội dung sẽ được xuất PDF -->
+                  
                   <div :id="'pdf-content-' + l.id" class="pdf-print-area">
                     <div class="pdf-header-print">
                       <div class="pdf-header-row">
@@ -770,15 +764,11 @@ onMounted(() => {
                     </div>
                     <h2 class="pdf-title">{{ l.title }}</h2>
                     <div class="pdf-body-content" v-html="parseLessonContent(l.content).docContent"></div>
-                    <div v-if="parseLessonContent(l.content).description" class="pdf-desc-content">
-                      <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
-                      <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(l.content).description }}</p>
-                    </div>
                   </div>
                 </div>
 
                 <!-- Generic file content area (PDF & DOCX) -->
-                <div v-if="parseLessonContent(l.content).type === 'file'" class="student-pdf-wrapper mb-3" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; border: 0; background: transparent; box-shadow: none; padding: 0;">
+                <div v-if="parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0" class="student-pdf-wrapper mb-3" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; border: 0; background: transparent; box-shadow: none; padding: 0;">
                   <div v-for="(file, idx) in parseLessonContent(l.content).files" :key="idx" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                     <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                       <span>Tài liệu {{ idx + 1 }}: {{ file.fileName }}</span>
@@ -808,12 +798,9 @@ onMounted(() => {
                 </div>
 
                 <!-- Description for Video and File lessons -->
-                <div v-if="['video', 'file'].includes(parseLessonContent(l.content).type) && parseLessonContent(l.content).description" class="student-lesson-desc">
+                <div v-if="parseLessonContent(l.content).description" class="student-lesson-desc">
                   <strong style="color: #374151; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Mô tả / Ghi chú:</strong>
                   {{ parseLessonContent(l.content).description }}
-                </div>
-                <div v-else-if="parseLessonContent(l.content).type === 'video' && !parseLessonContent(l.content).youtubeId" class="empty-desc">
-                  Không có nội dung bài giảng video bổ sung.
                 </div>
               </div>
             </div>
@@ -1557,6 +1544,16 @@ onMounted(() => {
   font-size: 0.7rem;
   background: var(--lms-primary-light);
   color: var(--lms-primary);
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.badge-mixed {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  background: #dbeafe;
+  color: #1e40af;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-weight: 600;

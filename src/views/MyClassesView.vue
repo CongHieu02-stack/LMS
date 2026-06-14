@@ -296,22 +296,35 @@ function exportToPDF(lesson: any) {
                 <div class="student-lesson-title">
                   <span class="lesson-index">Bài {{ Number(idx) + 1 }}</span>
                   <span class="lesson-name">{{ l.title }}</span>
-                  <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
-                    <i class="pi pi-video mr-1"></i>Video
-                  </span>
-                  <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
-                    <i class="pi pi-file mr-1"></i>Tài liệu
-                  </span>
-                  <span v-else-if="parseLessonContent(l.content).type === 'file'" class="ml-2" :class="parseLessonContent(l.content).fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
-                    <i :class="parseLessonContent(l.content).fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>{{ parseLessonContent(l.content).fileExt === 'docx' ? 'Word' : 'PDF' }}
-                  </span>
+                  <template v-if="parseLessonContent(l.content).youtubeId && parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0">
+                    <span class="badge-mixed ml-2">
+                      <i class="pi pi-clone mr-1"></i>Video + Tài liệu
+                    </span>
+                  </template>
+                  <template v-else-if="parseLessonContent(l.content).youtubeId">
+                    <span class="badge-video ml-2">
+                      <i class="pi pi-video mr-1"></i>Video
+                    </span>
+                  </template>
+                  <template v-else-if="parseLessonContent(l.content).type === 'doc'">
+                    <span class="badge-doc ml-2">
+                      <i class="pi pi-file mr-1"></i>Tài liệu
+                    </span>
+                  </template>
+                  <template v-else-if="parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0">
+                    <span class="ml-2" :class="parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
+                      <i :class="parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>
+                      {{ parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'Word' : 'PDF' }}
+                      <span v-if="parseLessonContent(l.content).files.length > 1"> (+{{ parseLessonContent(l.content).files.length - 1 }})</span>
+                    </span>
+                  </template>
                 </div>
                 <i class="pi" :class="expandedStudentLessons.includes(l.id) ? 'pi-chevron-up text-purple-600' : 'pi-chevron-down'"></i>
               </div>
 
               <div v-if="expandedStudentLessons.includes(l.id)" class="student-lesson-body">
                 <!-- Video player -->
-                <div v-if="parseLessonContent(l.content).type === 'video' && parseLessonContent(l.content).youtubeId" class="student-video-wrapper mb-3">
+                <div v-if="parseLessonContent(l.content).youtubeId" class="student-video-wrapper mb-3">
                   <iframe :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;" allowfullscreen></iframe>
                 </div>
 
@@ -336,15 +349,11 @@ function exportToPDF(lesson: any) {
                     </div>
                     <h2 class="pdf-title">{{ l.title }}</h2>
                     <div class="pdf-body-content" v-html="parseLessonContent(l.content).docContent"></div>
-                    <div v-if="parseLessonContent(l.content).description" class="pdf-desc-content">
-                      <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
-                      <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(l.content).description }}</p>
-                    </div>
                   </div>
                 </div>
 
                 <!-- Generic file content area (PDF & DOCX) -->
-                <div v-if="parseLessonContent(l.content).type === 'file'" class="student-pdf-wrapper mb-3" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; border: 0; background: transparent; box-shadow: none; padding: 0;">
+                <div v-if="parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0" class="student-pdf-wrapper mb-3" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; border: 0; background: transparent; box-shadow: none; padding: 0;">
                   <div v-for="(file, idx) in parseLessonContent(l.content).files" :key="idx" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                     <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                       <span>Tài liệu {{ idx + 1 }}: {{ file.fileName }}</span>
@@ -374,7 +383,7 @@ function exportToPDF(lesson: any) {
                 </div>
 
                 <!-- Description for Video and File lessons -->
-                <div v-if="['video', 'file'].includes(parseLessonContent(l.content).type) && parseLessonContent(l.content).description" class="student-lesson-desc">
+                <div v-if="parseLessonContent(l.content).description" class="student-lesson-desc">
                   <strong style="color: #374151; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Mô tả / Ghi chú:</strong>
                   {{ parseLessonContent(l.content).description }}
                 </div>
@@ -462,6 +471,7 @@ function exportToPDF(lesson: any) {
 
 /* Lesson Badges */
 .badge-video { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; }
+.badge-mixed { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; }
 .badge-doc { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; }
 .badge-pdf { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; }
 .badge-word { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; }

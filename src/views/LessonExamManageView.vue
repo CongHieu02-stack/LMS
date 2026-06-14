@@ -15,7 +15,7 @@ const loading = ref(true)
 const msg = ref<string | null>(null)
 
 // Forms
-const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'video', sortOrder: 1 })
+const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'mixed', sortOrder: 1 })
 const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm' })
 
 // Modal state variables
@@ -452,53 +452,45 @@ function removeExistingFile(index: number) {
 async function createLesson() {
   if (!selectedClass.value) return
   try {
-    let contentPayload = ''
-    if (lessonForm.value.type === 'video') {
-      const url = (lessonForm.value.youtubeUrl || '').trim()
-      if (!url) {
-        showToast('warning', 'Cảnh báo', 'Vui lòng nhập link video YouTube!')
-        return
-      }
-      const ytId = getYouTubeId(url)
+    const youtubeUrl = (lessonForm.value.youtubeUrl || '').trim()
+    const description = (lessonForm.value.description || '').trim()
+    
+    if (!youtubeUrl && selectedFiles.value.length === 0) {
+      showToast('warning', 'Cảnh báo', 'Vui lòng nhập link video YouTube hoặc tải lên ít nhất một tệp tin!')
+      return
+    }
+
+    let ytId = ''
+    if (youtubeUrl) {
+      ytId = getYouTubeId(youtubeUrl)
       const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-      const isValid = url.match(regExp) && ytId && ytId.length === 11
+      const isValid = youtubeUrl.match(regExp) && ytId && ytId.length === 11
       if (!isValid) {
         showToast('warning', 'Cảnh báo', 'Link video YouTube không hợp lệ! Vui lòng nhập đúng định dạng link xem video (Ví dụ: https://www.youtube.com/watch?v=...)')
         return
       }
-      contentPayload = JSON.stringify({
-        type: 'video',
-        youtubeId: ytId,
-        description: lessonForm.value.description
-      })
-    } else if (lessonForm.value.type === 'doc') {
-      contentPayload = JSON.stringify({
-        type: 'doc',
-        docContent: lessonForm.value.docContent,
-        description: lessonForm.value.description
-      })
-    } else if (lessonForm.value.type === 'file') {
-      if (selectedFiles.value.length === 0) {
-        showToast('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một tệp tin để tải lên!')
-        return
-      }
+    }
+
+    let uploadedFiles: any[] = []
+    if (selectedFiles.value.length > 0) {
       const formData = new FormData()
       selectedFiles.value.forEach(file => {
         formData.append('files', file)
       })
-      
       const uploadRes = await apiPost<{ success: boolean; files: any[] }>('/lessons/upload', formData)
-      
       if (uploadRes.success) {
-        contentPayload = JSON.stringify({
-          type: 'file',
-          files: uploadRes.files,
-          description: lessonForm.value.description
-        })
+        uploadedFiles = uploadRes.files
       } else {
         throw new Error('Tải lên tệp tin thất bại.')
       }
     }
+
+    const contentPayload = JSON.stringify({
+      type: 'mixed',
+      youtubeId: ytId,
+      files: uploadedFiles,
+      description: description
+    })
 
     await apiPost('/lessons', {
       classId: selectedClass.value,
@@ -512,7 +504,7 @@ async function createLesson() {
       youtubeUrl: '', 
       description: '', 
       docContent: '', 
-      type: 'video', 
+      type: 'mixed', 
       sortOrder: lessons.value.length + 2 
     }
     selectedFiles.value = []
@@ -580,8 +572,8 @@ function startEditLesson(lesson: any) {
   editLessonForm.value = {
     title: lesson.title,
     type: content.type,
-    youtubeUrl: content.type === 'video' && content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
-    docContent: content.type === 'doc' ? content.docContent : '',
+    youtubeUrl: content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
+    docContent: content.docContent || '',
     description: content.description || '',
     sortOrder: lesson.sort_order || lesson.sortOrder || 1
   }
@@ -593,59 +585,45 @@ function startEditLesson(lesson: any) {
 async function saveEditLesson() {
   if (!editingLessonId.value) return
   try {
-    let contentPayload = ''
-    if (editLessonForm.value.type === 'video') {
-      const url = (editLessonForm.value.youtubeUrl || '').trim()
-      if (!url) {
-        showToast('warning', 'Cảnh báo', 'Vui lòng nhập link video YouTube!')
-        return
-      }
-      const ytId = getYouTubeId(url)
+    const youtubeUrl = (editLessonForm.value.youtubeUrl || '').trim()
+    const description = (editLessonForm.value.description || '').trim()
+
+    if (!youtubeUrl && existingFiles.value.length === 0 && editSelectedFiles.value.length === 0) {
+      showToast('warning', 'Cảnh báo', 'Vui lòng nhập link video YouTube hoặc tải lên ít nhất một tệp tin!')
+      return
+    }
+
+    let ytId = ''
+    if (youtubeUrl) {
+      ytId = getYouTubeId(youtubeUrl)
       const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-      const isValid = url.match(regExp) && ytId && ytId.length === 11
+      const isValid = youtubeUrl.match(regExp) && ytId && ytId.length === 11
       if (!isValid) {
         showToast('warning', 'Cảnh báo', 'Link video YouTube không hợp lệ! Vui lòng nhập đúng định dạng link xem video (Ví dụ: https://www.youtube.com/watch?v=...)')
         return
       }
-      contentPayload = JSON.stringify({
-        type: 'video',
-        youtubeId: ytId,
-        description: editLessonForm.value.description
-      })
-    } else if (editLessonForm.value.type === 'doc') {
-      contentPayload = JSON.stringify({
-        type: 'doc',
-        docContent: editLessonForm.value.docContent,
-        description: editLessonForm.value.description
-      })
-    } else if (editLessonForm.value.type === 'file') {
-      let filesPayload = [...existingFiles.value]
-      
-      if (editSelectedFiles.value.length > 0) {
-        const formData = new FormData()
-        editSelectedFiles.value.forEach(file => {
-          formData.append('files', file)
-        })
-        const uploadRes = await apiPost<{ success: boolean; files: any[] }>('/lessons/upload', formData)
-        
-        if (uploadRes.success) {
-          filesPayload = [...filesPayload, ...uploadRes.files]
-        } else {
-          throw new Error('Tải lên tệp tin thất bại.')
-        }
-      }
-      
-      if (filesPayload.length === 0) {
-        showToast('warning', 'Cảnh báo', 'Vui lòng tải lên ít nhất một tệp tin!')
-        return
-      }
-      
-      contentPayload = JSON.stringify({
-        type: 'file',
-        files: filesPayload,
-        description: editLessonForm.value.description
-      })
     }
+
+    let filesPayload = [...existingFiles.value]
+    if (editSelectedFiles.value.length > 0) {
+      const formData = new FormData()
+      editSelectedFiles.value.forEach(file => {
+        formData.append('files', file)
+      })
+      const uploadRes = await apiPost<{ success: boolean; files: any[] }>('/lessons/upload', formData)
+      if (uploadRes.success) {
+        filesPayload = [...filesPayload, ...uploadRes.files]
+      } else {
+        throw new Error('Tải lên tệp tin thất bại.')
+      }
+    }
+
+    const contentPayload = JSON.stringify({
+      type: 'mixed',
+      youtubeId: ytId,
+      files: filesPayload,
+      description: description
+    })
 
     await apiPut(`/lessons/${editingLessonId.value}`, {
       title: editLessonForm.value.title,
@@ -788,15 +766,28 @@ async function saveEditExam() {
                       <span class="lesson-index mr-2">BÀI {{ idx + 1 }}</span>
                       <span class="lesson-title-text">{{ l.title }}</span>
                       
-                      <span v-if="parseLessonContent(l.content).type === 'video'" class="badge-video ml-2">
-                        <i class="pi pi-video mr-1"></i>Video
-                      </span>
-                      <span v-else-if="parseLessonContent(l.content).type === 'doc'" class="badge-doc ml-2">
-                        <i class="pi pi-file mr-1"></i>Tài liệu (HTML)
-                      </span>
-                      <span v-else-if="parseLessonContent(l.content).type === 'file'" class="ml-2" :class="parseLessonContent(l.content).fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
-                        <i :class="parseLessonContent(l.content).fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>{{ parseLessonContent(l.content).fileExt === 'docx' ? 'Word' : 'PDF' }}
-                      </span>
+                      <template v-if="parseLessonContent(l.content).youtubeId && parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0">
+                        <span class="badge-mixed ml-2">
+                          <i class="pi pi-clone mr-1"></i>Video + Tài liệu
+                        </span>
+                      </template>
+                      <template v-else-if="parseLessonContent(l.content).youtubeId">
+                        <span class="badge-video ml-2">
+                          <i class="pi pi-video mr-1"></i>Video
+                        </span>
+                      </template>
+                      <template v-else-if="parseLessonContent(l.content).type === 'doc'">
+                        <span class="badge-doc ml-2">
+                          <i class="pi pi-file mr-1"></i>Tài liệu (HTML)
+                        </span>
+                      </template>
+                      <template v-else-if="parseLessonContent(l.content).files && parseLessonContent(l.content).files.length > 0">
+                        <span class="ml-2" :class="parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'badge-word' : 'badge-pdf'">
+                          <i :class="parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'pi pi-file-word mr-1' : 'pi pi-file-pdf mr-1'"></i>
+                          {{ parseLessonContent(l.content).files[0].fileExt === 'docx' ? 'Word' : 'PDF' }}
+                          <span v-if="parseLessonContent(l.content).files.length > 1"> (+{{ parseLessonContent(l.content).files.length - 1 }})</span>
+                        </span>
+                      </template>
                     </div>
                     <div class="lesson-actions">
                       <button @click="viewLessonDetail(l)" class="btn-view-inline mr-2" title="Xem chi tiết"><i class="pi pi-eye"></i></button>
@@ -866,25 +857,13 @@ async function saveEditExam() {
         <form @submit.prevent="createLesson" class="frm-col">
           <input v-model="lessonForm.title" class="inp" placeholder="Tên bài giảng mới (Ví dụ: Bài 1 - Nhập môn)..." required />
           
-          <div class="type-selector mb-2">
-            <label class="selector-label">Loại bài học:</label>
-            <div class="radio-options">
-              <label class="radio-option">
-                <input type="radio" v-model="lessonForm.type" value="video" />
-                <span><i class="pi pi-video"></i> Video YouTube</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" v-model="lessonForm.type" value="file" />
-                <span><i class="pi pi-upload"></i> Tài liệu (PDF, Word)</span>
-              </label>
-            </div>
-          </div>
-
-          <div v-if="lessonForm.type === 'video'">
+          <div class="frm-col">
+            <label class="selector-label">Video bài giảng (YouTube):</label>
             <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
           </div>
 
-          <div v-else-if="lessonForm.type === 'file'" class="frm-col">
+          <div class="frm-col">
+            <label class="selector-label">Tài liệu đính kèm (PDF, Word):</label>
             <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
               <input type="file" @change="handleFileChange" accept=".pdf,.docx" multiple style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
               <div class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
@@ -1041,7 +1020,7 @@ async function saveEditExam() {
       </div>
       <div class="custom-modal-body modal-scrollable">
         <!-- YouTube video iframe container -->
-        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && parseLessonContent(selectedLessonDetail.content).youtubeId" class="video-wrapper mb-3">
+        <div v-if="parseLessonContent(selectedLessonDetail.content).youtubeId" class="video-wrapper mb-3">
           <iframe 
             :src="'https://www.youtube.com/embed/' + parseLessonContent(selectedLessonDetail.content).youtubeId" 
             frameborder="0" 
@@ -1072,15 +1051,11 @@ async function saveEditExam() {
             </div>
             <h2 class="pdf-title">{{ selectedLessonDetail.title }}</h2>
             <div class="pdf-body-content" v-html="parseLessonContent(selectedLessonDetail.content).docContent"></div>
-            <div v-if="parseLessonContent(selectedLessonDetail.content).description" class="pdf-desc-content">
-              <strong style="color: #374151; font-size: 0.9rem;">Ghi chú từ giảng viên:</strong>
-              <p style="margin-top: 0.25rem; font-style: italic; color: #4b5563; white-space: pre-wrap;">{{ parseLessonContent(selectedLessonDetail.content).description }}</p>
-            </div>
           </div>
         </div>
 
         <!-- Generic file content area (PDF & DOCX) -->
-        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'file'" class="student-pdf-wrapper mb-3" style="width: 100%; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div v-if="parseLessonContent(selectedLessonDetail.content).files && parseLessonContent(selectedLessonDetail.content).files.length > 0" class="student-pdf-wrapper mb-3" style="width: 100%; display: flex; flex-direction: column; gap: 1.5rem;">
           <div v-for="(file, idx) in parseLessonContent(selectedLessonDetail.content).files" :key="idx" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; background: #fff;">
             <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
               <span>Tài liệu {{ idx + 1 }}: {{ file.fileName }}</span>
@@ -1109,19 +1084,10 @@ async function saveEditExam() {
           </div>
         </div>
 
-        <!-- Description for Video and File lessons -->
-        <div v-if="['video', 'file'].includes(parseLessonContent(selectedLessonDetail.content).type) && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3" style="margin-top: 1rem; background: #f1f5f9; padding: 1rem; border-radius: 10px; font-size: 0.85rem; color: #475569; line-height: 1.5; border-left: 4px solid #cbd5e1;">
+        <!-- Description formixed, Video and File lessons -->
+        <div v-if="parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3" style="margin-top: 1rem; background: #f1f5f9; padding: 1rem; border-radius: 10px; font-size: 0.85rem; color: #475569; line-height: 1.5; border-left: 4px solid #cbd5e1;">
           <strong style="color: #374151; font-size: 0.9rem; display: block; margin-bottom: 0.25rem;">Mô tả / Ghi chú:</strong>
           {{ parseLessonContent(selectedLessonDetail.content).description }}
-        </div>
-
-        <!-- Description for video lessons -->
-        <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && parseLessonContent(selectedLessonDetail.content).description" class="lesson-description mt-3">
-          <strong style="color: #374151; font-size: 0.9rem;">Mô tả:</strong>
-          <p style="margin-top: 0.25rem; white-space: pre-wrap;">{{ parseLessonContent(selectedLessonDetail.content).description }}</p>
-        </div>
-        <div v-else-if="parseLessonContent(selectedLessonDetail.content).type === 'video' && !parseLessonContent(selectedLessonDetail.content).youtubeId" class="empty-desc">
-          Không có nội dung bài giảng video bổ sung.
         </div>
       </div>
       <div class="custom-modal-footer">
@@ -1181,25 +1147,13 @@ async function saveEditExam() {
         <form @submit.prevent="saveEditLesson" class="frm-col">
           <input v-model="editLessonForm.title" class="inp" placeholder="Tên bài giảng..." required />
           
-          <div class="type-selector mb-2">
-            <label class="selector-label">Loại bài học:</label>
-            <div class="radio-options">
-              <label class="radio-option">
-                <input type="radio" v-model="editLessonForm.type" value="video" />
-                <span><i class="pi pi-video"></i> Video YouTube</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" v-model="editLessonForm.type" value="file" />
-                <span><i class="pi pi-upload"></i> Tài liệu (PDF, Word)</span>
-              </label>
-            </div>
-          </div>
-
-          <div v-if="editLessonForm.type === 'video'">
+          <div class="frm-col">
+            <label class="selector-label">Video bài giảng (YouTube):</label>
             <input v-model="editLessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube..." />
           </div>
 
-          <div v-else-if="editLessonForm.type === 'file'" class="frm-col">
+          <div class="frm-col">
+            <label class="selector-label">Tài liệu đính kèm (PDF, Word):</label>
             <div class="file-upload-zone" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; position: relative;">
               <input type="file" @change="handleEditFileChange" accept=".pdf,.docx" multiple style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
               <div class="file-upload-prompt" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: #64748b;">
@@ -1436,6 +1390,7 @@ async function saveEditExam() {
   text-transform: uppercase;
 }
 .badge-video { display: inline-flex; align-items: center; font-size: 0.7rem; background: #f3e8ff; color: #6b21a8; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600; }
+.badge-mixed { display: inline-flex; align-items: center; font-size: 0.7rem; background: #dbeafe; color: #1e40af; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600; }
 .lesson-card-body { padding: 1.25rem; border-top: 1px solid #e5e7eb; background: #fff; }
 .video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.07); border: 1px solid #e5e7eb; background: #000; }
 .video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
