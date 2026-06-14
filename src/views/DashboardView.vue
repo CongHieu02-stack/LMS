@@ -185,6 +185,7 @@ function parseLessonContent(contentStr: string) {
     return {
       type: type === 'pdf' ? 'file' : type,
       youtubeId: parsed.youtubeId || '',
+      videoNote: parsed.videoNote || '',
       docContent: parsed.docContent || '',
       fileUrl: fileUrl || (files[0]?.fileUrl || ''),
       pdfUrl: fileUrl || (files[0]?.fileUrl || ''),
@@ -197,6 +198,7 @@ function parseLessonContent(contentStr: string) {
     return {
       type: 'video',
       youtubeId: '',
+      videoNote: '',
       docContent: '',
       fileUrl: '',
       pdfUrl: '',
@@ -741,6 +743,9 @@ onMounted(() => {
                 <!-- Video player -->
                 <div v-if="parseLessonContent(l.content).youtubeId" class="student-video-wrapper mb-3">
                   <iframe :src="'https://www.youtube.com/embed/' + parseLessonContent(l.content).youtubeId" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;" allowfullscreen></iframe>
+                </div>
+                <div v-if="parseLessonContent(l.content).youtubeId && parseLessonContent(l.content).videoNote" class="video-note mb-3" style="background: #fdf2f8; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; color: #db2777; border-left: 4px solid #ec4899; font-weight: 500; text-align: left;">
+                  <i class="pi pi-info-circle mr-1"></i> Ghi chú video: {{ parseLessonContent(l.content).videoNote }}
                 </div>
 
                 <!-- Document viewer -->

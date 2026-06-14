@@ -15,7 +15,7 @@ const loading = ref(true)
 const msg = ref<string | null>(null)
 
 // Forms
-const lessonForm = ref({ title: '', youtubeUrl: '', description: '', docContent: '', type: 'mixed', sortOrder: 1 })
+const lessonForm = ref({ title: '', youtubeUrl: '', videoNote: '', description: '', docContent: '', type: 'mixed', sortOrder: 1 })
 const examForm = ref({ title: '', durationMinutes: 60, examType: 'midterm' })
 
 // Modal state variables
@@ -263,6 +263,7 @@ function parseLessonContent(contentStr: string) {
     return {
       type,
       youtubeId: parsed.youtubeId || '',
+      videoNote: parsed.videoNote || '',
       docContent: parsed.docContent || '',
       fileUrl: parsed.fileUrl || parsed.pdfUrl || (files[0]?.fileUrl || ''),
       fileExt: parsed.fileExt || (files[0]?.fileExt || 'pdf'),
@@ -274,6 +275,7 @@ function parseLessonContent(contentStr: string) {
     return {
       type: 'video',
       youtubeId: '',
+      videoNote: '',
       docContent: '',
       fileUrl: '',
       fileExt: '',
@@ -453,6 +455,7 @@ async function createLesson() {
   if (!selectedClass.value) return
   try {
     const youtubeUrl = (lessonForm.value.youtubeUrl || '').trim()
+    const videoNote = (lessonForm.value.videoNote || '').trim()
     const description = (lessonForm.value.description || '').trim()
     
     if (!youtubeUrl && selectedFiles.value.length === 0) {
@@ -488,6 +491,7 @@ async function createLesson() {
     const contentPayload = JSON.stringify({
       type: 'mixed',
       youtubeId: ytId,
+      videoNote: videoNote,
       files: uploadedFiles,
       description: description
     })
@@ -502,6 +506,7 @@ async function createLesson() {
     lessonForm.value = { 
       title: '', 
       youtubeUrl: '', 
+      videoNote: '',
       description: '', 
       docContent: '', 
       type: 'mixed', 
@@ -561,6 +566,7 @@ const editLessonForm = ref({
   title: '',
   type: 'video',
   youtubeUrl: '',
+  videoNote: '',
   docContent: '',
   description: '',
   sortOrder: 1
@@ -573,6 +579,7 @@ function startEditLesson(lesson: any) {
     title: lesson.title,
     type: content.type,
     youtubeUrl: content.youtubeId ? 'https://www.youtube.com/watch?v=' + content.youtubeId : '',
+    videoNote: content.videoNote || '',
     docContent: content.docContent || '',
     description: content.description || '',
     sortOrder: lesson.sort_order || lesson.sortOrder || 1
@@ -586,6 +593,7 @@ async function saveEditLesson() {
   if (!editingLessonId.value) return
   try {
     const youtubeUrl = (editLessonForm.value.youtubeUrl || '').trim()
+    const videoNote = (editLessonForm.value.videoNote || '').trim()
     const description = (editLessonForm.value.description || '').trim()
 
     if (!youtubeUrl && existingFiles.value.length === 0 && editSelectedFiles.value.length === 0) {
@@ -621,6 +629,7 @@ async function saveEditLesson() {
     const contentPayload = JSON.stringify({
       type: 'mixed',
       youtubeId: ytId,
+      videoNote: videoNote,
       files: filesPayload,
       description: description
     })
@@ -860,6 +869,7 @@ async function saveEditExam() {
           <div class="frm-col">
             <label class="selector-label">Video bài giảng (YouTube):</label>
             <input v-model="lessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube (Ví dụ: https://www.youtube.com/watch?v=...)..." />
+            <input v-if="lessonForm.youtubeUrl" v-model="lessonForm.videoNote" class="inp w-full mt-2" placeholder="Ghi chú riêng cho video (Ví dụ: Xem kỹ phần 2m15s)..." />
           </div>
 
           <div class="frm-col">
@@ -1028,6 +1038,9 @@ async function saveEditExam() {
             allowfullscreen>
           </iframe>
         </div>
+        <div v-if="parseLessonContent(selectedLessonDetail.content).youtubeId && parseLessonContent(selectedLessonDetail.content).videoNote" class="video-note mb-3" style="background: #fdf2f8; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; color: #db2777; border-left: 4px solid #ec4899; font-weight: 500; text-align: left;">
+          <i class="pi pi-info-circle mr-1"></i> Ghi chú video: {{ parseLessonContent(selectedLessonDetail.content).videoNote }}
+        </div>
 
         <!-- Document content area -->
         <div v-if="parseLessonContent(selectedLessonDetail.content).type === 'doc'" class="instructor-doc-wrapper">
@@ -1150,6 +1163,7 @@ async function saveEditExam() {
           <div class="frm-col">
             <label class="selector-label">Video bài giảng (YouTube):</label>
             <input v-model="editLessonForm.youtubeUrl" class="inp w-full" placeholder="Link Video Youtube..." />
+            <input v-if="editLessonForm.youtubeUrl" v-model="editLessonForm.videoNote" class="inp w-full mt-2" placeholder="Ghi chú riêng cho video..." />
           </div>
 
           <div class="frm-col">
