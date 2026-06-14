@@ -1084,7 +1084,7 @@ async function saveEditExam() {
           <div v-for="(file, idx) in parseLessonContent(selectedLessonDetail.content).files" :key="idx" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; background: #fff;">
             <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
               <span>Tài liệu {{ idx + 1 }}: {{ file.fileName }}</span>
-              <a :href="file.fileUrl" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; background: #7c3aed; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.75rem;">
+              <a :href="file.fileUrl" :download="file.fileName" target="_blank" class="btn-pdf-download text-center no-underline" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; background: #7c3aed; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.75rem;">
                 <i class="pi pi-download mr-1"></i> Tải về ({{ file.fileExt.toUpperCase() }})
               </a>
             </div>
@@ -1102,7 +1102,7 @@ async function saveEditExam() {
                   <span class="docx-hint" style="font-size: 0.75rem; color: #64748b;">Tài liệu Word (.docx) cần được tải xuống để xem nội dung</span>
                 </div>
               </div>
-              <a :href="file.fileUrl" target="_blank" class="btn-download-docx" style="background: #2563eb; color: #fff; padding: 0.4rem 0.80rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center;">
+              <a :href="file.fileUrl" :download="file.fileName" target="_blank" class="btn-download-docx" style="background: #2563eb; color: #fff; padding: 0.4rem 0.80rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center;">
                 <i class="pi pi-download mr-1"></i> Tải xuống (.docx)
               </a>
             </div>

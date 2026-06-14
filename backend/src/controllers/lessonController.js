@@ -66,9 +66,10 @@ export async function uploadFiles(req, res) {
 
     const uploadedFiles = req.files.map(file => {
       const fileExt = file.originalname.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
+      const utf8FileName = Buffer.from(file.originalname, 'latin1').toString('utf8')
       return {
         fileUrl: `/uploads/${file.filename}`,
-        fileName: file.originalname,
+        fileName: utf8FileName,
         fileExt
       }
     })
