@@ -10,6 +10,7 @@ export async function findByClass(classId) {
     .select('*')
     .eq('class_id', classId)
     .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
   if (error) throw error
   return data || []
 }
